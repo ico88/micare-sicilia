@@ -4,6 +4,7 @@ from pathlib import Path
 
 from flask import Flask
 from flask_sqlalchemy import SQLAlchemy
+from sqlalchemy import inspect, text as sql_text
 
 db = SQLAlchemy()
 
@@ -39,5 +40,23 @@ def create_app(test_config: dict | None = None) -> Flask:
 
     with app.app_context():
         db.create_all()
+        _ensure_prediction_schema()
 
     return app
+
+
+def _ensure_prediction_schema() -> None:
+    inspector = inspect(db.engine)
+    if "predictions" not in inspector.get_table_names():
+        return
+    columns = {column["name"] for column in inspector.get_columns("predictions")}
+    additions = {
+        "quantitative_model": "VARCHAR(120) NOT NULL DEFAULT ''",
+        "decision_model": "VARCHAR(120) NOT NULL DEFAULT ''",
+        "decision_class": "VARCHAR(1) NOT NULL DEFAULT ''",
+        "decision_confidence": "FLOAT",
+    }
+    for name, ddl in additions.items():
+        if name not in columns:
+            db.session.execute(sql_text(f"ALTER TABLE predictions ADD COLUMN {name} {ddl}"))
+    db.session.commit()

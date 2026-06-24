@@ -20,6 +20,28 @@ def test_normalize_wide_mic_dataframe():
     assert normalized["resistant_count"].sum() == 1
 
 
+def test_normalize_retemic_2024_headers():
+    raw = pd.DataFrame(
+        {
+            "DATA PRELIEVO": ["01/01/2024"],
+            "MICROORGANISMO": ["ESCCOL"],
+            "LABORATORIO": ["IT049"],
+            "REPARTO_DI_RICOVERO": [68],
+            "AMK_QUALITATIVO": ["S"],
+            "AMK_QUANTITATIVO": ["<=2"],
+        }
+    )
+
+    normalized = normalize_uploaded_dataframe(raw)
+
+    assert normalized.loc[0, "date"] == pd.Timestamp("2024-01-01")
+    assert normalized.loc[0, "pathogen"] == "ESCCOL"
+    assert normalized.loc[0, "laboratory"] == "IT049"
+    assert normalized.loc[0, "ward"] == "68"
+    assert normalized.loc[0, "antibiotic"] == "AMK"
+    assert normalized.loc[0, "result"] == "S"
+
+
 def test_aggregate_observations_monthly_percentages():
     observations = pd.DataFrame(
         {

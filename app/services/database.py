@@ -36,6 +36,40 @@ def observations_to_db(df: pd.DataFrame, uploaded_file: UploadedFile) -> None:
     db.session.bulk_save_objects(rows)
 
 
+def observations_from_db() -> pd.DataFrame:
+    rows = Observation.query.order_by(Observation.observed_at.asc()).all()
+    columns = [
+        "date",
+        "pathogen",
+        "antibiotic",
+        "laboratory",
+        "ward",
+        "result",
+        "samples",
+        "sensitive_count",
+        "intermediate_count",
+        "resistant_count",
+    ]
+    return pd.DataFrame(
+        [
+            {
+                "date": row.observed_at,
+                "pathogen": row.pathogen,
+                "antibiotic": row.antibiotic,
+                "laboratory": row.laboratory,
+                "ward": row.ward or "",
+                "result": row.result,
+                "samples": row.samples,
+                "sensitive_count": row.sensitive_count,
+                "intermediate_count": row.intermediate_count,
+                "resistant_count": row.resistant_count,
+            }
+            for row in rows
+        ],
+        columns=columns,
+    )
+
+
 def aggregated_to_db(df: pd.DataFrame) -> None:
     AggregatedObservation.query.delete()
     rows = []
@@ -126,6 +160,10 @@ def save_prediction(prediction: dict) -> Prediction:
         laboratory=prediction["laboratory"],
         ward=prediction.get("ward") or "",
         model_name=prediction["model_name"],
+        quantitative_model=prediction.get("quantitative_model") or prediction["model_name"],
+        decision_model=prediction.get("decision_model") or prediction["model_name"],
+        decision_class=prediction.get("decision_class") or "",
+        decision_confidence=prediction.get("decision_confidence"),
         sensitive_pct=prediction["sensitive_pct"],
         intermediate_pct=prediction["intermediate_pct"],
         resistant_pct=prediction["resistant_pct"],

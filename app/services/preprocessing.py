@@ -5,11 +5,11 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-DATE_ALIASES = ["data", "date", "DATA_PRELIEVO", "data_prelievo", "mese", "month"]
+DATE_ALIASES = ["data", "date", "DATA_PRELIEVO", "DATA PRELIEVO", "data_prelievo", "mese", "month"]
 PATHOGEN_ALIASES = ["patogeno", "microorganismo", "MICROORGANISMO", "specie", "batterio"]
 ANTIBIOTIC_ALIASES = ["antibiotico", "antibiotic", "farmaco"]
 LAB_ALIASES = ["laboratorio", "LABORATORIO", "lab", "codice_laboratorio"]
-WARD_ALIASES = ["reparto", "ward", "unit", "unita_operativa"]
+WARD_ALIASES = ["reparto", "REPARTO_DI_RICOVERO", "ward", "unit", "unita_operativa"]
 RESULT_ALIASES = ["risultato", "sir", "interpretazione", "esito"]
 SAMPLES_ALIASES = ["campioni", "numero_campioni", "n_campioni", "samples", "Totale_Campioni"]
 

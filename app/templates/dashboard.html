@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% block title %}Dashboard - MIC RES Sicilia{% endblock %}
 {% block content %}
-<div class="d-flex justify-content-between align-items-center mb-3">
+<div class="dashboard-header mb-3">
   <div>
     <h1 class="h4 mb-1">Dashboard epidemiologica</h1>
     <div class="text-muted">Sorveglianza aggregata S/I/R per patogeno, antibiotico e laboratorio.</div>
@@ -19,92 +19,277 @@
     <a class="btn btn-primary mt-3" href="{{ url_for('upload.upload') }}">Vai all'upload</a>
   </section>
 {% else %}
-  <div class="row g-4">
-    <div class="col-xl-3">
-      <section class="panel mb-4">
-        <h2 class="h6">Filtri</h2>
-        <form method="get" action="{{ url_for('dashboard.dashboard') }}">
-          <label class="form-label">Patogeno</label>
-          <select class="form-select mb-2" name="pathogen">
-            {% for value in filters.pathogens %}
-              <option value="{{ value }}" {% if value == selected.pathogen %}selected{% endif %}>{{ value }}</option>
-            {% endfor %}
-          </select>
-          <label class="form-label">Antibiotico</label>
-          <select class="form-select mb-2" name="antibiotic">
-            {% for value in filters.antibiotics %}
-              <option value="{{ value }}" {% if value == selected.antibiotic %}selected{% endif %}>{{ value }}</option>
-            {% endfor %}
-          </select>
-          <label class="form-label">Laboratorio</label>
-          <select class="form-select mb-2" name="laboratory">
-            {% for value in filters.laboratories %}
-              <option value="{{ value }}" {% if value == selected.laboratory %}selected{% endif %}>{{ value }}</option>
-            {% endfor %}
-          </select>
-          <label class="form-label">Reparto</label>
-          <select class="form-select mb-3" name="ward">
-            <option value="">Tutti</option>
-            {% for value in filters.wards %}
-              <option value="{{ value }}" {% if value == selected.ward %}selected{% endif %}>{{ value }}</option>
-            {% endfor %}
-          </select>
-          <button class="btn btn-outline-primary w-100" type="submit">Aggiorna</button>
-        </form>
-      </section>
+  <section class="bi-filterbar mb-3">
+    <form method="get" action="{{ url_for('dashboard.dashboard') }}" class="bi-filter-grid" id="dashboardFilterForm">
+      <input type="hidden" name="tab" id="activeDashboardTab" value="{{ selected_tab }}">
+      <div>
+        <label class="form-label">Patogeno</label>
+        <select class="form-select form-select-sm" name="pathogen">
+          {% for value in filters.pathogens %}
+            <option value="{{ value }}" {% if value == selected.pathogen %}selected{% endif %}>{{ value }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div>
+        <label class="form-label">Antibiotico</label>
+        <select class="form-select form-select-sm" name="antibiotic">
+          {% for value in filters.antibiotics %}
+            <option value="{{ value }}" {% if value == selected.antibiotic %}selected{% endif %}>{{ value }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div>
+        <label class="form-label">Laboratorio</label>
+        <select class="form-select form-select-sm" name="laboratory">
+          <option value="" {% if not selected.laboratory %}selected{% endif %}>Tutti</option>
+          {% for value in filters.laboratories %}
+            <option value="{{ value }}" {% if value == selected.laboratory %}selected{% endif %}>{{ value }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div>
+        <label class="form-label">Reparto</label>
+        <select class="form-select form-select-sm" name="ward">
+          <option value="">Tutti</option>
+          {% for value in filters.wards %}
+            <option value="{{ value }}" {% if value == selected.ward %}selected{% endif %}>{{ value }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div>
+        <label class="form-label">Da mese</label>
+        <input class="form-control form-control-sm" name="month_from" type="month" min="{{ prediction_month_min }}" value="{{ selected.month_from }}">
+      </div>
+      <div>
+        <label class="form-label">A mese</label>
+        <input class="form-control form-control-sm" name="month_to" type="month" min="{{ prediction_month_min }}" value="{{ selected.month_to }}">
+      </div>
+      <div class="bi-filter-actions">
+        <button class="btn btn-primary btn-sm" type="submit">Applica</button>
+        <a class="btn btn-outline-secondary btn-sm" href="{{ url_for('dashboard.dashboard') }}">Reset</a>
+      </div>
+    </form>
+  </section>
 
-      <section class="panel">
-        <h2 class="h6">Previsione</h2>
-        <form method="post" action="{{ url_for('dashboard.predict') }}">
-          <input type="hidden" name="pathogen" value="{{ selected.pathogen }}">
-          <input type="hidden" name="antibiotic" value="{{ selected.antibiotic }}">
-          <input type="hidden" name="laboratory" value="{{ selected.laboratory }}">
-          <input type="hidden" name="ward" value="{{ selected.ward }}">
-          <label class="form-label">Mese previsione</label>
-          <input class="form-control mb-2" name="prediction_month" type="month" required>
-          <label class="form-label">Modello</label>
-          <select class="form-select mb-3" name="model_name">
-            <option value="hist_gradient_boosting">HistGradientBoosting</option>
-            <option value="random_forest">RandomForest</option>
-          </select>
-          <button class="btn btn-primary w-100" type="submit">Genera</button>
-        </form>
+  <div class="selection-strip mb-3">
+    <span>{{ selected.pathogen }}</span>
+    <span>{{ selected.antibiotic }}</span>
+    <span>{{ selected.laboratory or 'Tutti i laboratori' }}</span>
+    <span>{{ selected.ward or 'Tutti i reparti' }}</span>
+  </div>
+
+  <div class="kpi-grid mb-3">
+    <div class="kpi-tile"><span>Mesi</span><strong>{{ history_summary.months }}</strong></div>
+    <div class="kpi-tile"><span>Campioni totali</span><strong>{{ '{:,}'.format(history_summary.samples).replace(',', '.') }}</strong></div>
+    <div class="kpi-tile"><span>Ultimo mese</span><strong>{{ history_summary.latest_month or '-' }}</strong><small>{{ history_summary.latest_samples }} campioni</small></div>
+    <div class="kpi-tile"><span>Affidabilita</span><strong>{{ latest_prediction.reliability if latest_prediction else '-' }}</strong><small>{{ latest_prediction.model_name if latest_prediction else 'nessuna previsione' }}</small></div>
+  </div>
+
+  <ul class="nav nav-tabs bi-tabs" id="dashboardTabs" role="tablist">
+    <li class="nav-item" role="presentation"><button class="nav-link {% if selected_tab == 'history' %}active{% endif %}" id="history-tab" data-dashboard-tab="history" data-bs-toggle="tab" data-bs-target="#history-pane" type="button" role="tab">Storico</button></li>
+    <li class="nav-item" role="presentation"><button class="nav-link {% if selected_tab == 'prediction' %}active{% endif %}" id="prediction-tab" data-dashboard-tab="prediction" data-bs-toggle="tab" data-bs-target="#prediction-pane" type="button" role="tab">Previsioni</button></li>
+    <li class="nav-item" role="presentation"><button class="nav-link {% if selected_tab == 'metrics' %}active{% endif %}" id="metrics-tab" data-dashboard-tab="metrics" data-bs-toggle="tab" data-bs-target="#metrics-pane" type="button" role="tab">Validazione</button></li>
+  </ul>
+
+  <div class="tab-content bi-tabcontent">
+    <div class="tab-pane fade {% if selected_tab == 'history' %}show active{% endif %}" id="history-pane" role="tabpanel" aria-labelledby="history-tab" tabindex="0">
+      <section class="panel mb-4">
+        <div class="panel-titlebar mb-3">
+          <h2 class="h6 mb-0">Serie storica S/I/R</h2>
+          <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('dashboard.export_aggregated_csv', **selected) }}">Esporta CSV</a>
+        </div>
+        <div class="chart-frame chart-frame-lg"><canvas id="historyChart"></canvas></div>
       </section>
     </div>
 
-    <div class="col-xl-9">
-      <section class="panel mb-4">
-        <h2 class="h6">Serie storica S/I/R</h2>
-        <canvas id="historyChart" height="110"></canvas>
-      </section>
+    <div class="tab-pane fade {% if selected_tab == 'prediction' %}show active{% endif %}" id="prediction-pane" role="tabpanel" aria-labelledby="prediction-tab" tabindex="0">
+      <div class="row g-4">
+        <div class="col-xl-4">
+          <section class="panel mb-4">
+            <h2 class="h6">Genera previsione</h2>
+            <form method="post" action="{{ url_for('dashboard.predict') }}">
+              <input type="hidden" name="pathogen" value="{{ selected.pathogen }}">
+              <input type="hidden" name="antibiotic" value="{{ selected.antibiotic }}">
+              <input type="hidden" name="laboratory" value="{{ selected.laboratory }}">
+              <input type="hidden" name="ward" value="{{ selected.ward }}">
+              <label class="form-label">Mese previsione</label>
+              <input class="form-control mb-2" name="prediction_month" type="month" min="{{ prediction_month_min }}" value="{{ prediction_month_default }}" required>
+              <label class="form-label">Modello</label>
+              <select class="form-select mb-3" name="model_name">
+                <option value="all_models">Tutti i modelli</option>
+                <option value="rf_quant_hgb_class">RF quantitativo + HGB classe</option>
+                <option value="ensemble_rf_hgb">Ensemble 60% RF + 40% HGB</option>
+                <option value="auto_hierarchical">Automatico gerarchico</option>
+                <option value="hist_gradient_boosting">HistGradientBoosting globale</option>
+                <option value="random_forest">RandomForest globale</option>
+                <option value="prophet">Prophet opzionale/legacy</option>
+              </select>
+              <button class="btn btn-primary w-100" type="submit">Genera</button>
+            </form>
+          </section>
 
-      {% if latest_prediction %}
-        <section class="panel mb-4">
-          <div class="d-flex justify-content-between">
-            <h2 class="h6">Ultima previsione</h2>
-            <span class="badge text-bg-{{ 'success' if latest_prediction.reliability == 'alta' else 'warning' if latest_prediction.reliability == 'media' else 'danger' }}">
-              affidabilita {{ latest_prediction.reliability }}
-            </span>
-          </div>
-          <div class="row text-center mt-3">
-            <div class="col-md-4"><div class="metric s">{{ latest_prediction.sensitive_pct|round(2) }}%<span>S</span></div></div>
-            <div class="col-md-4"><div class="metric i">{{ latest_prediction.intermediate_pct|round(2) }}%<span>I</span></div></div>
-            <div class="col-md-4"><div class="metric r">{{ latest_prediction.resistant_pct|round(2) }}%<span>R</span></div></div>
-          </div>
-          <p class="text-muted mt-3 mb-0">{{ latest_prediction.reliability_reason }}</p>
-        </section>
-      {% endif %}
+          <section class="panel mb-4">
+            <h2 class="h6">Previsione annuale</h2>
+            <form method="post" action="{{ url_for('dashboard.predict_year') }}">
+              <input type="hidden" name="pathogen" value="{{ selected.pathogen }}">
+              <input type="hidden" name="antibiotic" value="{{ selected.antibiotic }}">
+              <input type="hidden" name="laboratory" value="{{ selected.laboratory }}">
+              <input type="hidden" name="ward" value="{{ selected.ward }}">
+              <label class="form-label">Anno previsione</label>
+              <input class="form-control mb-2" name="prediction_year" type="number" min="2000" max="2100" value="{{ prediction_year }}" required>
+              <label class="form-label">Modello</label>
+              <select class="form-select mb-3" name="model_name">
+                <option value="all_models">Tutti i modelli</option>
+                <option value="rf_quant_hgb_class">RF quantitativo + HGB classe</option>
+                <option value="ensemble_rf_hgb">Ensemble 60% RF + 40% HGB</option>
+                <option value="auto_hierarchical">Automatico gerarchico</option>
+                <option value="hist_gradient_boosting">HistGradientBoosting globale</option>
+                <option value="random_forest">RandomForest globale</option>
+                <option value="prophet">Prophet opzionale/legacy</option>
+              </select>
+              <button class="btn btn-outline-primary w-100" type="submit">Genera anno</button>
+            </form>
+          </section>
 
+          <section class="panel">
+            <h2 class="h6">Previsioni recenti</h2>
+            <div class="table-responsive">
+              <table class="table table-sm align-middle mb-0">
+                <thead><tr><th>Mese</th><th>Modello</th><th>Classe</th><th>R</th></tr></thead>
+                <tbody>
+                  {% for item in recent_predictions %}
+                    <tr><td>{{ item.prediction_month.strftime('%Y-%m') }}</td><td>{{ item.model_name }}</td><td>{{ item.decision_class or '-' }}</td><td>{{ item.resistant_pct|round(1) }}%</td></tr>
+                  {% else %}
+                    <tr><td colspan="4" class="text-muted">Nessuna previsione per la selezione.</td></tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          </section>
+        </div>
+
+        <div class="col-xl-8">
+          {% if latest_prediction %}
+            <section class="panel mb-4">
+              <div class="panel-titlebar">
+                <h2 class="h6 mb-0">Ultima previsione</h2>
+                <span class="badge text-bg-{{ 'success' if latest_prediction.reliability == 'alta' else 'warning' if latest_prediction.reliability == 'media' else 'danger' }}">affidabilita {{ latest_prediction.reliability }}</span>
+              </div>
+              <div class="forecast-layout mt-3">
+                <div>
+                  <div class="forecast-metrics">
+                    <div class="metric s">{{ latest_prediction.sensitive_pct|round(2) }}%<span>S</span></div>
+                    <div class="metric i">{{ latest_prediction.intermediate_pct|round(2) }}%<span>I</span></div>
+                    <div class="metric r">{{ latest_prediction.resistant_pct|round(2) }}%<span>R</span></div>
+                  </div>
+                  <div class="decision-tile mt-3">
+                    <span>Classe finale suggerita</span>
+                    <strong>{{ latest_prediction.decision_class or '-' }}</strong>
+                    <small>{{ latest_prediction.decision_model or latest_prediction.model_name }} · confidenza {{ latest_prediction.decision_confidence|round(1) if latest_prediction.decision_confidence is not none else '-' }}%</small>
+                  </div>
+                </div>
+                <div class="chart-frame"><canvas id="predictionChart"></canvas></div>
+              </div>
+              <p class="text-muted mt-3 mb-0">{{ latest_prediction.reliability_reason }}</p>
+            </section>
+
+            {% if annual_prediction.available %}
+              <section class="panel mb-4">
+                <div class="panel-titlebar mb-3">
+                  <h3 class="h6 mb-0">Sintesi annuale {{ annual_prediction.year }}</h3>
+                  <span class="text-muted small">{{ annual_prediction.models|length }} modelli · {{ annual_prediction.rows|length }} righe previsionali</span>
+                </div>
+                <div class="annual-summary-grid mb-3">
+                  <div class="summary-tile"><span>Media S</span><strong>{{ annual_prediction.sensitive_pct|round(2) }}%</strong></div>
+                  <div class="summary-tile"><span>Media I</span><strong>{{ annual_prediction.intermediate_pct|round(2) }}%</strong></div>
+                  <div class="summary-tile"><span>Media R</span><strong>{{ annual_prediction.resistant_pct|round(2) }}%</strong></div>
+                  <div class="summary-tile"><span>Classe anno</span><strong>{{ annual_prediction.decision_class }}</strong><small>R max {{ annual_prediction.worst_resistant_pct|round(2) }}% · {{ annual_prediction.worst_month }}</small></div>
+                </div>
+                <div class="table-responsive mb-3">
+                  <table class="table table-sm align-middle mb-0">
+                    <thead><tr><th>Modello</th><th>Mesi</th><th>Classe</th><th>Media S</th><th>Media I</th><th>Media R</th><th>R max</th></tr></thead>
+                    <tbody>
+                      {% for model in annual_prediction.models %}
+                        <tr>
+                          <td>{{ model.model_name }}</td><td>{{ model.months }}</td><td>{{ model.decision_class }}</td>
+                          <td>{{ model.sensitive_pct|round(2) }}%</td><td>{{ model.intermediate_pct|round(2) }}%</td><td>{{ model.resistant_pct|round(2) }}%</td>
+                          <td>{{ model.worst_resistant_pct|round(2) }}% · {{ model.worst_month }}</td>
+                        </tr>
+                      {% endfor %}
+                    </tbody>
+                  </table>
+                </div>
+                <div class="table-responsive">
+                  <table class="table table-sm align-middle mb-0">
+                    <thead><tr><th>Mese</th><th>Modello</th><th>Classe</th><th>S</th><th>I</th><th>R</th></tr></thead>
+                    <tbody>
+                      {% for row in annual_prediction.rows %}
+                        <tr>
+                          <td>{{ row.month }}</td><td>{{ row.model_name }}</td><td>{{ row.decision_class }}</td>
+                          <td>{{ row.sensitive_pct|round(2) }}%</td><td>{{ row.intermediate_pct|round(2) }}%</td><td>{{ row.resistant_pct|round(2) }}%</td>
+                        </tr>
+                      {% endfor %}
+                    </tbody>
+                  </table>
+                </div>
+                {% if annual_prediction.comparison %}
+                  <div class="mt-3">
+                    <div class="text-muted small mb-2">Confronto annuale con {{ annual_prediction.comparison.months }} mesi reali · {{ annual_prediction.comparison.samples }} campioni</div>
+                    <div class="table-responsive">
+                      <table class="table table-sm align-middle mb-0">
+                        <thead><tr><th>Classe</th><th>Previsto</th><th>Reale</th><th>Scostamento</th></tr></thead>
+                        <tbody>
+                          {% for row in annual_prediction.comparison.rows %}
+                            <tr><td>{{ row.label }}</td><td>{{ row.predicted|round(2) }}%</td><td>{{ row.observed|round(2) }}%</td><td>{{ '%+.2f'|format(row.delta) }} pp</td></tr>
+                          {% endfor %}
+                        </tbody>
+                        <tfoot><tr><th colspan="3">Scostamento medio assoluto</th><th>{{ annual_prediction.comparison.mean_abs_delta|round(2) }} pp</th></tr></tfoot>
+                      </table>
+                    </div>
+                  </div>
+                {% endif %}
+              </section>
+            {% endif %}
+
+            {% if latest_prediction_comparison %}
+              <section class="panel mb-4">
+                <div class="panel-titlebar mb-2">
+                  <h3 class="h6 mb-0">Confronto con dato reale</h3>
+                  <span class="text-muted small">{{ latest_prediction_comparison.month }} · {{ latest_prediction_comparison.samples }} campioni</span>
+                </div>
+                <div class="table-responsive">
+                  <table class="table table-sm align-middle mb-0">
+                    <thead><tr><th>Classe</th><th>Previsto</th><th>Reale</th><th>Scostamento</th></tr></thead>
+                    <tbody>
+                      {% for row in latest_prediction_comparison.rows %}
+                        <tr><td>{{ row.label }}</td><td>{{ row.predicted|round(2) }}%</td><td>{{ row.observed|round(2) }}%</td><td>{{ '%+.2f'|format(row.delta) }} pp</td></tr>
+                      {% endfor %}
+                    </tbody>
+                    <tfoot><tr><th colspan="3">Scostamento medio assoluto</th><th>{{ latest_prediction_comparison.mean_abs_delta|round(2) }} pp</th></tr></tfoot>
+                  </table>
+                </div>
+              </section>
+            {% endif %}
+          {% else %}
+            <section class="panel"><p class="mb-0 text-muted">Genera una previsione per visualizzare risultato, grafico e confronto.</p></section>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+    <div class="tab-pane fade {% if selected_tab == 'metrics' %}show active{% endif %}" id="metrics-pane" role="tabpanel" aria-labelledby="metrics-tab" tabindex="0">
       <section class="panel">
-        <h2 class="h6">Metriche validazione</h2>
+        <div class="panel-titlebar mb-3">
+          <h2 class="h6 mb-0">Metriche validazione</h2>
+          <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('dashboard.export_predictions_csv') }}">Esporta previsioni</a>
+        </div>
         <div class="table-responsive">
           <table class="table table-sm align-middle">
             <thead><tr><th>Modello</th><th>Target</th><th>MAE</th><th>RMSE</th><th>MAPE</th><th>Accuracy</th><th>F1 macro</th></tr></thead>
             <tbody>
               {% for metric in metrics %}
                 <tr>
-                  <td>{{ metric.model_name }}</td>
-                  <td>{{ metric.target }}</td>
+                  <td>{{ metric.model_name }}</td><td>{{ metric.target }}</td>
                   <td>{{ metric.mae|round(3) if metric.mae is not none else '' }}</td>
                   <td>{{ metric.rmse|round(3) if metric.rmse is not none else '' }}</td>
                   <td>{{ metric.mape|round(3) if metric.mape is not none else '' }}</td>
@@ -125,7 +310,20 @@
 
 {% block scripts %}
 <script>
+const tabButtons = document.querySelectorAll('#dashboardTabs [data-dashboard-tab]');
+const activeTabInput = document.getElementById('activeDashboardTab');
+tabButtons.forEach((button) => {
+  button.addEventListener('shown.bs.tab', (event) => {
+    const tab = event.target.dataset.dashboardTab;
+    if (activeTabInput) activeTabInput.value = tab;
+    const url = new URL(window.location.href);
+    url.searchParams.set('tab', tab);
+    window.history.replaceState({}, '', url);
+    window.dispatchEvent(new Event('resize'));
+  });
+});
 const historyPayload = {{ history_chart|tojson }};
+const predictionPayload = {{ prediction_chart|tojson }};
 const ctx = document.getElementById('historyChart');
 if (ctx) {
   new Chart(ctx, {
@@ -140,8 +338,29 @@ if (ctx) {
     },
     options: {
       responsive: true,
+      maintainAspectRatio: false,
       scales: { y: { min: 0, max: 100, title: {display: true, text: '%'} } },
       plugins: { legend: { position: 'bottom' } }
+    }
+  });
+}
+const predictionCtx = document.getElementById('predictionChart');
+if (predictionCtx && predictionPayload.labels.length) {
+  new Chart(predictionCtx, {
+    type: 'bar',
+    data: {
+      labels: predictionPayload.labels,
+      datasets: [{
+        label: 'Previsione %',
+        data: predictionPayload.values,
+        backgroundColor: ['#198754', '#d99b00', '#dc3545']
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      scales: { y: { min: 0, max: 100, title: {display: true, text: '%'} } },
+      plugins: { legend: { display: false } }
     }
   });
 }

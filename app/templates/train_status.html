@@ -1,0 +1,213 @@
+{% extends "base.html" %}
+{% block title %}Training modelli - MIC RES Sicilia{% endblock %}
+{% block content %}
+<section class="panel training-status" data-job-id="{{ job.id }}">
+  <div class="d-flex justify-content-between align-items-start mb-3">
+    <div>
+      <h1 class="h4 mb-1">Training modelli</h1>
+      <div class="text-muted" id="training-stage">{{ job.stage }}</div>
+    </div>
+    <span class="badge text-bg-secondary" id="training-status">{{ job.status }}</span>
+  </div>
+
+  <div class="progress training-progress mb-3" role="progressbar" aria-label="Avanzamento training" aria-valuemin="0" aria-valuemax="100">
+    <div class="progress-bar" id="training-progress-bar" style="width: {{ job.progress }}%">{{ job.progress }}%</div>
+  </div>
+
+  <p class="mb-3" id="training-message">{{ job.message }}</p>
+  <div class="training-time-grid mb-3">
+    <div class="summary-tile"><span>Tempo trascorso</span><strong id="training-elapsed">{{ job.elapsed_seconds or 0 }} s</strong></div>
+    <div class="summary-tile"><span>Tempo stimato restante</span><strong id="training-eta">{{ job.eta_text or 'Calcolo stima...' }}</strong></div>
+    <div class="summary-tile"><span id="training-work-label">{{ job.work_label or 'Unita lavoro' }}</span><strong id="training-work">{{ job.work_completed or 0 }}/{{ job.work_total or 0 }}</strong></div>
+  </div>
+  <div class="alert alert-{{ 'success' if job.status == 'success' else 'danger' if job.status == 'error' else 'warning' if job.status in ['paused', 'stopping'] else 'secondary' if job.status == 'stopped' else 'info' }} py-2" id="training-waiting">
+    {% if job.status == 'success' %}
+      Training completato. Ora puoi visualizzare dashboard, dati e previsioni aggiornate.
+    {% elif job.status == 'error' %}
+      Training non completato. Correggi l'errore prima di usare i risultati aggiornati.
+    {% elif job.status == 'paused' %}
+      Training in pausa. Puoi riprenderlo oppure fermarlo definitivamente.
+    {% elif job.status == 'stopping' %}
+      Arresto richiesto: attendo il prossimo checkpoint sicuro.
+    {% elif job.status == 'stopped' %}
+      Training interrotto definitivamente. Avvia un nuovo addestramento per generare risultati aggiornati.
+    {% else %}
+      Attendi il completamento del training prima di visualizzare dashboard e previsioni aggiornate.
+    {% endif %}
+  </div>
+  <pre class="alert alert-danger d-none" id="training-error"></pre>
+
+  <div class="table-responsive d-none" id="training-summary-wrap">
+    <table class="table table-sm align-middle mb-3">
+      <tbody id="training-summary"></tbody>
+    </table>
+  </div>
+
+  <div class="d-flex gap-2">
+    <a class="btn btn-primary {% if job.status != 'success' %}d-none{% endif %}" id="view-dashboard" href="{{ url_for('dashboard.dashboard') }}">Visualizza dashboard</a>
+    <button class="btn btn-outline-warning {% if job.status != 'running' %}d-none{% endif %}" type="button" id="pause-training">Pausa</button>
+    <button class="btn btn-outline-success {% if job.status != 'paused' %}d-none{% endif %}" type="button" id="resume-training">Riprendi</button>
+    <button class="btn btn-outline-danger {% if job.status not in ['queued', 'running', 'paused'] %}d-none{% endif %}" type="button" id="stop-training">Stop</button>
+    <button class="btn btn-outline-secondary" type="button" id="refresh-training">Aggiorna</button>
+  </div>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const trainingPanel = document.querySelector('.training-status');
+const jobId = trainingPanel?.dataset.jobId;
+const progressBar = document.getElementById('training-progress-bar');
+const statusBadge = document.getElementById('training-status');
+const stageText = document.getElementById('training-stage');
+const messageText = document.getElementById('training-message');
+const errorBox = document.getElementById('training-error');
+const refreshButton = document.getElementById('refresh-training');
+const pauseButton = document.getElementById('pause-training');
+const resumeButton = document.getElementById('resume-training');
+const stopButton = document.getElementById('stop-training');
+const viewDashboardButton = document.getElementById('view-dashboard');
+const waitingBox = document.getElementById('training-waiting');
+const elapsedText = document.getElementById('training-elapsed');
+const etaText = document.getElementById('training-eta');
+const workLabelText = document.getElementById('training-work-label');
+const workText = document.getElementById('training-work');
+const summaryWrap = document.getElementById('training-summary-wrap');
+const summaryBody = document.getElementById('training-summary');
+let pollTimer = null;
+const controlUrlTemplate = "{{ url_for('dashboard.train_control', action='__ACTION__') }}";
+
+function formatNumber(value) {
+  if (value === undefined || value === null || value === '') return '';
+  return Number(value).toLocaleString('it-IT');
+}
+
+function formatDuration(seconds) {
+  if (seconds === undefined || seconds === null) return 'Calcolo stima...';
+  const total = Math.max(0, Number(seconds));
+  if (total < 60) return `${Math.round(total)} s`;
+  const minutes = Math.floor(total / 60);
+  const remainingSeconds = Math.round(total % 60).toString().padStart(2, '0');
+  if (minutes < 60) return `${minutes} min ${remainingSeconds} s`;
+  const hours = Math.floor(minutes / 60);
+  const remainingMinutes = (minutes % 60).toString().padStart(2, '0');
+  return `${hours} h ${remainingMinutes} min`;
+}
+
+function renderSummary(summary) {
+  if (!summary || Object.keys(summary).length === 0) return;
+  const rows = [
+    ['Righe aggregate usate', formatNumber(summary.aggregated_rows)],
+    ['Righe train', formatNumber(summary.train_rows)],
+    ['Righe test', formatNumber(summary.test_rows)],
+    ['Periodo dati', `${summary.first_month} → ${summary.last_month}`],
+    ['Train fino a', summary.trained_until],
+    ['Test', `${summary.test_from} → ${summary.test_until}`],
+    ['Mesi', formatNumber(summary.unique_months)],
+    ['Patogeni', formatNumber(summary.unique_pathogens)],
+    ['Antibiotici', formatNumber(summary.unique_antibiotics)],
+    ['Laboratori', formatNumber(summary.unique_laboratories)],
+    ['Modelli gerarchici', formatNumber(summary.hierarchical_models)],
+    ['Durata', `${summary.duration_seconds} s`],
+  ];
+  summaryBody.innerHTML = rows
+    .filter(([, value]) => value !== undefined && value !== null && value !== '')
+    .map(([label, value]) => `<tr><th>${label}</th><td>${value}</td></tr>`)
+    .join('');
+  summaryWrap.classList.remove('d-none');
+}
+
+function badgeClass(status) {
+  if (status === 'success') return 'badge text-bg-success';
+  if (status === 'error') return 'badge text-bg-danger';
+  if (status === 'stopped') return 'badge text-bg-dark';
+  if (status === 'paused') return 'badge text-bg-warning';
+  if (status === 'stopping') return 'badge text-bg-warning';
+  if (status === 'running') return 'badge text-bg-primary';
+  return 'badge text-bg-secondary';
+}
+
+async function sendTrainingControl(action) {
+  if (!jobId) return;
+  const body = new URLSearchParams({job_id: jobId});
+  const response = await fetch(controlUrlTemplate.replace('__ACTION__', action), {
+    method: 'POST',
+    headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+    body,
+  });
+  if (response.ok) await refreshTrainingStatus();
+}
+
+function updateControlButtons(status) {
+  pauseButton?.classList.toggle('d-none', status !== 'running');
+  resumeButton?.classList.toggle('d-none', status !== 'paused');
+  stopButton?.classList.toggle('d-none', !['queued', 'running', 'paused', 'stopping'].includes(status));
+  if (stopButton) stopButton.disabled = status === 'stopping';
+}
+
+async function refreshTrainingStatus() {
+  if (!jobId) return;
+  const response = await fetch(`{{ url_for('dashboard.train_status_json') }}?job_id=${encodeURIComponent(jobId)}`);
+  if (!response.ok) return;
+  const job = await response.json();
+  progressBar.style.width = `${job.progress}%`;
+  progressBar.textContent = `${job.progress}%`;
+  statusBadge.className = badgeClass(job.status);
+  statusBadge.textContent = job.status;
+  updateControlButtons(job.status);
+  stageText.textContent = job.stage;
+  messageText.textContent = job.message;
+  elapsedText.textContent = formatDuration(job.elapsed_seconds || 0);
+  etaText.textContent = job.eta_text || formatDuration(job.eta_seconds);
+  workLabelText.textContent = job.work_label || 'Unita lavoro';
+  workText.textContent = job.work_total ? `${job.work_completed}/${job.work_total}` : '-';
+
+  renderSummary(job.summary);
+
+  if (job.status === 'success') {
+    waitingBox.className = 'alert alert-success py-2';
+    waitingBox.textContent = 'Training completato. Ora puoi visualizzare dashboard, dati e previsioni aggiornate.';
+    viewDashboardButton.classList.remove('d-none');
+  } else if (job.status === 'error') {
+    waitingBox.className = 'alert alert-danger py-2';
+    waitingBox.textContent = "Training non completato. Correggi l'errore prima di usare i risultati aggiornati.";
+    viewDashboardButton.classList.add('d-none');
+  } else if (job.status === 'stopped') {
+    waitingBox.className = 'alert alert-secondary py-2';
+    waitingBox.textContent = 'Training interrotto definitivamente. Avvia un nuovo addestramento per generare risultati aggiornati.';
+    viewDashboardButton.classList.add('d-none');
+  } else if (job.status === 'paused') {
+    waitingBox.className = 'alert alert-warning py-2';
+    waitingBox.textContent = 'Training in pausa. Puoi riprenderlo oppure fermarlo definitivamente.';
+    viewDashboardButton.classList.add('d-none');
+  } else if (job.status === 'stopping') {
+    waitingBox.className = 'alert alert-warning py-2';
+    waitingBox.textContent = 'Arresto richiesto: attendo il prossimo checkpoint sicuro.';
+    viewDashboardButton.classList.add('d-none');
+  } else {
+    waitingBox.className = 'alert alert-info py-2';
+    waitingBox.textContent = 'Attendi il completamento del training prima di visualizzare dashboard e previsioni aggiornate.';
+    viewDashboardButton.classList.add('d-none');
+  }
+
+  if (job.error) {
+    errorBox.textContent = job.error;
+    errorBox.classList.remove('d-none');
+  } else {
+    errorBox.classList.add('d-none');
+  }
+
+  if (job.finished && pollTimer) {
+    clearInterval(pollTimer);
+    pollTimer = null;
+  }
+}
+
+refreshButton?.addEventListener('click', refreshTrainingStatus);
+pauseButton?.addEventListener('click', () => sendTrainingControl('pause'));
+resumeButton?.addEventListener('click', () => sendTrainingControl('resume'));
+stopButton?.addEventListener('click', () => sendTrainingControl('stop'));
+refreshTrainingStatus();
+pollTimer = setInterval(refreshTrainingStatus, 2000);
+</script>
+{% endblock %}

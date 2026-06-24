@@ -1,0 +1,38 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Virtual environments and local env
+.venv/
+venv/
+.env
+.env.*
+
+# OS and IDE
+.DS_Store
+.idea/
+.vscode/
+
+# Local application state
+instance/
+*.sqlite
+*.sqlite3
+*.db
+
+# Uploaded/private datasets
+data/
+*.xlsx
+*.xls
+
+# Trained/generated model artifacts
+models/
+*.joblib
+
+# Generated exports/reports
+*.csv

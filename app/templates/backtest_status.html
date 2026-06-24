@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+{% block title %}Backtest rolling - MIC RES Sicilia{% endblock %}
+{% block content %}
+<section class="panel backtest-status" data-job-id="{{ job.id }}">
+  <div class="d-flex justify-content-between align-items-start mb-3">
+    <div>
+      <h1 class="h4 mb-1">Backtest rolling</h1>
+      <div class="text-muted" id="job-stage">{{ job.stage }}</div>
+    </div>
+    <span class="badge text-bg-secondary" id="job-status">{{ job.status }}</span>
+  </div>
+  <div class="progress training-progress mb-3" role="progressbar" aria-label="Avanzamento backtest" aria-valuemin="0" aria-valuemax="100">
+    <div class="progress-bar" id="job-progress-bar" style="width: {{ job.progress }}%">{{ job.progress }}%</div>
+  </div>
+  <p id="job-message">{{ job.message }}</p>
+  <pre class="alert alert-danger d-none" id="job-error"></pre>
+  <div class="table-responsive d-none" id="job-summary-wrap">
+    <table class="table table-sm align-middle"><tbody id="job-summary"></tbody></table>
+  </div>
+  <div class="d-flex gap-2">
+    <a class="btn btn-primary {% if job.status != 'success' %}d-none{% endif %}" id="view-report" href="{{ url_for('dashboard.validation_report') }}">Visualizza report</a>
+    <button class="btn btn-outline-secondary" type="button" id="refresh-job">Aggiorna</button>
+  </div>
+</section>
+{% endblock %}
+{% block scripts %}
+<script>
+const panel = document.querySelector('.backtest-status');
+const jobId = panel?.dataset.jobId;
+const progressBar = document.getElementById('job-progress-bar');
+const statusBadge = document.getElementById('job-status');
+const stageText = document.getElementById('job-stage');
+const messageText = document.getElementById('job-message');
+const errorBox = document.getElementById('job-error');
+const summaryWrap = document.getElementById('job-summary-wrap');
+const summaryBody = document.getElementById('job-summary');
+const reportButton = document.getElementById('view-report');
+let pollTimer = null;
+function badgeClass(status) {
+  if (status === 'success') return 'badge text-bg-success';
+  if (status === 'error') return 'badge text-bg-danger';
+  if (status === 'running') return 'badge text-bg-primary';
+  return 'badge text-bg-secondary';
+}
+function renderSummary(summary) {
+  if (!summary || !summary.models) return;
+  summaryBody.innerHTML = [
+    ['Mesi testati', summary.months_tested],
+    ['Periodo', `${summary.test_from} → ${summary.test_to}`],
+    ['Durata', `${summary.duration_seconds} s`],
+    ['Modelli confrontati', summary.models.length],
+  ].map(([label, value]) => `<tr><th>${label}</th><td>${value}</td></tr>`).join('');
+  summaryWrap.classList.remove('d-none');
+}
+async function refreshStatus() {
+  const response = await fetch(`{{ url_for('dashboard.backtest_status_json') }}?job_id=${encodeURIComponent(jobId)}`);
+  if (!response.ok) return;
+  const job = await response.json();
+  progressBar.style.width = `${job.progress}%`;
+  progressBar.textContent = `${job.progress}%`;
+  statusBadge.className = badgeClass(job.status);
+  statusBadge.textContent = job.status;
+  stageText.textContent = job.stage;
+  messageText.textContent = job.message;
+  renderSummary(job.summary);
+  if (job.error) { errorBox.textContent = job.error; errorBox.classList.remove('d-none'); }
+  else { errorBox.classList.add('d-none'); }
+  if (job.status === 'success') reportButton.classList.remove('d-none');
+  if (job.finished && pollTimer) { clearInterval(pollTimer); pollTimer = null; }
+}
+document.getElementById('refresh-job')?.addEventListener('click', refreshStatus);
+refreshStatus();
+pollTimer = setInterval(refreshStatus, 2000);
+</script>
+{% endblock %}

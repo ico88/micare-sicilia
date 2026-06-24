@@ -1,0 +1,167 @@
+{% extends "base.html" %}
+{% block title %}Validazione scientifica - MIC RES Sicilia{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <div>
+    <h1 class="h4 mb-1">Validazione scientifica</h1>
+    <div class="text-muted">Sintesi metodologica per valutare affidabilita, copertura e performance aggregate.</div>
+  </div>
+</div>
+
+<div class="alert alert-warning py-2">{{ disclaimer }}</div>
+
+{% if not has_data %}
+  <section class="panel">
+    <p class="mb-0">Carica e aggrega un dataset per generare il report di validazione.</p>
+    <a class="btn btn-primary mt-3" href="{{ url_for('upload.upload') }}">Vai all'upload</a>
+  </section>
+{% else %}
+  <section class="panel mb-4">
+    <h2 class="h6">Dataset</h2>
+    <div class="row g-3">
+      <div class="col-md-3"><div class="summary-tile"><span>Periodo</span><strong>{{ report.dataset.first_month }} → {{ report.dataset.last_month }}</strong><small>{{ report.dataset.months }} mesi</small></div></div>
+      <div class="col-md-3"><div class="summary-tile"><span>Campioni</span><strong>{{ '{:,}'.format(report.dataset.samples).replace(',', '.') }}</strong><small>{{ '{:,}'.format(report.dataset.aggregated_rows).replace(',', '.') }} righe aggregate</small></div></div>
+      <div class="col-md-3"><div class="summary-tile"><span>Patogeni / antibiotici</span><strong>{{ report.dataset.pathogens }} / {{ report.dataset.antibiotics }}</strong><small>{{ report.dataset.pathogen_antibiotic_pairs }} coppie</small></div></div>
+      <div class="col-md-3"><div class="summary-tile"><span>Laboratori</span><strong>{{ report.dataset.laboratories }}</strong><small>{{ report.dataset.lab_combinations }} combinazioni lab</small></div></div>
+    </div>
+  </section>
+
+  <section class="panel mb-4">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+      <h2 class="h6 mb-0">Copertura combinazioni</h2>
+      <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('dashboard.export_validation_table', table_name='coverage') }}">Esporta CSV</a>
+    </div>
+    <div class="table-responsive">
+      <table class="table table-sm align-middle">
+        <thead><tr><th>Livello</th><th>Combinazioni</th><th>Eleggibili</th><th>% eleggibili</th><th>Mediana mesi</th><th>Mediana campioni</th></tr></thead>
+        <tbody>
+          {% for row in report.coverage %}
+            <tr><td>{{ row.scope }}</td><td>{{ row.combinations }}</td><td>{{ row.eligible }}</td><td>{{ row.eligible_pct|round(1) }}%</td><td>{{ row.median_months|round(1) }}</td><td>{{ row.median_samples|round(1) }}</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <p class="text-muted mb-0">Soglie modelli gerarchici: almeno 24 mesi, 24 righe aggregate e 100 campioni.</p>
+  </section>
+
+  <section class="panel mb-4">
+    <h2 class="h6">Modelli gerarchici</h2>
+    <div class="summary-tile">
+      <span>Modelli dedicati addestrati</span>
+      <strong>{{ report.hierarchical.trained_models }}</strong>
+      <small>{% if report.hierarchical.available %}Disponibili dall'ultimo training{% else %}Non ancora disponibili: rilancia Addestra modelli{% endif %}</small>
+    </div>
+  </section>
+
+  <section class="panel mb-4">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+      <h2 class="h6 mb-0">Backtest rolling modelli</h2>
+      <form method="post" action="{{ url_for('dashboard.validation_backtest') }}" class="d-flex gap-2 align-items-center">
+        <select class="form-select form-select-sm" name="months">
+          <option value="6">Ultimi 6 mesi</option>
+          <option value="12">Ultimi 12 mesi</option>
+          <option value="3">Ultimi 3 mesi</option>
+        </select>
+        <button class="btn btn-sm btn-primary" type="submit">Esegui backtest</button>
+      </form>
+    </div>
+    {% if backtest.available %}
+      <p class="text-muted">Periodo: {{ backtest.test_from }} → {{ backtest.test_to }} · {{ backtest.months_tested }} mesi · durata {{ backtest.duration_seconds }} s</p>
+      <div class="table-responsive">
+        <table class="table table-sm align-middle">
+          <thead><tr><th>Modello</th><th>Righe</th><th>Accuracy</th><th>F1 macro</th><th>MAE S</th><th>MAE I</th><th>MAE R</th></tr></thead>
+          <tbody>
+            {% for row in backtest.models %}
+              <tr>
+                <td>{{ row.model_name }}</td><td>{{ row.rows }}</td><td>{{ row.accuracy|round(3) }}</td><td>{{ row.f1_macro|round(3) }}</td>
+                <td>{{ row.sensitive_pct_mae|round(3) }}</td><td>{{ row.intermediate_pct_mae|round(3) }}</td><td>{{ row.resistant_pct_mae|round(3) }}</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('dashboard.export_backtest_predictions') }}">Esporta predizioni backtest</a>
+    {% else %}
+      <p class="text-muted mb-0">Nessun backtest rolling disponibile. Eseguilo per confrontare baseline, gerarchico e modello ML senza leakage temporale.</p>
+    {% endif %}
+  </section>
+
+  <section class="panel mb-4">
+    <h2 class="h6">Backtest baseline temporale</h2>
+    <p class="text-muted">Periodo test: {{ report.baseline_backtest.test_from }} → {{ report.baseline_backtest.test_to }} · {{ report.baseline_backtest.test_rows }} righe</p>
+    <div class="table-responsive">
+      <table class="table table-sm align-middle">
+        <thead><tr><th>Target</th><th>MAE</th><th>RMSE</th><th>MAPE</th></tr></thead>
+        <tbody>
+          {% for row in report.baseline_backtest.targets %}
+            <tr><td>{{ row.target }}</td><td>{{ row.mae|round(3) }}</td><td>{{ row.rmse|round(3) }}</td><td>{{ row.mape|round(3) if row.mape is not none else '' }}</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <p class="mb-0">Accuracy classe prevalente: {{ report.baseline_backtest.classification.accuracy|round(3) }} · F1 macro: {{ report.baseline_backtest.classification.f1_macro|round(3) }}</p>
+  </section>
+
+  <section class="panel mb-4">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+      <h2 class="h6 mb-0">Metriche modelli addestrati</h2>
+      <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('dashboard.export_validation_table', table_name='metrics') }}">Esporta CSV</a>
+    </div>
+    <div class="table-responsive">
+      <table class="table table-sm align-middle">
+        <thead><tr><th>Modello</th><th>Target</th><th>MAE</th><th>RMSE</th><th>MAPE</th><th>Accuracy</th><th>F1 macro</th></tr></thead>
+        <tbody>
+          {% for row in report.metrics %}
+            <tr>
+              <td>{{ row.model_name }}</td><td>{{ row.target }}</td>
+              <td>{{ row.mae|round(3) if row.mae is not none else '' }}</td>
+              <td>{{ row.rmse|round(3) if row.rmse is not none else '' }}</td>
+              <td>{{ row.mape|round(3) if row.mape is not none else '' }}</td>
+              <td>{{ row.accuracy|round(3) if row.accuracy is not none else '' }}</td>
+              <td>{{ row.f1_macro|round(3) if row.f1_macro is not none else '' }}</td>
+            </tr>
+          {% else %}
+            <tr><td colspan="7" class="text-muted">Nessun training eseguito.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <div class="row g-4">
+    <div class="col-lg-6">
+      <section class="panel">
+        <div class="d-flex justify-content-between align-items-center mb-3"><h2 class="h6 mb-0">Patogeni principali</h2><a class="btn btn-sm btn-outline-secondary" href="{{ url_for('dashboard.export_validation_table', table_name='top_pathogens') }}">CSV</a></div>
+        <canvas id="pathogenChart" height="120"></canvas>
+      </section>
+    </div>
+    <div class="col-lg-6">
+      <section class="panel">
+        <div class="d-flex justify-content-between align-items-center mb-3"><h2 class="h6 mb-0">Antibiotici principali</h2><a class="btn btn-sm btn-outline-secondary" href="{{ url_for('dashboard.export_validation_table', table_name='top_antibiotics') }}">CSV</a></div>
+        <canvas id="antibioticChart" height="120"></canvas>
+      </section>
+    </div>
+  </div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+const pathogenRows = {{ report.top_pathogens[:10]|tojson }};
+const antibioticRows = {{ report.top_antibiotics[:10]|tojson }};
+function barChart(canvasId, rows, labelKey) {
+  const ctx = document.getElementById(canvasId);
+  if (!ctx) return;
+  new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: rows.map(row => row[labelKey]),
+      datasets: [{label: 'Campioni', data: rows.map(row => row.samples), backgroundColor: '#0d6efd'}]
+    },
+    options: {responsive: true, plugins: {legend: {display: false}}, scales: {y: {beginAtZero: true}}}
+  });
+}
+barChart('pathogenChart', pathogenRows, 'pathogen');
+barChart('antibioticChart', antibioticRows, 'antibiotic');
+</script>
+{% endblock %}
