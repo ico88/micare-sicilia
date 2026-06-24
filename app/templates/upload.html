@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block title %}Upload dati - MIC RES Sicilia{% endblock %}
+{% block content %}
+<div class="row g-4">
+  <div class="col-lg-5">
+    <section class="panel">
+      <h1 class="h4 mb-3">Upload dati</h1>
+      <form method="post" enctype="multipart/form-data">
+        <label class="form-label" for="dataset">Dataset CSV/XLSX</label>
+        <input class="form-control" id="dataset" name="dataset" type="file" accept=".csv,.xls,.xlsx" required>
+        <button class="btn btn-primary mt-3" type="submit">Importa e normalizza</button>
+      </form>
+    </section>
+  </div>
+  <div class="col-lg-7">
+    <section class="panel">
+      <h2 class="h5 mb-3">Ultimi upload</h2>
+      <div class="table-responsive">
+        <table class="table table-sm align-middle">
+          <thead>
+            <tr>
+              <th>File</th>
+              <th>Stato</th>
+              <th>Righe</th>
+              <th>Messaggio</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for file in files %}
+              <tr>
+                <td>{{ file.original_name }}</td>
+                <td><span class="badge text-bg-{{ 'success' if file.status == 'imported' else 'danger' if file.status == 'error' else 'secondary' }}">{{ file.status }}</span></td>
+                <td>{{ file.row_count }}</td>
+                <td>{{ file.message }}</td>
+              </tr>
+            {% else %}
+              <tr><td colspan="4" class="text-muted">Nessun upload registrato.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,149 @@
+{% extends "base.html" %}
+{% block title %}Dashboard - MIC RES Sicilia{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <div>
+    <h1 class="h4 mb-1">Dashboard epidemiologica</h1>
+    <div class="text-muted">Sorveglianza aggregata S/I/R per patogeno, antibiotico e laboratorio.</div>
+  </div>
+  <form method="post" action="{{ url_for('dashboard.train') }}">
+    <button class="btn btn-success" type="submit" {% if not has_data %}disabled{% endif %}>Addestra modelli</button>
+  </form>
+</div>
+
+<div class="alert alert-warning py-2">{{ disclaimer }}</div>
+
+{% if not has_data %}
+  <section class="panel">
+    <p class="mb-0">Carica un dataset per attivare dashboard, training e previsioni.</p>
+    <a class="btn btn-primary mt-3" href="{{ url_for('upload.upload') }}">Vai all'upload</a>
+  </section>
+{% else %}
+  <div class="row g-4">
+    <div class="col-xl-3">
+      <section class="panel mb-4">
+        <h2 class="h6">Filtri</h2>
+        <form method="get" action="{{ url_for('dashboard.dashboard') }}">
+          <label class="form-label">Patogeno</label>
+          <select class="form-select mb-2" name="pathogen">
+            {% for value in filters.pathogens %}
+              <option value="{{ value }}" {% if value == selected.pathogen %}selected{% endif %}>{{ value }}</option>
+            {% endfor %}
+          </select>
+          <label class="form-label">Antibiotico</label>
+          <select class="form-select mb-2" name="antibiotic">
+            {% for value in filters.antibiotics %}
+              <option value="{{ value }}" {% if value == selected.antibiotic %}selected{% endif %}>{{ value }}</option>
+            {% endfor %}
+          </select>
+          <label class="form-label">Laboratorio</label>
+          <select class="form-select mb-2" name="laboratory">
+            {% for value in filters.laboratories %}
+              <option value="{{ value }}" {% if value == selected.laboratory %}selected{% endif %}>{{ value }}</option>
+            {% endfor %}
+          </select>
+          <label class="form-label">Reparto</label>
+          <select class="form-select mb-3" name="ward">
+            <option value="">Tutti</option>
+            {% for value in filters.wards %}
+              <option value="{{ value }}" {% if value == selected.ward %}selected{% endif %}>{{ value }}</option>
+            {% endfor %}
+          </select>
+          <button class="btn btn-outline-primary w-100" type="submit">Aggiorna</button>
+        </form>
+      </section>
+
+      <section class="panel">
+        <h2 class="h6">Previsione</h2>
+        <form method="post" action="{{ url_for('dashboard.predict') }}">
+          <input type="hidden" name="pathogen" value="{{ selected.pathogen }}">
+          <input type="hidden" name="antibiotic" value="{{ selected.antibiotic }}">
+          <input type="hidden" name="laboratory" value="{{ selected.laboratory }}">
+          <input type="hidden" name="ward" value="{{ selected.ward }}">
+          <label class="form-label">Mese previsione</label>
+          <input class="form-control mb-2" name="prediction_month" type="month" required>
+          <label class="form-label">Modello</label>
+          <select class="form-select mb-3" name="model_name">
+            <option value="hist_gradient_boosting">HistGradientBoosting</option>
+            <option value="random_forest">RandomForest</option>
+          </select>
+          <button class="btn btn-primary w-100" type="submit">Genera</button>
+        </form>
+      </section>
+    </div>
+
+    <div class="col-xl-9">
+      <section class="panel mb-4">
+        <h2 class="h6">Serie storica S/I/R</h2>
+        <canvas id="historyChart" height="110"></canvas>
+      </section>
+
+      {% if latest_prediction %}
+        <section class="panel mb-4">
+          <div class="d-flex justify-content-between">
+            <h2 class="h6">Ultima previsione</h2>
+            <span class="badge text-bg-{{ 'success' if latest_prediction.reliability == 'alta' else 'warning' if latest_prediction.reliability == 'media' else 'danger' }}">
+              affidabilita {{ latest_prediction.reliability }}
+            </span>
+          </div>
+          <div class="row text-center mt-3">
+            <div class="col-md-4"><div class="metric s">{{ latest_prediction.sensitive_pct|round(2) }}%<span>S</span></div></div>
+            <div class="col-md-4"><div class="metric i">{{ latest_prediction.intermediate_pct|round(2) }}%<span>I</span></div></div>
+            <div class="col-md-4"><div class="metric r">{{ latest_prediction.resistant_pct|round(2) }}%<span>R</span></div></div>
+          </div>
+          <p class="text-muted mt-3 mb-0">{{ latest_prediction.reliability_reason }}</p>
+        </section>
+      {% endif %}
+
+      <section class="panel">
+        <h2 class="h6">Metriche validazione</h2>
+        <div class="table-responsive">
+          <table class="table table-sm align-middle">
+            <thead><tr><th>Modello</th><th>Target</th><th>MAE</th><th>RMSE</th><th>MAPE</th><th>Accuracy</th><th>F1 macro</th></tr></thead>
+            <tbody>
+              {% for metric in metrics %}
+                <tr>
+                  <td>{{ metric.model_name }}</td>
+                  <td>{{ metric.target }}</td>
+                  <td>{{ metric.mae|round(3) if metric.mae is not none else '' }}</td>
+                  <td>{{ metric.rmse|round(3) if metric.rmse is not none else '' }}</td>
+                  <td>{{ metric.mape|round(3) if metric.mape is not none else '' }}</td>
+                  <td>{{ metric.accuracy|round(3) if metric.accuracy is not none else '' }}</td>
+                  <td>{{ metric.f1_macro|round(3) if metric.f1_macro is not none else '' }}</td>
+                </tr>
+              {% else %}
+                <tr><td colspan="7" class="text-muted">Nessun training eseguito.</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </div>
+  </div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+const historyPayload = {{ history_chart|tojson }};
+const ctx = document.getElementById('historyChart');
+if (ctx) {
+  new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: historyPayload.labels,
+      datasets: [
+        {label: 'Sensibili', data: historyPayload.s, borderColor: '#198754', backgroundColor: '#198754', tension: 0.25},
+        {label: 'Intermedi', data: historyPayload.i, borderColor: '#d99b00', backgroundColor: '#d99b00', tension: 0.25},
+        {label: 'Resistenti', data: historyPayload.r, borderColor: '#dc3545', backgroundColor: '#dc3545', tension: 0.25},
+      ]
+    },
+    options: {
+      responsive: true,
+      scales: { y: { min: 0, max: 100, title: {display: true, text: '%'} } },
+      plugins: { legend: { position: 'bottom' } }
+    }
+  });
+}
+</script>
+{% endblock %}

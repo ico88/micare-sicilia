@@ -1,0 +1,34 @@
+body {
+  background: #f6f8fb;
+  color: #1f2937;
+}
+
+.panel {
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 1rem;
+}
+
+.preview-table {
+  max-height: 420px;
+}
+
+.metric {
+  border-radius: 8px;
+  color: #fff;
+  font-size: 2rem;
+  font-weight: 700;
+  padding: 1rem;
+}
+
+.metric span {
+  display: block;
+  font-size: 0.85rem;
+  font-weight: 600;
+  margin-top: 0.25rem;
+}
+
+.metric.s { background: #198754; }
+.metric.i { background: #d99b00; }
+.metric.r { background: #dc3545; }

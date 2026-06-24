@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% block title %}Preview dati - MIC RES Sicilia{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <div>
+    <h1 class="h4 mb-1">Data preview</h1>
+    <div class="text-muted">{{ uploaded.original_name }} · {{ uploaded.message }}</div>
+  </div>
+  <div class="d-flex gap-2">
+    <form method="post" action="{{ url_for('dashboard.train') }}">
+      <button class="btn btn-success" type="submit">Addestra modelli</button>
+    </form>
+    <a class="btn btn-outline-secondary" href="{{ url_for('dashboard.dashboard') }}">Dashboard</a>
+  </div>
+</div>
+
+<section class="panel mb-4">
+  <h2 class="h6">Colonne rilevate</h2>
+  <div class="d-flex flex-wrap gap-2">
+    {% for column in columns %}
+      <span class="badge text-bg-light border">{{ column }}</span>
+    {% endfor %}
+  </div>
+</section>
+
+<div class="row g-4">
+  <div class="col-xl-6">
+    <section class="panel">
+      <h2 class="h6">Osservazioni normalizzate</h2>
+      {% set rows = normalized_preview %}
+      {% include "_table_preview.html" %}
+    </section>
+  </div>
+  <div class="col-xl-6">
+    <section class="panel">
+      <h2 class="h6">Aggregazione mensile S/I/R</h2>
+      {% set rows = aggregated_preview %}
+      {% include "_table_preview.html" %}
+    </section>
+  </div>
+</div>
+{% endblock %}
