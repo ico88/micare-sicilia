@@ -16,11 +16,24 @@
 
 <section class="panel mb-4">
   <h2 class="h6">Colonne rilevate</h2>
-  <div class="d-flex flex-wrap gap-2">
+  <div class="d-flex flex-wrap gap-2 mb-2">
     {% for column in columns %}
       <span class="badge text-bg-light border">{{ column }}</span>
     {% endfor %}
   </div>
+  <div class="d-flex flex-wrap gap-2 mt-2">
+    {% if 'REPARTO_DI_RICOVERO' in columns %}
+      <span class="badge text-bg-success">% ICU (reparto 26) disponibile</span>
+    {% else %}
+      <span class="badge text-bg-secondary">REPARTO_DI_RICOVERO assente — regressore ICU non attivo</span>
+    {% endif %}
+    {% if 'PAZIENTE_RICOVERATO' in columns %}
+      <span class="badge text-bg-success">% ricoverati disponibile</span>
+    {% else %}
+      <span class="badge text-bg-secondary">PAZIENTE_RICOVERATO assente — regressore ricoverati non attivo</span>
+    {% endif %}
+  </div>
+  <p class="text-muted small mb-0 mt-2">Le righe mensili con meno di 10 campioni vengono escluse dall'aggregazione per garantire stime S/I/R affidabili.</p>
 </section>
 
 <div class="row g-4">

@@ -88,6 +88,8 @@ def aggregated_to_db(df: pd.DataFrame) -> None:
                 sensitive_pct=float(item.get("sensitive_pct") or 0),
                 intermediate_pct=float(item.get("intermediate_pct") or 0),
                 resistant_pct=float(item.get("resistant_pct") or 0),
+                pct_icu=float(item["pct_icu"]) if item.get("pct_icu") is not None and str(item.get("pct_icu")) != "nan" else None,
+                pct_inpatient=float(item["pct_inpatient"]) if item.get("pct_inpatient") is not None and str(item.get("pct_inpatient")) != "nan" else None,
             )
         )
     db.session.bulk_save_objects(rows)
@@ -110,6 +112,8 @@ def aggregated_from_db() -> pd.DataFrame:
                 "sensitive_pct": row.sensitive_pct,
                 "intermediate_pct": row.intermediate_pct,
                 "resistant_pct": row.resistant_pct,
+                "pct_icu": row.pct_icu,
+                "pct_inpatient": row.pct_inpatient,
             }
             for row in rows
         ]
@@ -144,6 +148,8 @@ def save_training_summary(summary: dict) -> None:
                 mae=metric.get("mae"),
                 rmse=metric.get("rmse"),
                 mape=metric.get("mape"),
+                mase=metric.get("mase"),
+                rmse_arima=metric.get("rmse_arima"),
                 accuracy=metric.get("accuracy"),
                 f1_macro=metric.get("f1_macro"),
                 metadata_json=json.dumps({}),

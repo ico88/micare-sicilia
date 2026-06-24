@@ -53,6 +53,8 @@ class AggregatedObservation(db.Model):
     sensitive_pct = db.Column(db.Float, default=0, nullable=False)
     intermediate_pct = db.Column(db.Float, default=0, nullable=False)
     resistant_pct = db.Column(db.Float, default=0, nullable=False)
+    pct_icu = db.Column(db.Float, nullable=True)
+    pct_inpatient = db.Column(db.Float, nullable=True)
 
 
 class TrainedModel(db.Model):
@@ -99,6 +101,8 @@ class ValidationMetric(db.Model):
     mae = db.Column(db.Float, nullable=True)
     rmse = db.Column(db.Float, nullable=True)
     mape = db.Column(db.Float, nullable=True)
+    mase = db.Column(db.Float, nullable=True)
+    rmse_arima = db.Column(db.Float, nullable=True)
     accuracy = db.Column(db.Float, nullable=True)
     f1_macro = db.Column(db.Float, nullable=True)
     metadata_json = db.Column(db.Text, default="{}", nullable=False)

@@ -40,23 +40,36 @@ def create_app(test_config: dict | None = None) -> Flask:
 
     with app.app_context():
         db.create_all()
-        _ensure_prediction_schema()
+        _ensure_schema_migrations()
 
     return app
 
 
-def _ensure_prediction_schema() -> None:
+def _ensure_schema_migrations() -> None:
     inspector = inspect(db.engine)
-    if "predictions" not in inspector.get_table_names():
-        return
-    columns = {column["name"] for column in inspector.get_columns("predictions")}
-    additions = {
+    tables = inspector.get_table_names()
+
+    _migrate_table(inspector, tables, "predictions", {
         "quantitative_model": "VARCHAR(120) NOT NULL DEFAULT ''",
         "decision_model": "VARCHAR(120) NOT NULL DEFAULT ''",
         "decision_class": "VARCHAR(1) NOT NULL DEFAULT ''",
         "decision_confidence": "FLOAT",
-    }
-    for name, ddl in additions.items():
-        if name not in columns:
-            db.session.execute(sql_text(f"ALTER TABLE predictions ADD COLUMN {name} {ddl}"))
+    })
+    _migrate_table(inspector, tables, "validation_metrics", {
+        "mase": "FLOAT",
+        "rmse_arima": "FLOAT",
+    })
+    _migrate_table(inspector, tables, "aggregated_observations", {
+        "pct_icu": "FLOAT",
+        "pct_inpatient": "FLOAT",
+    })
     db.session.commit()
+
+
+def _migrate_table(inspector, tables: list[str], table: str, additions: dict[str, str]) -> None:
+    if table not in tables:
+        return
+    existing = {col["name"] for col in inspector.get_columns(table)}
+    for name, ddl in additions.items():
+        if name not in existing:
+            db.session.execute(sql_text(f"ALTER TABLE {table} ADD COLUMN {name} {ddl}"))

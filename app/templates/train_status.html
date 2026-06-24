@@ -107,6 +107,7 @@ function renderSummary(summary) {
     ['Patogeni', formatNumber(summary.unique_pathogens)],
     ['Antibiotici', formatNumber(summary.unique_antibiotics)],
     ['Laboratori', formatNumber(summary.unique_laboratories)],
+    ['Righe filtrate (campioni < soglia)', formatNumber(summary.filtered_rows)],
     ['Modelli gerarchici', formatNumber(summary.hierarchical_models)],
     ['Durata', `${summary.duration_seconds} s`],
   ];
@@ -152,6 +153,7 @@ async function refreshTrainingStatus() {
   const job = await response.json();
   progressBar.style.width = `${job.progress}%`;
   progressBar.textContent = `${job.progress}%`;
+  progressBar.className = 'progress-bar' + (job.status === 'success' ? ' bg-success' : job.status === 'error' ? ' bg-danger' : job.status === 'stopped' ? ' bg-secondary' : job.status === 'paused' ? ' bg-warning' : '');
   statusBadge.className = badgeClass(job.status);
   statusBadge.textContent = job.status;
   updateControlButtons(job.status);

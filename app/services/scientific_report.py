@@ -24,6 +24,7 @@ def build_scientific_report(aggregated: pd.DataFrame, metrics_rows, model_folder
         "dataset": _dataset_summary(data),
         "coverage": _coverage_summary(data),
         "hierarchical": _hierarchical_summary(data, model_folder),
+        "covariate_coverage": _covariate_coverage(data),
         "baseline_backtest": _baseline_backtest_summary(test, baseline_pred),
         "metrics": _metrics_table(metrics_rows),
         "top_pathogens": _top_table(data, "pathogen"),
@@ -122,6 +123,24 @@ def _baseline_backtest_summary(test: pd.DataFrame, baseline_pred: pd.DataFrame) 
     }
 
 
+def _covariate_coverage(data: pd.DataFrame) -> dict | None:
+    if "pct_icu" not in data.columns or data["pct_icu"].isna().all():
+        return None
+    icu_valid = data["pct_icu"].notna()
+    inpatient_valid = data.get("pct_inpatient", pd.Series(dtype=float)).notna() if "pct_inpatient" in data.columns else pd.Series(False, index=data.index)
+    combos_with = int(
+        data[icu_valid | inpatient_valid]
+        .groupby(["pathogen", "antibiotic", "laboratory"])
+        .ngroups
+    )
+    return {
+        "pct_icu_mean": float(data.loc[icu_valid, "pct_icu"].mean() * 100) if icu_valid.any() else 0.0,
+        "pct_inpatient_mean": float(data.loc[data["pct_inpatient"].notna(), "pct_inpatient"].mean() * 100) if "pct_inpatient" in data.columns and data["pct_inpatient"].notna().any() else 0.0,
+        "pct_icu_coverage": int(round(icu_valid.mean() * 100)),
+        "combinations_with_covariates": combos_with,
+    }
+
+
 def _metrics_table(metrics_rows) -> list[dict]:
     return [
         {
@@ -130,6 +149,8 @@ def _metrics_table(metrics_rows) -> list[dict]:
             "mae": row.mae,
             "rmse": row.rmse,
             "mape": row.mape,
+            "mase": row.mase,
+            "rmse_arima": row.rmse_arima,
             "accuracy": row.accuracy,
             "f1_macro": row.f1_macro,
         }
@@ -159,6 +180,7 @@ def _empty_report() -> dict:
         "dataset": {},
         "coverage": [],
         "hierarchical": {"trained_models": 0, "available": False},
+        "covariate_coverage": None,
         "baseline_backtest": {},
         "metrics": [],
         "top_pathogens": [],

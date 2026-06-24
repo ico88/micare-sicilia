@@ -53,6 +53,22 @@
     </div>
   </section>
 
+  {% set cov_data = report.covariate_coverage %}
+  <section class="panel mb-4">
+    <h2 class="h6 mb-2">Copertura covariati</h2>
+    <p class="text-muted small mb-3">I covariati <strong>% campioni da UTI</strong> (reparto 26, Tabella A2 Min. Salute) e <strong>% pazienti ricoverati</strong> vengono usati come regressori in Prophet quando almeno 12 mesi hanno dati validi.</p>
+    {% if cov_data %}
+      <div class="row g-3 mb-2">
+        <div class="col-sm-3"><div class="summary-tile"><span>% ICU media</span><strong>{{ cov_data.pct_icu_mean|round(1) }}%</strong><small>Media regionale</small></div></div>
+        <div class="col-sm-3"><div class="summary-tile"><span>% Ricoverati media</span><strong>{{ cov_data.pct_inpatient_mean|round(1) }}%</strong><small>Media regionale</small></div></div>
+        <div class="col-sm-3"><div class="summary-tile"><span>Mesi con copertura ICU</span><strong>{{ cov_data.pct_icu_coverage }}%</strong><small>Delle righe aggregate</small></div></div>
+        <div class="col-sm-3"><div class="summary-tile"><span>Combinazioni con regressori</span><strong>{{ cov_data.combinations_with_covariates }}</strong><small>Modelli arricchiti</small></div></div>
+      </div>
+    {% else %}
+      <p class="text-muted mb-0">Covariati non disponibili. Carica dataset con colonne REPARTO_DI_RICOVERO e PAZIENTE_RICOVERATO per abilitare i regressori Prophet.</p>
+    {% endif %}
+  </section>
+
   <section class="panel mb-4">
     <div class="d-flex justify-content-between align-items-center mb-3">
       <h2 class="h6 mb-0">Backtest rolling modelli</h2>
@@ -109,7 +125,15 @@
     </div>
     <div class="table-responsive">
       <table class="table table-sm align-middle">
-        <thead><tr><th>Modello</th><th>Target</th><th>MAE</th><th>RMSE</th><th>MAPE</th><th>Accuracy</th><th>F1 macro</th></tr></thead>
+        <thead>
+          <tr>
+            <th>Modello</th><th>Target</th>
+            <th>MAE</th><th>RMSE</th><th>MAPE</th>
+            <th title="Mean Absolute Scaled Error: valori < 1 indicano che il modello supera la previsione naive">MASE ℹ</th>
+            <th title="RMSE baseline ARIMA(1,1,1) sulla stessa serie — confronto competitivo con Prophet">RMSE ARIMA ℹ</th>
+            <th>Accuracy</th><th>F1 macro</th>
+          </tr>
+        </thead>
         <tbody>
           {% for row in report.metrics %}
             <tr>
@@ -117,15 +141,37 @@
               <td>{{ row.mae|round(3) if row.mae is not none else '' }}</td>
               <td>{{ row.rmse|round(3) if row.rmse is not none else '' }}</td>
               <td>{{ row.mape|round(3) if row.mape is not none else '' }}</td>
+              <td>
+                {% if row.mase is not none %}
+                  <span class="badge text-bg-{{ 'success' if row.mase < 1 else 'warning' if row.mase < 1.5 else 'danger' }}">
+                    {{ row.mase|round(3) }}
+                  </span>
+                {% endif %}
+              </td>
+              <td>
+                {% if row.rmse_arima is not none and row.rmse is not none %}
+                  <span title="Prophet {{ row.rmse|round(3) }} vs ARIMA {{ row.rmse_arima|round(3) }}">
+                    {{ row.rmse_arima|round(3) }}
+                    {% if row.rmse < row.rmse_arima %}
+                      <span class="text-success small">↓ Prophet migliore</span>
+                    {% else %}
+                      <span class="text-danger small">↑ ARIMA migliore</span>
+                    {% endif %}
+                  </span>
+                {% elif row.rmse_arima is not none %}
+                  {{ row.rmse_arima|round(3) }}
+                {% endif %}
+              </td>
               <td>{{ row.accuracy|round(3) if row.accuracy is not none else '' }}</td>
               <td>{{ row.f1_macro|round(3) if row.f1_macro is not none else '' }}</td>
             </tr>
           {% else %}
-            <tr><td colspan="7" class="text-muted">Nessun training eseguito.</td></tr>
+            <tr><td colspan="9" class="text-muted">Nessun training eseguito.</td></tr>
           {% endfor %}
         </tbody>
       </table>
     </div>
+    <p class="text-muted small mb-0">MASE &lt; 1: il modello supera la previsione naive (ultima osservazione). RMSE ARIMA: baseline ARIMA(1,1,1) con walk-forward CV sulle stesse serie.</p>
   </section>
 
   <div class="row g-4">
