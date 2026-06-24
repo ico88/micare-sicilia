@@ -36,3 +36,6 @@ models/
 
 # Generated exports/reports
 *.csv
+
+# Build artifacts
+*.egg-info/
