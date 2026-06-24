@@ -6,9 +6,14 @@
     <h1 class="h4 mb-1">Dashboard epidemiologica</h1>
     <div class="text-muted">Sorveglianza aggregata S/I/R per patogeno, antibiotico e laboratorio.</div>
   </div>
-  <form method="post" action="{{ url_for('dashboard.train') }}">
-    <button class="btn btn-success" type="submit" {% if not has_data %}disabled{% endif %}>Addestra modelli</button>
-  </form>
+  <div class="d-flex gap-2 align-items-start">
+    <form method="post" action="{{ url_for('dashboard.train') }}">
+      <button class="btn btn-success" type="submit" {% if not has_data %}disabled title="Carica prima un dataset"{% endif %}>
+        Addestra modelli
+      </button>
+    </form>
+    <a class="btn btn-outline-secondary" href="{{ url_for('upload.upload') }}">Upload dati</a>
+  </div>
 </div>
 
 <div class="alert alert-warning py-2">{{ disclaimer }}</div>

@@ -24,7 +24,8 @@ def index():
 def upload():
     if request.method == "GET":
         files = UploadedFile.query.order_by(UploadedFile.uploaded_at.desc()).limit(10).all()
-        return render_template("upload.html", files=files)
+        has_imports = UploadedFile.query.filter_by(status="imported").count() > 0
+        return render_template("upload.html", files=files, has_imports=has_imports)
 
     incoming = request.files.get("dataset")
     if not incoming or incoming.filename == "":
