@@ -9,6 +9,9 @@ import pandas as pd
 from .config import (
     ANTIBIOTIC_CLASS_CODES,
     INTRINSIC_RESISTANCE_EXCLUSIONS,
+    MIN_SAMPLES_PER_MONTH,
+    PAZIENTE_RICOVERATO_CODE,
+    REPARTO_UTI_CODE,
     START_DATE,
 )
 
@@ -23,25 +26,36 @@ class DataQualityReport:
 
 
 def read_excel_files(paths: list[str | Path]) -> pd.DataFrame:
-    frames = [pd.read_excel(path) for path in paths]
+    frames = []
+    for path in paths:
+        xl = pd.ExcelFile(path)
+        # Usa il primo foglio dati (salta fogli di conteggio come 'totali')
+        data_sheet = xl.sheet_names[0]
+        frame = pd.read_excel(xl, sheet_name=data_sheet)
+        frames.append(frame)
+
     if not frames:
         raise ValueError("Nessun file Excel indicato.")
 
-    df = pd.concat(frames, ignore_index=True)
-    if "MICROORGANISMO" in df.columns and "patogeno" not in df.columns:
-        df = df.rename(columns={"MICROORGANISMO": "patogeno"})
+    # Normalizza e converte la data per ogni file prima del concat per evitare conflitti di tipo
+    normalized = []
+    for frame in frames:
+        frame = frame.rename(columns={"DATA PRELIEVO": "DATA_PRELIEVO"})
+        if "MICROORGANISMO" in frame.columns and "patogeno" not in frame.columns:
+            frame = frame.rename(columns={"MICROORGANISMO": "patogeno"})
+        if "DATA_PRELIEVO" in frame.columns:
+            frame["DATA_PRELIEVO"] = pd.to_datetime(
+                frame["DATA_PRELIEVO"], dayfirst=True, errors="coerce"
+            )
+        normalized.append(frame)
+
+    df = pd.concat(normalized, ignore_index=True)
 
     required = {"DATA_PRELIEVO", "patogeno", "LABORATORIO"}
     missing = sorted(required - set(df.columns))
     if missing:
         raise ValueError(f"Colonne obbligatorie mancanti: {', '.join(missing)}")
 
-    df["DATA_PRELIEVO"] = pd.to_datetime(
-        df["DATA_PRELIEVO"],
-        format="mixed",
-        dayfirst=True,
-        errors="coerce",
-    )
     return df
 
 
@@ -180,6 +194,36 @@ def prepare_clean_dataframe(
     return consolidate_duplicates(df, conflict_output_path=conflict_output_path)
 
 
+def compute_covariates(df: pd.DataFrame) -> pd.DataFrame:
+    """Calcola covariati mensili per laboratorio dal dataset grezzo.
+
+    Restituisce un DataFrame con colonne:
+    - data: fine mese
+    - LABORATORIO
+    - pct_icu: % campioni da reparto UTI (codice REPARTO_UTI_CODE)
+    - pct_inpatient: % campioni da pazienti ricoverati ordinari
+    """
+    temp = df[["DATA_PRELIEVO", "LABORATORIO", "REPARTO_DI_RICOVERO", "PAZIENTE_RICOVERATO"]].copy()
+    temp = temp.dropna(subset=["DATA_PRELIEVO", "LABORATORIO"])
+
+    temp["mese"] = temp["DATA_PRELIEVO"].dt.to_period("M").dt.to_timestamp("M")
+    temp["is_icu"] = (temp["REPARTO_DI_RICOVERO"] == REPARTO_UTI_CODE).astype(float)
+    temp["is_inpatient"] = (temp["PAZIENTE_RICOVERATO"] == PAZIENTE_RICOVERATO_CODE).astype(float)
+
+    cov = (
+        temp.groupby(["mese", "LABORATORIO"])
+        .agg(
+            n_tot=("is_icu", "count"),
+            n_icu=("is_icu", "sum"),
+            n_inpatient=("is_inpatient", "sum"),
+        )
+        .reset_index()
+    )
+    cov["pct_icu"] = (cov["n_icu"] / cov["n_tot"] * 100).round(2)
+    cov["pct_inpatient"] = (cov["n_inpatient"] / cov["n_tot"] * 100).round(2)
+    return cov.rename(columns={"mese": "data"})[["data", "LABORATORIO", "pct_icu", "pct_inpatient"]]
+
+
 def aggregate_monthly(df: pd.DataFrame) -> pd.DataFrame:
     qualitative_columns = antibiotic_qualitative_columns(df)
     frames = []
@@ -237,6 +281,10 @@ def aggregate_monthly(df: pd.DataFrame) -> pd.DataFrame:
         aggregated["Conteggio_R"] + aggregated["Conteggio_I"] + aggregated["Conteggio_S"]
     )
     aggregated["data"] = pd.to_datetime(aggregated["data"])
+
+    # Filtra mesi con campioni insufficienti per una stima percentuale affidabile
+    aggregated = aggregated[aggregated["Totale_Campioni"] >= MIN_SAMPLES_PER_MONTH].copy()
+
     aggregated["combinazione_unica"] = (
         aggregated["patogeno"].astype(str)
         + "_"
@@ -244,6 +292,14 @@ def aggregate_monthly(df: pd.DataFrame) -> pd.DataFrame:
         + "_"
         + aggregated["antibiotico"].astype(str)
     )
+
+    # Unisci covariati ICU/inpatient se disponibili nel dataframe originale
+    if "REPARTO_DI_RICOVERO" in df.columns and "PAZIENTE_RICOVERATO" in df.columns:
+        covariates = compute_covariates(df)
+        aggregated = aggregated.merge(covariates, on=["data", "LABORATORIO"], how="left")
+    else:
+        aggregated["pct_icu"] = np.nan
+        aggregated["pct_inpatient"] = np.nan
 
     return aggregated.sort_values(["combinazione_unica", "data"]).reset_index(drop=True)
 
@@ -254,4 +310,16 @@ def load_and_aggregate(
 ) -> tuple[pd.DataFrame, DataQualityReport]:
     raw = read_excel_files(paths)
     clean, report = prepare_clean_dataframe(raw, conflict_output_path=conflict_output_path)
-    return aggregate_monthly(clean), report
+    # Passa il raw (non clean) per calcolare i covariati su tutti i campioni del mese,
+    # inclusi quelli senza esito antibiotico (es. colture negative)
+    aggregated = aggregate_monthly(clean)
+    if "REPARTO_DI_RICOVERO" in raw.columns and "PAZIENTE_RICOVERATO" in raw.columns:
+        raw_dated = raw.copy()
+        raw_dated["DATA_PRELIEVO"] = pd.to_datetime(
+            raw_dated["DATA_PRELIEVO"], format="mixed", dayfirst=True, errors="coerce"
+        )
+        raw_dated = raw_dated[raw_dated["DATA_PRELIEVO"] >= START_DATE]
+        covariates = compute_covariates(raw_dated)
+        aggregated = aggregated.drop(columns=["pct_icu", "pct_inpatient"], errors="ignore")
+        aggregated = aggregated.merge(covariates, on=["data", "LABORATORIO"], how="left")
+    return aggregated, report

@@ -9,6 +9,15 @@ MIN_MONTHS_PER_COMBINATION = 12
 FORECAST_PERIODS_MONTHS = 24
 TARGETS = ("resistenti", "intermedi", "sensibili")
 
+# Soglia minima di campioni/mese per una stima percentuale affidabile
+MIN_SAMPLES_PER_MONTH = 10
+
+# Codice reparto UTI/Rianimazione secondo Tabella A2 Min. Salute
+REPARTO_UTI_CODE = 26
+
+# Codice paziente ricoverato in regime ordinario
+PAZIENTE_RICOVERATO_CODE = 1
+
 ANTIBIOTIC_CLASS_CODES = {
     "GLICOPEPTIDI": ["VAN", "TPL"],
     "LIPOPEPTIDI": ["DAP"],
