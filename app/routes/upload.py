@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import shutil
 import uuid
 from pathlib import Path
 
@@ -100,7 +101,16 @@ def reset_db():
     Observation.query.delete()
     UploadedFile.query.delete()
     db.session.commit()
-    flash("Database azzerato. Puoi ricaricare i file Excel.", "success")
+
+    # cancella file modello su disco
+    model_folder = Path(current_app.config["MODEL_FOLDER"])
+    for item in model_folder.iterdir():
+        if item.is_file():
+            item.unlink(missing_ok=True)
+        elif item.is_dir():
+            shutil.rmtree(item, ignore_errors=True)
+
+    flash("Database e modelli azzerati. Puoi ricaricare i file Excel.", "success")
     return redirect(url_for("upload.upload"))
 
 
