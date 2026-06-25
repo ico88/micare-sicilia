@@ -8,7 +8,7 @@ from flask import Blueprint, current_app, flash, redirect, render_template, requ
 from werkzeug.utils import secure_filename
 
 from app import db
-from app.models import UploadedFile
+from app.models import AggregatedObservation, Observation, Prediction, TrainedModel, UploadedFile, ValidationMetric
 from app.services.database import aggregated_to_db, observations_from_db, observations_to_db
 from app.services.preprocessing import aggregate_observations, load_tabular_file, normalize_uploaded_dataframe
 
@@ -89,6 +89,19 @@ def upload():
         db.session.commit()
         flash(f"Errore import: {exc}", "danger")
         return redirect(url_for("upload.upload"))
+
+
+@bp.post("/reset-db")
+def reset_db():
+    Prediction.query.delete()
+    ValidationMetric.query.delete()
+    TrainedModel.query.delete()
+    AggregatedObservation.query.delete()
+    Observation.query.delete()
+    UploadedFile.query.delete()
+    db.session.commit()
+    flash("Database azzerato. Puoi ricaricare i file Excel.", "success")
+    return redirect(url_for("upload.upload"))
 
 
 def _uploaded_file_hash(incoming) -> str:

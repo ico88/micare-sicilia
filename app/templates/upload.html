@@ -21,6 +21,33 @@
       </form>
     </section>
     {% endif %}
+
+    <section class="panel mt-3 border-danger">
+      <h2 class="h6 mb-2 text-danger">Zona pericolosa</h2>
+      <p class="text-muted small mb-3">Cancella tutte le osservazioni, aggregazioni, modelli e previsioni dal database. Operazione irreversibile.</p>
+      <button class="btn btn-outline-danger w-100" data-bs-toggle="modal" data-bs-target="#resetModal">Azzera database</button>
+    </section>
+
+    <div class="modal fade" id="resetModal" tabindex="-1" aria-labelledby="resetModalLabel" aria-hidden="true">
+      <div class="modal-dialog">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title" id="resetModalLabel">Conferma azzeramento database</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+          </div>
+          <div class="modal-body">
+            Stai per eliminare <strong>tutti i dati</strong>: osservazioni, aggregazioni mensili, modelli addestrati e previsioni.<br>
+            Questa operazione è <strong>irreversibile</strong>. Continuare?
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annulla</button>
+            <form method="post" action="{{ url_for('upload.reset_db') }}">
+              <button type="submit" class="btn btn-danger">Sì, azzera tutto</button>
+            </form>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
   <div class="col-lg-7">
     <section class="panel">
