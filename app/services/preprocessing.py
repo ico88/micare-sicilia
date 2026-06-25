@@ -189,7 +189,9 @@ def _normalize_long_or_aggregated_dataframe(df: pd.DataFrame) -> pd.DataFrame:
         out["intermediate_count"] = np.where(out["result"] == "I", out["samples"], 0.0)
         out["resistant_count"] = np.where(out["result"] == "R", out["samples"], 0.0)
 
-    return out.dropna(subset=["date"]).reset_index(drop=True)
+    out = out.dropna(subset=["date"]).reset_index(drop=True)
+    out = out[out["date"] >= pd.Timestamp("2019-01-01")]
+    return out.reset_index(drop=True)
 
 
 def aggregate_observations(observations: pd.DataFrame) -> pd.DataFrame:
