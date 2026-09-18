@@ -112,16 +112,17 @@
               <input type="hidden" name="laboratory" value="{{ selected.laboratory }}">
               <input type="hidden" name="ward" value="{{ selected.ward }}">
               <label class="form-label">Mese previsione</label>
-              <input class="form-control mb-2" name="prediction_month" type="month" min="{{ prediction_month_min }}" value="{{ prediction_month_default }}" required>
+              <input class="form-control mb-2" name="prediction_month" type="month" min="{{ prediction_month_min }}" max="{{ prediction_month_max }}" value="{{ prediction_month_default }}" required>
               <label class="form-label">Metodo previsione</label>
               <select class="form-select mb-3" name="model_name">
+                <option value="prophet_pretrained">Prophet per combinazione (consigliato)</option>
                 <option value="all_models">Tutti i metodi</option>
-                <option value="auto_hierarchical">Automatico — adattivo per laboratorio (consigliato)</option>
+                <option value="auto_hierarchical">Automatico — adattivo per laboratorio</option>
                 <option value="rf_quant_hgb_class">Predittivo avanzato</option>
                 <option value="ensemble_rf_hgb">Ensemble (media ponderata modelli)</option>
                 <option value="hist_gradient_boosting">Gradiente stocastico</option>
                 <option value="random_forest">Foresta decisionale</option>
-                <option value="prophet">Prophet (serie temporale)</option>
+                <option value="prophet">Prophet in tempo reale</option>
               </select>
               <button class="btn btn-primary w-100" type="submit">Genera previsione</button>
             </form>
@@ -138,13 +139,14 @@
               <input class="form-control mb-2" name="prediction_year" type="number" min="2000" max="2100" value="{{ prediction_year }}" required>
               <label class="form-label">Metodo previsione</label>
               <select class="form-select mb-3" name="model_name">
+                <option value="prophet_pretrained">Prophet per combinazione (consigliato)</option>
                 <option value="all_models">Tutti i metodi</option>
-                <option value="auto_hierarchical">Automatico — adattivo per laboratorio (consigliato)</option>
+                <option value="auto_hierarchical">Automatico — adattivo per laboratorio</option>
                 <option value="rf_quant_hgb_class">Predittivo avanzato</option>
                 <option value="ensemble_rf_hgb">Ensemble (media ponderata modelli)</option>
                 <option value="hist_gradient_boosting">Gradiente stocastico</option>
                 <option value="random_forest">Foresta decisionale</option>
-                <option value="prophet">Prophet (serie temporale)</option>
+                <option value="prophet">Prophet in tempo reale</option>
               </select>
               <button class="btn btn-outline-primary w-100" type="submit">Genera previsione annuale</button>
             </form>

@@ -13,6 +13,7 @@ from flask import Flask
 from app import db
 from app.services.database import aggregated_from_db, save_training_summary
 from app.services.hierarchical_training import train_hierarchical_models
+from app.services.prophet_training_adapter import run_prophet_training
 from app.services.training import train_all_models
 
 _jobs: dict[str, dict[str, Any]] = {}
@@ -205,18 +206,25 @@ def _run_training_job(app: Flask, job_id: str, model_folder: str) -> None:
             summary = train_all_models(data, model_folder, progress_callback=progress_callback)
             hierarchical_summary = train_hierarchical_models(data, model_folder, progress_callback=progress_callback)
             summary["hierarchical_training"] = hierarchical_summary
+
+            # Prophet per-combination training (primary scientific engine)
+            prophet_summary = run_prophet_training(data, model_folder, progress_callback=progress_callback)
+            summary["prophet_training"] = prophet_summary
+
             _update_job(job_id, progress=95, stage="Salvataggio", message="Salvo modelli e metriche nel database.")
             save_training_summary(summary)
             db.session.commit()
             training_info = summary.get("training", {})
             training_info["hierarchical_models"] = summary.get("hierarchical_training", {}).get("models_trained", 0)
+            training_info["prophet_combinations"] = prophet_summary.get("prophet_combinations", 0)
             _update_job(
                 job_id,
                 status="success",
                 progress=100,
                 stage="Completato",
                 message=(
-                    "Training completato: baseline, HistGradientBoosting e RandomForest aggiornati. "
+                    "Training completato. "
+                    f"Prophet: {training_info.get('prophet_combinations', 0)} combinazioni. "
                     f"Righe aggregate: {training_info.get('aggregated_rows', 'n/d')}. "
                     f"Modelli gerarchici: {training_info.get('hierarchical_models', 0)}."
                 ),

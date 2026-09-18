@@ -6,7 +6,7 @@ START_DATE = pd.Timestamp("2019-01-01")
 MAX_TRAINING_DATE = pd.Timestamp("2024-12-31")
 VARIANCE_THRESHOLD = 750.0
 MIN_MONTHS_PER_COMBINATION = 12
-FORECAST_PERIODS_MONTHS = 24
+FORECAST_PERIODS_MONTHS = 60
 TARGETS = ("resistenti", "intermedi", "sensibili")
 
 # Soglia minima di campioni/mese per una stima percentuale affidabile

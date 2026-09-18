@@ -6,9 +6,12 @@ import joblib
 import numpy as np
 import pandas as pd
 
+from micare_sicilia.model import predict_percentages
+
 from .feature_engineering import next_month_feature
 from .hierarchical_training import find_hierarchical_bundle
 from .prophet_forecast import forecast_sir_with_prophet
+from .prophet_training_adapter import prophet_output_dir
 from .training import TARGETS
 from .validation import reliability_level
 
@@ -81,7 +84,27 @@ def predict_sir(
     decision_model = model_name
     x = next_month_feature(pd.to_datetime(prediction_month), pathogen, antibiotic, laboratory, ward, samples)
 
-    if model_name == "prophet":
+    # Try pre-computed Prophet forecasts (primary scientific engine)
+    if raw_values is None:
+        try:
+            prophet_dir = prophet_output_dir(model_dir)
+            dt = pd.to_datetime(prediction_month)
+            prophet_raw = predict_percentages(
+                prophet_dir, pathogen, laboratory, antibiotic, dt.year, dt.month
+            )
+            # predict_percentages returns {resistenti, intermedi, sensibili} keys
+            raw_values = {
+                "resistant_pct": prophet_raw.get("resistenti", 0.0),
+                "intermediate_pct": prophet_raw.get("intermedi", 0.0),
+                "sensitive_pct": prophet_raw.get("sensibili", 0.0),
+            }
+            model_name = "prophet_pretrained"
+            quantitative_model = "prophet_pretrained"
+            decision_model = "prophet_pretrained"
+        except (KeyError, FileNotFoundError, Exception):
+            raw_values = None
+
+    if model_name == "prophet" and raw_values is None:
         raw_values = forecast_sir_with_prophet(scoped_history, prediction_month)
         if raw_values is not None:
             model_name = f"prophet:{scope}"

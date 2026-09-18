@@ -19,6 +19,7 @@ from app.services.training_jobs import control_training_job, get_training_job, s
 bp = Blueprint("dashboard", __name__)
 
 COMPARABLE_MODELS = [
+    "prophet_pretrained",
     "rf_quant_hgb_class",
     "ensemble_rf_hgb",
     "auto_hierarchical",
@@ -66,6 +67,7 @@ def dashboard():
         annual_prediction=annual_prediction,
         prediction_month_min=month_bounds[0],
         prediction_month_default=month_bounds[1],
+        prediction_month_max=month_bounds[2],
         prediction_year=prediction_year,
         metrics=metrics,
         disclaimer=DISCLAIMER,
@@ -535,13 +537,14 @@ def _history_chart_payload(history: pd.DataFrame) -> dict:
     }
 
 
-def _month_bounds(data: pd.DataFrame) -> tuple[str, str]:
+def _month_bounds(data: pd.DataFrame) -> tuple[str, str, str]:
     if data.empty:
-        return "", ""
+        return "", "", ""
     months = pd.to_datetime(data["month"])
     first_month = months.min().to_period("M").strftime("%Y-%m")
     next_month = (months.max().to_period("M") + 1).strftime("%Y-%m")
-    return first_month, next_month
+    max_month = (months.max().to_period("M") + 60).strftime("%Y-%m")
+    return first_month, next_month, max_month
 
 
 def _selected_prediction_year(raw_year: str | None, default_month: str) -> int:
