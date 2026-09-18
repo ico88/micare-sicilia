@@ -141,29 +141,39 @@ def process_combination(
         mase_values: list[float] = []
 
         for end_date in cv_dates:
-            train = prophet_data[prophet_data["ds"] <= end_date].copy()
-            test = prophet_data[
-                (prophet_data["ds"] > end_date)
-                & (prophet_data["ds"] <= end_date + pd.DateOffset(months=6))
-            ].copy()
+            try:
+                train = prophet_data[prophet_data["ds"] <= end_date].copy()
+                test = prophet_data[
+                    (prophet_data["ds"] > end_date)
+                    & (prophet_data["ds"] <= end_date + pd.DateOffset(months=6))
+                ].copy()
 
-            if len(train) < 2 or test.empty:
+                if len(train) < 2 or test.empty:
+                    continue
+
+                cv_model = _new_prophet_model(use_regressors=has_covariates)
+                cv_model.fit(train)
+                cv_forecast = cv_model.predict(test)
+
+                y_pred_raw = np.clip(cv_forecast["yhat"].values, 0, 100)
+                y_true_raw = test["y"].values
+                y_train = train["y"].values
+
+                # Rimuovi coppie con NaN (Prophet può restituire NaN su serie corte)
+                valid = np.isfinite(y_pred_raw) & np.isfinite(y_true_raw)
+                if valid.sum() == 0:
+                    continue
+                y_pred = y_pred_raw[valid]
+                y_true = y_true_raw[valid]
+
+                rmse_values.append(float(np.sqrt(mean_squared_error(y_true, y_pred))))
+                y_true_stable = np.where(y_true == 0, 0.0001, y_true)
+                mape_values.append(float(np.mean(np.abs((y_true - y_pred) / y_true_stable)) * 100))
+                mase = calculate_mase(y_true, y_pred, y_train)
+                if not np.isnan(mase):
+                    mase_values.append(mase)
+            except Exception:
                 continue
-
-            cv_model = _new_prophet_model(use_regressors=has_covariates)
-            cv_model.fit(train)
-            cv_forecast = cv_model.predict(test)
-
-            y_pred = np.clip(cv_forecast["yhat"].values, 0, 100)
-            y_true = test["y"].values
-            y_train = train["y"].values
-
-            rmse_values.append(float(np.sqrt(mean_squared_error(y_true, y_pred))))
-            y_true_stable = np.where(y_true == 0, 0.0001, y_true)
-            mape_values.append(float(np.mean(np.abs((y_true - y_pred) / y_true_stable)) * 100))
-            mase = calculate_mase(y_true, y_pred, y_train)
-            if not np.isnan(mase):
-                mase_values.append(mase)
 
         if rmse_values:
             local_metrics["rmse"][target] = float(np.mean(rmse_values))
