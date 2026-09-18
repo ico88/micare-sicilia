@@ -71,6 +71,83 @@
 
   <section class="panel mb-4">
     <div class="d-flex justify-content-between align-items-center mb-3">
+      <div>
+        <h2 class="h6 mb-0">Validazione expanding-window per anno</h2>
+        <p class="text-muted small mb-0">Addestra su N anni, predice i successivi. Produce un reliability score per ogni combinazione patogeno/antibiotico/laboratorio.</p>
+      </div>
+      <form method="post" action="{{ url_for('dashboard.expanding_cv') }}">
+        <button class="btn btn-sm btn-primary" type="submit">Esegui validazione</button>
+      </form>
+    </div>
+    {% if expanding_cv.available %}
+      <p class="text-muted small mb-3">Anni: {{ expanding_cv.years_used | join(', ') }} · {{ expanding_cv.combination_count }} combinazioni · {{ expanding_cv.duration_seconds }} s</p>
+      <div class="row g-3 mb-3">
+        <div class="col-sm-3"><div class="summary-tile"><span>Alta affidabilità</span><strong class="text-success">{{ expanding_cv.high_reliability }}</strong><small>accuracy ≥ 80%</small></div></div>
+        <div class="col-sm-3"><div class="summary-tile"><span>Media affidabilità</span><strong class="text-warning">{{ expanding_cv.medium_reliability }}</strong><small>accuracy 60–80%</small></div></div>
+        <div class="col-sm-3"><div class="summary-tile"><span>Bassa affidabilità</span><strong class="text-danger">{{ expanding_cv.low_reliability }}</strong><small>accuracy 40–60%</small></div></div>
+        <div class="col-sm-3"><div class="summary-tile"><span>Insufficiente</span><strong class="text-muted">{{ expanding_cv.insufficient_reliability }}</strong><small>accuracy &lt; 40%</small></div></div>
+      </div>
+      {% if expanding_cv.folds %}
+        <h3 class="h6 mb-2">Metriche per fold</h3>
+        <div class="table-responsive mb-3">
+          <table class="table table-sm align-middle">
+            <thead><tr><th>Fold</th><th>Modello</th><th>Train</th><th>Test</th><th>N test</th><th>Accuracy</th><th>F1 macro</th><th>MAE %R</th></tr></thead>
+            <tbody>
+              {% for row in expanding_cv.folds %}
+                <tr>
+                  <td class="small">{{ row.train_years }} → {{ row.test_years }}</td>
+                  <td>{{ row.model_name }}</td>
+                  <td>{{ row.n_train }}</td>
+                  <td>{{ row.n_test }}</td>
+                  <td>{{ row.n_test }}</td>
+                  <td>
+                    <span class="badge text-bg-{{ 'success' if row.accuracy >= 0.8 else 'warning' if row.accuracy >= 0.6 else 'danger' }}">
+                      {{ (row.accuracy * 100)|round(1) }}%
+                    </span>
+                  </td>
+                  <td>{{ (row.f1_macro)|round(3) }}</td>
+                  <td>{{ row.resistant_pct_mae|round(2) if row.resistant_pct_mae is defined else '' }}</td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      {% endif %}
+      {% if combo_reliability %}
+        <div class="d-flex justify-content-between align-items-center mb-2">
+          <h3 class="h6 mb-0">Top 50 combinazioni per reliability score</h3>
+          <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('dashboard.export_expanding_cv_combinations') }}">Esporta CSV completo</a>
+        </div>
+        <div class="table-responsive">
+          <table class="table table-sm align-middle">
+            <thead><tr><th>Patogeno</th><th>Antibiotico</th><th>Laboratorio</th><th>Fold valutati</th><th>Accuracy media</th><th>MAE %R medio</th><th>Reliability</th></tr></thead>
+            <tbody>
+              {% for row in combo_reliability %}
+                <tr>
+                  <td>{{ row.pathogen }}</td>
+                  <td>{{ row.antibiotic }}</td>
+                  <td>{{ row.laboratory }}</td>
+                  <td>{{ row.folds_evaluated }}</td>
+                  <td>{{ (row.mean_accuracy * 100)|round(1) }}%</td>
+                  <td>{{ row.mean_resistant_mae|round(2) }}</td>
+                  <td>
+                    <span class="badge text-bg-{{ 'success' if row.tier == 'alta' else 'warning' if row.tier == 'media' else 'danger' if row.tier == 'bassa' else 'secondary' }}">
+                      {{ row.tier }}
+                    </span>
+                  </td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      {% endif %}
+    {% else %}
+      <p class="text-muted mb-0">Nessuna validazione eseguita. Clicca "Esegui validazione" per avviare l'expanding-window cross-validation per anno.</p>
+    {% endif %}
+  </section>
+
+  <section class="panel mb-4">
+    <div class="d-flex justify-content-between align-items-center mb-3">
       <h2 class="h6 mb-0">Backtest rolling modelli</h2>
       <form method="post" action="{{ url_for('dashboard.validation_backtest') }}" class="d-flex gap-2 align-items-center">
         <select class="form-select form-select-sm" name="months">

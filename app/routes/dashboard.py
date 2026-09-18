@@ -10,6 +10,8 @@ from app.models import Prediction, ValidationMetric
 from app.services.backtest import BACKTEST_PREDICTIONS, load_rolling_backtest
 from app.services.backtest_jobs import get_backtest_job, start_backtest_job
 from app.services.database import aggregated_from_db, save_prediction
+from app.services.expanding_cv_jobs import get_expanding_cv_job, start_expanding_cv_job
+from app.services.expanding_window_cv import load_combination_reliability, load_expanding_cv
 from app.services.prediction import DISCLAIMER, predict_sir
 from app.services.scientific_report import build_scientific_report, report_tables
 from app.services.training_jobs import control_training_job, get_training_job, start_training_job
@@ -76,7 +78,17 @@ def validation_report():
     metrics = ValidationMetric.query.order_by(ValidationMetric.model_name, ValidationMetric.target).all()
     report = build_scientific_report(data, metrics, current_app.config["MODEL_FOLDER"])
     backtest = load_rolling_backtest(current_app.config["MODEL_FOLDER"])
-    return render_template("validation_report.html", has_data=not data.empty, report=report, backtest=backtest, disclaimer=DISCLAIMER)
+    expanding_cv = load_expanding_cv(current_app.config["MODEL_FOLDER"])
+    combo_reliability = load_combination_reliability(current_app.config["MODEL_FOLDER"])
+    return render_template(
+        "validation_report.html",
+        has_data=not data.empty,
+        report=report,
+        backtest=backtest,
+        expanding_cv=expanding_cv,
+        combo_reliability=combo_reliability[:50],
+        disclaimer=DISCLAIMER,
+    )
 
 
 @bp.post("/validation/backtest")
@@ -121,6 +133,61 @@ def backtest_status_json():
             "summary": job.get("summary", {}),
         }
     )
+
+
+@bp.post("/validation/expanding-cv")
+def expanding_cv():
+    data = aggregated_from_db()
+    if data.empty:
+        flash("Carica prima un dataset.", "warning")
+        return redirect(url_for("upload.upload"))
+    job_id, created = start_expanding_cv_job(current_app._get_current_object(), current_app.config["MODEL_FOLDER"])
+    if created:
+        flash("Validazione expanding-window avviata in background.", "success")
+    else:
+        flash("Validazione già in corso.", "warning")
+    return redirect(url_for("dashboard.expanding_cv_status", job_id=job_id))
+
+
+@bp.get("/validation/expanding-cv/status")
+def expanding_cv_status():
+    job = get_expanding_cv_job(request.args.get("job_id"))
+    if job is None:
+        flash("Nessuna validazione in corso.", "warning")
+        return redirect(url_for("dashboard.validation_report"))
+    return render_template("expanding_cv_status.html", job=job)
+
+
+@bp.get("/validation/expanding-cv/status.json")
+def expanding_cv_status_json():
+    job = get_expanding_cv_job(request.args.get("job_id"))
+    if job is None:
+        return jsonify({"status": "missing", "progress": 0}), 404
+    return jsonify({
+        "id": job["id"],
+        "status": job["status"],
+        "progress": job["progress"],
+        "stage": job["stage"],
+        "message": job["message"],
+        "error": job["error"],
+        "finished": job["status"] in {"success", "error"},
+        "summary": job.get("summary", {}),
+    })
+
+
+@bp.get("/validation/export/expanding_cv_combinations.csv")
+def export_expanding_cv_combinations():
+    import csv, io
+    combos = load_combination_reliability(current_app.config["MODEL_FOLDER"])
+    if not combos:
+        flash("Esegui prima la validazione expanding-window.", "warning")
+        return redirect(url_for("dashboard.validation_report"))
+    buf = io.StringIO()
+    writer = csv.DictWriter(buf, fieldnames=combos[0].keys())
+    writer.writeheader()
+    writer.writerows(combos)
+    return Response(buf.getvalue(), mimetype="text/csv",
+                    headers={"Content-Disposition": "attachment; filename=expanding_cv_combinations.csv"})
 
 
 @bp.get("/validation/export/backtest_predictions.csv")
