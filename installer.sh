@@ -248,8 +248,8 @@ export PYTHONPATH="\$APP_DIR/src:\$PYTHONPATH"
 cd "\$APP_DIR"
 exec "\$APP_DIR/.venv/bin/gunicorn" \\
     --bind 0.0.0.0:${APP_PORT} \\
-    --workers 2 \\
-    --threads 4 \\
+    --workers 1 \\
+    --threads 8 \\
     --worker-class gthread \\
     --timeout 3600 \\
     --graceful-timeout 120 \\
