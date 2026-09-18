@@ -3,25 +3,19 @@
 {% block content %}
 <div class="dashboard-header mb-3">
   <div>
-    <h1 class="h4 mb-1">Dashboard epidemiologica</h1>
-    <div class="text-muted">Sorveglianza aggregata S/I/R per patogeno, antibiotico e laboratorio.</div>
-  </div>
-  <div class="d-flex gap-2 align-items-start">
-    <form method="post" action="{{ url_for('dashboard.train') }}">
-      <button class="btn btn-success" type="submit" {% if not has_data %}disabled title="Carica prima un dataset"{% endif %}>
-        Addestra modelli
-      </button>
-    </form>
-    <a class="btn btn-outline-secondary" href="{{ url_for('upload.upload') }}">Upload dati</a>
+    <h1 class="h4 mb-1">Analisi resistenza antimicrobica</h1>
+    <div class="text-muted">Sorveglianza S/I/R aggregata per patogeno, antibiotico e laboratorio.</div>
   </div>
 </div>
 
-<div class="alert alert-warning py-2">{{ disclaimer }}</div>
+<div class="alert alert-info py-2 small">{{ disclaimer }}</div>
 
 {% if not has_data %}
-  <section class="panel">
-    <p class="mb-0">Carica un dataset per attivare dashboard, training e previsioni.</p>
-    <a class="btn btn-primary mt-3" href="{{ url_for('upload.upload') }}">Vai all'upload</a>
+  <section class="panel text-center py-5">
+    <div class="mb-3" style="font-size:3rem">📊</div>
+    <h2 class="h5 mb-2">Nessun dato disponibile</h2>
+    <p class="text-muted mb-4">Carica i file Excel della Rete MIC e avvia l'addestramento per attivare l'analisi e le previsioni.</p>
+    <a class="btn btn-primary" href="{{ url_for('upload.upload') }}">Vai a Gestione dati</a>
   </section>
 {% else %}
   <section class="bi-filterbar mb-3">
@@ -84,16 +78,16 @@
   </div>
 
   <div class="kpi-grid mb-3">
-    <div class="kpi-tile"><span>Mesi</span><strong>{{ history_summary.months }}</strong></div>
+    <div class="kpi-tile"><span>Mesi analizzati</span><strong>{{ history_summary.months }}</strong></div>
     <div class="kpi-tile"><span>Campioni totali</span><strong>{{ '{:,}'.format(history_summary.samples).replace(',', '.') }}</strong></div>
     <div class="kpi-tile"><span>Ultimo mese</span><strong>{{ history_summary.latest_month or '-' }}</strong><small>{{ history_summary.latest_samples }} campioni</small></div>
-    <div class="kpi-tile"><span>Affidabilita</span><strong>{{ latest_prediction.reliability if latest_prediction else '-' }}</strong><small>{{ latest_prediction.model_name if latest_prediction else 'nessuna previsione' }}</small></div>
+    <div class="kpi-tile"><span>Affidabilità previsione</span><strong>{{ latest_prediction.reliability if latest_prediction else '—' }}</strong><small>{{ latest_prediction.model_name if latest_prediction else 'nessuna previsione disponibile' }}</small></div>
   </div>
 
   <ul class="nav nav-tabs bi-tabs" id="dashboardTabs" role="tablist">
-    <li class="nav-item" role="presentation"><button class="nav-link {% if selected_tab == 'history' %}active{% endif %}" id="history-tab" data-dashboard-tab="history" data-bs-toggle="tab" data-bs-target="#history-pane" type="button" role="tab">Storico</button></li>
-    <li class="nav-item" role="presentation"><button class="nav-link {% if selected_tab == 'prediction' %}active{% endif %}" id="prediction-tab" data-dashboard-tab="prediction" data-bs-toggle="tab" data-bs-target="#prediction-pane" type="button" role="tab">Previsioni</button></li>
-    <li class="nav-item" role="presentation"><button class="nav-link {% if selected_tab == 'metrics' %}active{% endif %}" id="metrics-tab" data-dashboard-tab="metrics" data-bs-toggle="tab" data-bs-target="#metrics-pane" type="button" role="tab">Validazione</button></li>
+    <li class="nav-item" role="presentation"><button class="nav-link {% if selected_tab == 'history' %}active{% endif %}" id="history-tab" data-dashboard-tab="history" data-bs-toggle="tab" data-bs-target="#history-pane" type="button" role="tab">Andamento storico</button></li>
+    <li class="nav-item" role="presentation"><button class="nav-link {% if selected_tab == 'prediction' %}active{% endif %}" id="prediction-tab" data-dashboard-tab="prediction" data-bs-toggle="tab" data-bs-target="#prediction-pane" type="button" role="tab">Previsione</button></li>
+    <li class="nav-item" role="presentation"><button class="nav-link {% if selected_tab == 'metrics' %}active{% endif %}" id="metrics-tab" data-dashboard-tab="metrics" data-bs-toggle="tab" data-bs-target="#metrics-pane" type="button" role="tab">Qualità modelli</button></li>
   </ul>
 
   <div class="tab-content bi-tabcontent">
@@ -119,17 +113,17 @@
               <input type="hidden" name="ward" value="{{ selected.ward }}">
               <label class="form-label">Mese previsione</label>
               <input class="form-control mb-2" name="prediction_month" type="month" min="{{ prediction_month_min }}" value="{{ prediction_month_default }}" required>
-              <label class="form-label">Modello</label>
+              <label class="form-label">Metodo previsione</label>
               <select class="form-select mb-3" name="model_name">
-                <option value="all_models">Tutti i modelli</option>
-                <option value="rf_quant_hgb_class">RF quantitativo + HGB classe</option>
-                <option value="ensemble_rf_hgb">Ensemble 60% RF + 40% HGB</option>
-                <option value="auto_hierarchical">Automatico gerarchico</option>
-                <option value="hist_gradient_boosting">HistGradientBoosting globale</option>
-                <option value="random_forest">RandomForest globale</option>
-                <option value="prophet">Prophet opzionale/legacy</option>
+                <option value="all_models">Tutti i metodi</option>
+                <option value="auto_hierarchical">Automatico — adattivo per laboratorio (consigliato)</option>
+                <option value="rf_quant_hgb_class">Predittivo avanzato</option>
+                <option value="ensemble_rf_hgb">Ensemble (media ponderata modelli)</option>
+                <option value="hist_gradient_boosting">Gradiente stocastico</option>
+                <option value="random_forest">Foresta decisionale</option>
+                <option value="prophet">Prophet (serie temporale)</option>
               </select>
-              <button class="btn btn-primary w-100" type="submit">Genera</button>
+              <button class="btn btn-primary w-100" type="submit">Genera previsione</button>
             </form>
           </section>
 
@@ -142,17 +136,17 @@
               <input type="hidden" name="ward" value="{{ selected.ward }}">
               <label class="form-label">Anno previsione</label>
               <input class="form-control mb-2" name="prediction_year" type="number" min="2000" max="2100" value="{{ prediction_year }}" required>
-              <label class="form-label">Modello</label>
+              <label class="form-label">Metodo previsione</label>
               <select class="form-select mb-3" name="model_name">
-                <option value="all_models">Tutti i modelli</option>
-                <option value="rf_quant_hgb_class">RF quantitativo + HGB classe</option>
-                <option value="ensemble_rf_hgb">Ensemble 60% RF + 40% HGB</option>
-                <option value="auto_hierarchical">Automatico gerarchico</option>
-                <option value="hist_gradient_boosting">HistGradientBoosting globale</option>
-                <option value="random_forest">RandomForest globale</option>
-                <option value="prophet">Prophet opzionale/legacy</option>
+                <option value="all_models">Tutti i metodi</option>
+                <option value="auto_hierarchical">Automatico — adattivo per laboratorio (consigliato)</option>
+                <option value="rf_quant_hgb_class">Predittivo avanzato</option>
+                <option value="ensemble_rf_hgb">Ensemble (media ponderata modelli)</option>
+                <option value="hist_gradient_boosting">Gradiente stocastico</option>
+                <option value="random_forest">Foresta decisionale</option>
+                <option value="prophet">Prophet (serie temporale)</option>
               </select>
-              <button class="btn btn-outline-primary w-100" type="submit">Genera anno</button>
+              <button class="btn btn-outline-primary w-100" type="submit">Genera previsione annuale</button>
             </form>
           </section>
 

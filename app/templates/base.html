@@ -10,11 +10,11 @@
   <body>
     <nav class="navbar navbar-expand-lg border-bottom bg-white">
       <div class="container-fluid">
-        <a class="navbar-brand fw-semibold" href="{{ url_for('dashboard.dashboard') }}">mic-res-sicilia</a>
-        <div class="navbar-nav">
-          <a class="nav-link" href="{{ url_for('upload.upload') }}">Upload</a>
-          <a class="nav-link" href="{{ url_for('dashboard.dashboard') }}">Dashboard</a>
-          <a class="nav-link" href="{{ url_for('dashboard.validation_report') }}">Validazione</a>
+        <a class="navbar-brand fw-bold text-primary" href="{{ url_for('dashboard.dashboard') }}">MIC RES Sicilia</a>
+        <div class="navbar-nav ms-auto gap-1">
+          <a class="nav-link" href="{{ url_for('dashboard.dashboard') }}">Analisi</a>
+          <a class="nav-link" href="{{ url_for('upload.upload') }}">Dati</a>
+          <a class="nav-link text-muted small" href="{{ url_for('dashboard.validation_report') }}">Rapporto tecnico</a>
         </div>
       </div>
     </nav>
@@ -24,7 +24,10 @@
         {% if messages %}
           <div class="mb-3">
             {% for category, message in messages %}
-              <div class="alert alert-{{ category }} mb-2">{{ message }}</div>
+              <div class="alert alert-{{ category }} alert-dismissible mb-2">
+                {{ message }}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+              </div>
             {% endfor %}
           </div>
         {% endif %}

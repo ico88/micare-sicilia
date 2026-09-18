@@ -1,77 +1,88 @@
 {% extends "base.html" %}
-{% block title %}Upload dati - MIC RES Sicilia{% endblock %}
+{% block title %}Gestione dati - MIC RES Sicilia{% endblock %}
 {% block content %}
+<div class="mb-3">
+  <h1 class="h4 mb-1">Gestione dati</h1>
+  <div class="text-muted">Carica i file Excel della Rete MIC e avvia l'addestramento dei modelli.</div>
+</div>
+
 <div class="row g-4">
   <div class="col-lg-5">
+
     <section class="panel">
-      <h1 class="h4 mb-3">Upload dati</h1>
+      <h2 class="h6 mb-1">1 · Carica file Excel</h2>
+      <p class="text-muted small mb-3">Seleziona un file annuale della Rete MIC (formato .xlsx). Puoi caricare più anni in sequenza.</p>
       <form method="post" enctype="multipart/form-data">
-        <label class="form-label" for="dataset">Dataset CSV/XLSX</label>
         <input class="form-control" id="dataset" name="dataset" type="file" accept=".csv,.xls,.xlsx" required>
-        <button class="btn btn-primary mt-3" type="submit">Importa e normalizza</button>
+        <button class="btn btn-primary mt-3 w-100" type="submit">Carica e importa</button>
       </form>
     </section>
 
     {% if has_imports %}
     <section class="panel mt-3">
-      <h2 class="h6 mb-2">Dati pronti per l'addestramento</h2>
-      <p class="text-muted small mb-3">Hai file già importati. Puoi addestrare i modelli predittivi sul dataset corrente.</p>
+      <h2 class="h6 mb-1">2 · Addestra i modelli predittivi</h2>
+      <p class="text-muted small mb-3">Una volta caricati tutti gli anni, avvia l'addestramento. L'operazione richiede alcuni minuti.</p>
       <form method="post" action="{{ url_for('dashboard.train') }}">
-        <button class="btn btn-success w-100" type="submit">Addestra modelli</button>
+        <button class="btn btn-success w-100" type="submit">Avvia addestramento</button>
       </form>
     </section>
     {% endif %}
 
-    <section class="panel mt-3 border-danger">
-      <h2 class="h6 mb-2 text-danger">Zona pericolosa</h2>
-      <p class="text-muted small mb-3">Cancella tutte le osservazioni, aggregazioni, modelli e previsioni dal database. Operazione irreversibile.</p>
-      <button class="btn btn-outline-danger w-100" data-bs-toggle="modal" data-bs-target="#resetModal">Azzera database</button>
+    <section class="panel mt-3">
+      <h2 class="h6 mb-2 text-danger">Reimposta database</h2>
+      <p class="text-muted small mb-3">Cancella tutti i dati e i modelli per ricominciare da capo con file aggiornati.</p>
+      <button class="btn btn-outline-danger w-100" data-bs-toggle="modal" data-bs-target="#resetModal">Azzera tutto</button>
     </section>
 
     <div class="modal fade" id="resetModal" tabindex="-1" aria-labelledby="resetModalLabel" aria-hidden="true">
       <div class="modal-dialog">
         <div class="modal-content">
           <div class="modal-header">
-            <h5 class="modal-title" id="resetModalLabel">Conferma azzeramento database</h5>
+            <h5 class="modal-title" id="resetModalLabel">Conferma reimposta</h5>
             <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
           </div>
           <div class="modal-body">
-            Stai per eliminare <strong>tutti i dati</strong>: osservazioni, aggregazioni mensili, modelli addestrati e previsioni.<br>
-            Questa operazione è <strong>irreversibile</strong>. Continuare?
+            Verranno eliminati <strong>tutti i dati</strong>: osservazioni, aggregazioni, modelli addestrati e previsioni.<br>
+            L'operazione è <strong>irreversibile</strong>. Continuare?
           </div>
           <div class="modal-footer">
             <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annulla</button>
             <form method="post" action="{{ url_for('upload.reset_db') }}">
-              <button type="submit" class="btn btn-danger">Sì, azzera tutto</button>
+              <button type="submit" class="btn btn-danger">Sì, reimposta</button>
             </form>
           </div>
         </div>
       </div>
     </div>
   </div>
+
   <div class="col-lg-7">
     <section class="panel">
-      <h2 class="h5 mb-3">Ultimi upload</h2>
+      <h2 class="h6 mb-3">File caricati</h2>
       <div class="table-responsive">
         <table class="table table-sm align-middle">
           <thead>
             <tr>
               <th>File</th>
               <th>Stato</th>
-              <th>Righe</th>
-              <th>Messaggio</th>
+              <th>Righe importate</th>
+              <th>Note</th>
             </tr>
           </thead>
           <tbody>
             {% for file in files %}
               <tr>
                 <td>{{ file.original_name }}</td>
-                <td><span class="badge text-bg-{{ 'success' if file.status == 'imported' else 'danger' if file.status == 'error' else 'secondary' }}">{{ file.status }}</span></td>
-                <td>{{ file.row_count }}</td>
-                <td>{{ file.message }}</td>
+                <td>
+                  <span class="badge text-bg-{{ 'success' if file.status == 'imported' else 'danger' if file.status == 'error' else 'warning' if file.status == 'skipped' else 'secondary' }}">
+                    {{ 'Importato' if file.status == 'imported' else 'Errore' if file.status == 'error' else 'Già presente' if file.status == 'skipped' else file.status }}
+                  </span>
+                </td>
+                <td>{{ file.row_count if file.row_count else '—' }}</td>
+                <td class="text-muted small">{{ file.message }}</td>
               </tr>
             {% else %}
-              <tr><td colspan="4" class="text-muted">Nessun upload registrato.</td></tr>
+              <tr><td colspan="4" class="text-muted">Nessun file caricato.</td></tr>
             {% endfor %}
           </tbody>
         </table>
