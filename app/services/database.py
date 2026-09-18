@@ -159,6 +159,7 @@ def save_training_summary(summary: dict) -> None:
 
 
 def save_prediction(prediction: dict) -> Prediction:
+    ci = prediction.get("ci")
     row = Prediction(
         prediction_month=prediction["prediction_month"],
         pathogen=prediction["pathogen"],
@@ -175,6 +176,7 @@ def save_prediction(prediction: dict) -> Prediction:
         resistant_pct=prediction["resistant_pct"],
         reliability=prediction["reliability"],
         reliability_reason=prediction["reliability_reason"],
+        ci_json=json.dumps(ci) if ci else None,
     )
     db.session.add(row)
     return row

@@ -85,6 +85,7 @@ def predict_sir(
     x = next_month_feature(pd.to_datetime(prediction_month), pathogen, antibiotic, laboratory, ward, samples)
 
     # Try pre-computed Prophet forecasts (primary scientific engine)
+    ci: dict[str, dict[str, float]] | None = None
     if raw_values is None:
         try:
             prophet_dir = prophet_output_dir(model_dir)
@@ -92,11 +93,19 @@ def predict_sir(
             prophet_raw = predict_percentages(
                 prophet_dir, pathogen, laboratory, antibiotic, dt.year, dt.month
             )
-            # predict_percentages returns {resistenti, intermedi, sensibili} keys
+            # predict_percentages returns {resistenti: {yhat, lower, upper}, ...}
             raw_values = {
-                "resistant_pct": prophet_raw.get("resistenti", 0.0),
-                "intermediate_pct": prophet_raw.get("intermedi", 0.0),
-                "sensitive_pct": prophet_raw.get("sensibili", 0.0),
+                "resistant_pct": prophet_raw["resistenti"]["yhat"],
+                "intermediate_pct": prophet_raw["intermedi"]["yhat"],
+                "sensitive_pct": prophet_raw["sensibili"]["yhat"],
+            }
+            ci = {
+                "resistant_lower": prophet_raw["resistenti"]["lower"],
+                "resistant_upper": prophet_raw["resistenti"]["upper"],
+                "intermediate_lower": prophet_raw["intermedi"]["lower"],
+                "intermediate_upper": prophet_raw["intermedi"]["upper"],
+                "sensitive_lower": prophet_raw["sensibili"]["lower"],
+                "sensitive_upper": prophet_raw["sensibili"]["upper"],
             }
             model_name = "prophet_pretrained"
             quantitative_model = "prophet_pretrained"
@@ -185,7 +194,7 @@ def predict_sir(
     normalized = normalize_prediction(raw_values)
     decision = _decision_summary(decision_values or raw_values)
     reliability, reason = reliability_level(samples, model_rmse, historical_std, scope)
-    return {
+    result = {
         "prediction_month": pd.to_datetime(prediction_month).to_period("M").to_timestamp("M").date(),
         "pathogen": pathogen,
         "antibiotic": antibiotic,
@@ -202,7 +211,9 @@ def predict_sir(
         "reliability": reliability,
         "reliability_reason": reason,
         "disclaimer": DISCLAIMER,
+        "ci": ci,
     }
+    return result
 
 
 def _predict_artifact_targets(model_dir: str | Path, model_name: str, x: pd.DataFrame) -> dict[str, float] | None:

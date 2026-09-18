@@ -179,9 +179,24 @@
               <div class="forecast-layout mt-3">
                 <div>
                   <div class="forecast-metrics">
-                    <div class="metric s">{{ latest_prediction.sensitive_pct|round(2) }}%<span>S</span></div>
-                    <div class="metric i">{{ latest_prediction.intermediate_pct|round(2) }}%<span>I</span></div>
-                    <div class="metric r">{{ latest_prediction.resistant_pct|round(2) }}%<span>R</span></div>
+                    <div class="metric s">
+                      {{ latest_prediction.sensitive_pct|round(1) }}%<span>S</span>
+                      {% if latest_ci %}
+                        <small class="ci-band">{{ latest_ci.sensitive_lower|round(1) }}–{{ latest_ci.sensitive_upper|round(1) }}%</small>
+                      {% endif %}
+                    </div>
+                    <div class="metric i">
+                      {{ latest_prediction.intermediate_pct|round(1) }}%<span>I</span>
+                      {% if latest_ci %}
+                        <small class="ci-band">{{ latest_ci.intermediate_lower|round(1) }}–{{ latest_ci.intermediate_upper|round(1) }}%</small>
+                      {% endif %}
+                    </div>
+                    <div class="metric r">
+                      {{ latest_prediction.resistant_pct|round(1) }}%<span>R</span>
+                      {% if latest_ci %}
+                        <small class="ci-band">{{ latest_ci.resistant_lower|round(1) }}–{{ latest_ci.resistant_upper|round(1) }}%</small>
+                      {% endif %}
+                    </div>
                   </div>
                   <div class="decision-tile mt-3">
                     <span>Classe finale suggerita</span>

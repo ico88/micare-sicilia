@@ -89,6 +89,7 @@ class Prediction(db.Model):
     resistant_pct = db.Column(db.Float, nullable=False)
     reliability = db.Column(db.String(20), nullable=False)
     reliability_reason = db.Column(db.Text, default="", nullable=False)
+    ci_json = db.Column(db.Text, nullable=True)
 
 
 class ValidationMetric(db.Model):

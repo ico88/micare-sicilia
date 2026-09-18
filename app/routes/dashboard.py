@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 import pandas as pd
@@ -52,6 +53,13 @@ def dashboard():
     prediction_year = _selected_prediction_year(request.args.get("prediction_year"), month_bounds[1])
     annual_prediction = _annual_prediction_summary(data, selected, prediction_year)
 
+    latest_ci = None
+    if latest_prediction and latest_prediction.ci_json:
+        try:
+            latest_ci = json.loads(latest_prediction.ci_json)
+        except (ValueError, TypeError):
+            latest_ci = None
+
     return render_template(
         "dashboard.html",
         has_data=not data.empty,
@@ -61,6 +69,7 @@ def dashboard():
         history_chart=_history_chart_payload(history),
         history_summary=_history_summary(history),
         latest_prediction=latest_prediction,
+        latest_ci=latest_ci,
         prediction_chart=_prediction_chart_payload(latest_prediction),
         latest_prediction_comparison=latest_prediction_comparison,
         recent_predictions=recent_predictions,

@@ -265,22 +265,38 @@ def predict_percentages(
     antibiotic: str,
     year: int,
     month: int,
-) -> dict[str, float]:
+) -> dict[str, dict[str, float]]:
+    """Return per-target yhat + confidence interval, normalized to sum to 100%.
+
+    Returns {target: {"yhat": float, "lower": float, "upper": float}}.
+    """
     forecasts = load_forecasts(output_dir)
     combination = f"{pathogen}_{laboratory}_{antibiotic}"
     date = pd.to_datetime(pd.Period(f"{year}-{month}", freq="M").end_time.date())
 
-    raw_values = {}
+    raw: dict[str, dict[str, float]] = {}
     for target in TARGETS:
         if combination not in forecasts[target]:
             raise KeyError(f"Nessuna previsione trovata per {combination}.")
         match = forecasts[target][combination][forecasts[target][combination]["ds"] == date]
         if match.empty:
             raise KeyError(f"Nessuna previsione trovata per {combination} alla data {date.date()}.")
-        raw_values[target] = max(0.0, float(match["yhat"].iloc[0]))
+        row = match.iloc[0]
+        raw[target] = {
+            "yhat": max(0.0, float(row["yhat"])),
+            "lower": max(0.0, float(row["yhat_lower"])),
+            "upper": max(0.0, float(row["yhat_upper"])),
+        }
 
-    total = sum(raw_values.values())
+    total = sum(v["yhat"] for v in raw.values())
     if total <= 0:
-        return {target: 0.0 for target in TARGETS}
+        return {t: {"yhat": 0.0, "lower": 0.0, "upper": 0.0} for t in TARGETS}
 
-    return {target: value * 100 / total for target, value in raw_values.items()}
+    return {
+        target: {
+            "yhat": v["yhat"] * 100 / total,
+            "lower": v["lower"] * 100 / total,
+            "upper": v["upper"] * 100 / total,
+        }
+        for target, v in raw.items()
+    }

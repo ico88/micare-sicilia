@@ -54,6 +54,7 @@ def _ensure_schema_migrations() -> None:
         "decision_model": "VARCHAR(120) NOT NULL DEFAULT ''",
         "decision_class": "VARCHAR(1) NOT NULL DEFAULT ''",
         "decision_confidence": "FLOAT",
+        "ci_json": "TEXT",
     })
     _migrate_table(inspector, tables, "validation_metrics", {
         "mase": "FLOAT",
