@@ -111,6 +111,39 @@
 </div>
 {% endfor %}
 
+<!-- Results summary (shown after successful run) -->
+{% if run and run.status == 'success' and run.summary %}
+<div class="panel mt-3 mb-2" id="results-summary">
+  <div class="fw-semibold mb-3" style="font-size:1rem;">
+    Risultati addestramento
+  </div>
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:0.75rem;margin-bottom:1.25rem;">
+    <div class="summary-tile">
+      <small>Combinazioni addestrate</small>
+      <strong>{{ run.summary.n_combinations_final or '—' }}</strong>
+    </div>
+    <div class="summary-tile">
+      <small>Previsioni pre-calcolate</small>
+      <strong>{{ run.summary.n_forecasts or '—' }}</strong>
+    </div>
+    <div class="summary-tile">
+      <small>Anni di dati</small>
+      <strong>{{ (run.summary.years | length) if run.summary.years else '—' }}</strong>
+    </div>
+    <div class="summary-tile">
+      <small>Orizzonte previsivo</small>
+      <strong>60 mesi</strong>
+    </div>
+  </div>
+
+  <!-- Step comparison bar chart -->
+  <div class="mb-2 text-muted small fw-semibold">Combinazioni Prophet valide per step</div>
+  <div style="height:80px;position:relative;">
+    <canvas id="summaryChart"></canvas>
+  </div>
+</div>
+{% endif %}
+
 <!-- Error -->
 {% if run and run.error %}
 <div class="alert alert-danger mt-3">
@@ -247,6 +280,38 @@ pollInterval = setInterval(async () => {
 
 {% if run %}
 applyAll({{ run | tojson }});
+{% endif %}
+
+{% if run and run.status == 'success' and run.summary %}
+const summaryCtx = document.getElementById('summaryChart');
+if (summaryCtx) {
+  new Chart(summaryCtx.getContext('2d'), {
+    type: 'bar',
+    data: {
+      labels: ['Step 2 (CV espansa)', 'Step 3 (CV raffinata)', 'Step 4 (finale)'],
+      datasets: [{
+        label: 'Combinazioni',
+        data: [
+          {{ run.summary.n_combinations_step2 or 0 }},
+          {{ run.summary.n_combinations_step3 or 0 }},
+          {{ run.summary.n_combinations_final or 0 }},
+        ],
+        backgroundColor: ['#93c5fd', '#60a5fa', '#2563eb'],
+        borderRadius: 4,
+      }],
+    },
+    options: {
+      indexAxis: 'y',
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { beginAtZero: true, ticks: { stepSize: 1 } },
+        y: { ticks: { font: { size: 11 } } },
+      },
+    },
+  });
+}
 {% endif %}
 </script>
 {% endblock %}

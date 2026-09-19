@@ -167,7 +167,8 @@ def process_combination(
                 y_true = y_true_raw[valid]
 
                 rmse_values.append(float(np.sqrt(mean_squared_error(y_true, y_pred))))
-                y_true_stable = np.where(y_true == 0, 0.0001, y_true)
+                # Denominatore minimo 1 pp (lavoriamo su scala 0-100%)
+                y_true_stable = np.where(np.abs(y_true) < 1.0, 1.0, y_true)
                 mape_values.append(float(np.mean(np.abs((y_true - y_pred) / y_true_stable)) * 100))
                 mase = calculate_mase(y_true, y_pred, y_train)
                 if not np.isnan(mase):

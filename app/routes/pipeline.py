@@ -182,6 +182,12 @@ def explore():
 # Clinical
 # ---------------------------------------------------------------------------
 
+def _forecast_months() -> list[str]:
+    """Return sorted list of available forecast months as 'YYYY-MM' strings."""
+    rows = db.session.query(CombinationForecast.forecast_month).distinct().order_by(CombinationForecast.forecast_month).all()
+    return [r[0].strftime("%Y-%m") for r in rows if r[0]]
+
+
 @bp.route("/clinical")
 def clinical():
     pathogens = db.session.query(CombinationForecast.pathogen).distinct().order_by(CombinationForecast.pathogen).all()
@@ -192,6 +198,7 @@ def clinical():
         pathogens=[p[0] for p in pathogens],
         antibiotics=[a[0] for a in antibiotics],
         laboratories=[l[0] for l in laboratories],
+        months=_forecast_months(),
         result=None,
         form={},
     )
@@ -249,6 +256,7 @@ def clinical_query():
         pathogens=[p[0] for p in pathogens],
         antibiotics=[a[0] for a in antibiotics],
         laboratories=[l[0] for l in laboratories],
+        months=_forecast_months(),
         result=result,
         error=error,
         form=form,

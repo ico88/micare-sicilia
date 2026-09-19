@@ -48,9 +48,20 @@
 
         <div class="mb-3">
           <label class="form-label fw-semibold">Mese di riferimento</label>
-          <input type="month" name="month" class="form-control"
-                 value="{{ form.month }}" required>
-          <div class="form-text">Seleziona un mese nei prossimi 24 mesi.</div>
+          {% if months %}
+          <select name="month" class="form-select" required>
+            <option value="">— seleziona mese —</option>
+            {% for m in months %}
+              <option value="{{ m }}" {% if form.month == m %}selected{% endif %}>
+                {{ m }}
+              </option>
+            {% endfor %}
+          </select>
+          {% else %}
+          <div class="alert alert-info mb-0 py-2 small">
+            Nessuna previsione disponibile. <a href="{{ url_for('pipeline.wizard') }}">Avvia prima la pipeline.</a>
+          </div>
+          {% endif %}
         </div>
 
         <button type="submit" class="btn btn-primary w-100">Calcola previsione</button>
