@@ -19,6 +19,8 @@ dependencies = [
   "plotly>=5.20",
   "prophet>=1.1",
   "scikit-learn>=1.4",
+  "statsmodels>=0.14",
+  "gunicorn>=21.0",
   "tqdm>=4.66",
 ]
 
