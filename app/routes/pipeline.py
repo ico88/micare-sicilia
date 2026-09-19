@@ -18,11 +18,24 @@ bp = Blueprint("pipeline", __name__)
 
 def _run_to_dict(run: PipelineRun) -> dict:
     import json
+    from datetime import timezone
     summary: dict = {}
     try:
         summary = json.loads(run.summary_json or "{}")
     except Exception:
         pass
+
+    # Compute elapsed and ETA
+    elapsed_seconds = None
+    eta_seconds = None
+    if run.created_at:
+        end = run.finished_at or datetime.utcnow()
+        elapsed_seconds = (end - run.created_at).total_seconds()
+        pct = run.progress or 0
+        if run.status in ("running", "queued") and pct > 2:
+            total_est = elapsed_seconds * 100 / pct
+            eta_seconds = max(0.0, total_est - elapsed_seconds)
+
     return {
         "id": run.id,
         "status": run.status,
@@ -38,6 +51,8 @@ def _run_to_dict(run: PipelineRun) -> dict:
         "finished_at": run.finished_at.isoformat() if run.finished_at else None,
         "summary": summary,
         "stop_requested": run.stop_requested,
+        "elapsed_seconds": elapsed_seconds,
+        "eta_seconds": eta_seconds,
     }
 
 

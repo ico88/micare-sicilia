@@ -3,140 +3,124 @@
 
 {% block content %}
 <div class="d-flex align-items-center justify-content-between mb-3">
-  <h1 class="h4 mb-0">Pipeline di analisi</h1>
-  {% if run %}
-    {% if run.status == "running" or run.status == "queued" %}
-      <span class="badge bg-primary fs-6" id="status-badge">
-        <span class="spinner-border spinner-border-sm me-1" role="status"></span>
-        In esecuzione
-      </span>
-    {% elif run.status == "success" %}
-      <span class="badge bg-success fs-6" id="status-badge">Completata</span>
-    {% elif run.status == "error" %}
-      <span class="badge bg-danger fs-6" id="status-badge">Errore</span>
-    {% elif run.status == "stopped" or run.status == "interrupted" %}
-      <span class="badge bg-warning text-dark fs-6" id="status-badge">Interrotta</span>
-    {% else %}
-      <span class="badge bg-secondary fs-6" id="status-badge">{{ run.status }}</span>
-    {% endif %}
-  {% else %}
-    <span class="badge bg-secondary fs-6" id="status-badge">Non avviata</span>
-  {% endif %}
+  <h1 class="page-heading mb-0">Pipeline di analisi</h1>
+  <span id="status-badge" class="badge fs-6
+    {% if run %}
+      {% if run.status in ('running', 'queued') %}bg-primary
+      {% elif run.status == 'success' %}bg-success
+      {% elif run.status == 'error' %}bg-danger
+      {% else %}bg-warning text-dark{% endif %}
+    {% else %}bg-secondary{% endif %}">
+    {% if run %}
+      {% if run.status in ('running', 'queued') %}
+        <span class="spinner-border spinner-border-sm me-1" role="status"></span>In esecuzione
+      {% elif run.status == 'success' %}Completata
+      {% elif run.status == 'error' %}Errore
+      {% elif run.status in ('stopped', 'interrupted') %}Interrotta
+      {% else %}{{ run.status }}{% endif %}
+    {% else %}Non avviata{% endif %}
+  </span>
 </div>
 
 <!-- Progress bar -->
-<div class="panel mb-4">
+<div class="panel mb-3">
   <div class="d-flex justify-content-between small text-muted mb-1">
     <span id="progress-msg">{{ run.message if run else "Nessuna pipeline avviata." }}</span>
     <span id="progress-pct">{{ run.progress if run else 0 }}%</span>
   </div>
-  <div class="progress" style="height:10px;">
+  <div class="progress mb-2" style="height:8px;border-radius:4px;">
     <div class="progress-bar bg-primary" id="progress-bar"
          role="progressbar"
-         style="width:{{ run.progress if run else 0 }}%;"
+         style="width:{{ run.progress if run else 0 }}%;transition:width .4s ease;"
          aria-valuenow="{{ run.progress if run else 0 }}"
          aria-valuemin="0" aria-valuemax="100"></div>
   </div>
 </div>
 
-<!-- Step cards -->
-<div class="mb-4">
-
-  <!-- Step 1 -->
-  <div class="panel mb-3 d-flex align-items-start gap-3">
-    <div class="mt-1">
-      {% if data.row_count > 0 %}
-        <span class="badge bg-success rounded-pill px-3 py-2">1</span>
-      {% else %}
-        <span class="badge bg-secondary rounded-pill px-3 py-2">1</span>
-      {% endif %}
-    </div>
-    <div class="flex-grow-1">
-      <div class="fw-semibold mb-1">Dati caricati</div>
-      {% if data.row_count > 0 %}
-        <div class="text-muted small">
-          {{ data.row_count }} righe aggregate disponibili
-          {% if data.year_min and data.year_max %}
-            ({{ data.year_min }}–{{ data.year_max }})
-          {% endif %}
-        </div>
-      {% else %}
-        <div class="text-warning small">
-          Nessun dato trovato. <a href="{{ url_for('upload.upload') }}">Carica i file CSV</a> prima di avviare la pipeline.
-        </div>
-      {% endif %}
-    </div>
-  </div>
-
-  <!-- Step 2 -->
-  <div class="panel mb-3 d-flex align-items-start gap-3" id="step2-card">
-    <div class="mt-1">
-      <span class="badge rounded-pill px-3 py-2 step-badge" id="step2-badge"
-            data-status="{{ run.step2_status if run else 'pending' }}">2</span>
-    </div>
-    <div class="flex-grow-1">
-      <div class="fw-semibold mb-1">Validazione espansa</div>
-      <div class="text-muted small">
-        Addestra Prophet sui primi 3 anni disponibili e valida sugli anni rimanenti.
-        Calcola RMSE e metriche di affidabilità per ogni combinazione.
-      </div>
-      <div id="step2-msg" class="small mt-1 text-muted"></div>
-    </div>
-    <div id="step2-spinner" class="d-none">
-      <span class="spinner-border spinner-border-sm text-primary" role="status"></span>
-    </div>
-  </div>
-
-  <!-- Step 3 -->
-  <div class="panel mb-3 d-flex align-items-start gap-3" id="step3-card">
-    <div class="mt-1">
-      <span class="badge rounded-pill px-3 py-2 step-badge" id="step3-badge"
-            data-status="{{ run.step3_status if run else 'pending' }}">3</span>
-    </div>
-    <div class="flex-grow-1">
-      <div class="fw-semibold mb-1">Validazione raffinata</div>
-      <div class="text-muted small">
-        Addestra Prophet su tutti gli anni tranne l'ultimo e valida sull'anno più recente.
-        Confronto con baseline ARIMA.
-      </div>
-      <div id="step3-msg" class="small mt-1 text-muted"></div>
-    </div>
-    <div id="step3-spinner" class="d-none">
-      <span class="spinner-border spinner-border-sm text-primary" role="status"></span>
-    </div>
-  </div>
-
-  <!-- Step 4 -->
-  <div class="panel mb-3 d-flex align-items-start gap-3" id="step4-card">
-    <div class="mt-1">
-      <span class="badge rounded-pill px-3 py-2 step-badge" id="step4-badge"
-            data-status="{{ run.step4_status if run else 'pending' }}">4</span>
-    </div>
-    <div class="flex-grow-1">
-      <div class="fw-semibold mb-1">Addestramento finale e pre-calcolo previsioni</div>
-      <div class="text-muted small">
-        Addestra Prophet su tutti gli anni disponibili. Pre-calcola le previsioni per tutte
-        le combinazioni patogeno/antibiotico/laboratorio per i prossimi 24 mesi.
-      </div>
-      <div id="step4-msg" class="small mt-1 text-muted"></div>
-    </div>
-    <div id="step4-spinner" class="d-none">
-      <span class="spinner-border spinner-border-sm text-primary" role="status"></span>
-    </div>
-  </div>
-
+<!-- Timing row -->
+<div class="pipeline-timing mb-3" id="timing-row"
+     {% if not run or run.status not in ('running','queued','success','error') %}style="display:none"{% endif %}>
+  <span>⏱ Trascorso: <strong id="timing-elapsed">—</strong></span>
+  <span id="timing-eta-wrap">ETA: <strong id="timing-eta">—</strong></span>
+  {% if run and run.created_at %}
+  <span>Avviata: <strong>{{ run.created_at | string | truncate(16, True, '') }}</strong></span>
+  {% endif %}
 </div>
 
-<!-- Error display -->
+<!-- Step cards -->
+{% set step_meta = [
+  (2, "step2", "Validazione espansa",
+   "Addestra Prophet sui primi 3 anni disponibili e valida sugli anni rimanenti. Calcola RMSE e affidabilità per ogni combinazione."),
+  (3, "step3", "Validazione raffinata",
+   "Addestra Prophet su tutti gli anni tranne l'ultimo e valida sull'anno più recente. Confronto con baseline ARIMA."),
+  (4, "step4", "Addestramento finale & pre-calcolo previsioni",
+   "Addestra Prophet su tutti i dati disponibili. Pre-calcola le previsioni per tutte le combinazioni per i prossimi 24+ mesi."),
+] %}
+
+<!-- Step 1 — always shown -->
+<div class="step-card">
+  <div class="step-num {{ 'done' if data.row_count > 0 else 'pending' }}">
+    {% if data.row_count > 0 %}✓{% else %}1{% endif %}
+  </div>
+  <div class="step-body">
+    <div class="step-title">Dati caricati</div>
+    {% if data.row_count > 0 %}
+      <div class="step-desc text-success">
+        {{ data.row_count }} righe aggregate disponibili
+        {% if data.year_min and data.year_max %}({{ data.year_min }}–{{ data.year_max }}){% endif %}
+      </div>
+    {% else %}
+      <div class="step-desc text-warning">
+        Nessun dato trovato.
+        <a href="{{ url_for('upload.upload') }}">Carica i file CSV</a> prima di avviare la pipeline.
+      </div>
+    {% endif %}
+  </div>
+</div>
+
+{% for num, key, title, desc in step_meta %}
+{% set st = run[key + '_status'] if run else 'pending' %}
+<div class="step-card {{ 'step-running' if st == 'running' else '' }}" id="{{ key }}-card">
+  <div class="step-num {{ st }}" id="{{ key }}-num">
+    {% if st == 'done' %}✓
+    {% elif st == 'error' %}✕
+    {% else %}{{ num }}{% endif %}
+  </div>
+  <div class="step-body">
+    <div class="step-title">{{ title }}</div>
+    <div class="step-desc">{{ desc }}</div>
+    <div id="{{ key }}-msg" class="step-status-msg
+      {% if st == 'done' %}text-success
+      {% elif st == 'running' %}text-primary
+      {% elif st == 'error' %}text-danger{% else %}text-muted{% endif %}">
+      {% if st == 'done' %}Completato
+      {% elif st == 'running' %}In corso…
+      {% elif st == 'error' %}Errore
+      {% else %}In attesa{% endif %}
+    </div>
+  </div>
+  {% if st == 'running' %}
+  <div id="{{ key }}-spinner">
+    <span class="spinner-border spinner-border-sm text-primary" role="status"></span>
+  </div>
+  {% else %}
+  <div id="{{ key }}-spinner" class="d-none">
+    <span class="spinner-border spinner-border-sm text-primary" role="status"></span>
+  </div>
+  {% endif %}
+</div>
+{% endfor %}
+
+<!-- Error -->
 {% if run and run.error %}
-<div class="alert alert-danger mb-4">
+<div class="alert alert-danger mt-3">
   <strong>Dettaglio errore:</strong>
   <pre class="mt-2 mb-0 small" style="white-space:pre-wrap;">{{ run.error }}</pre>
 </div>
 {% endif %}
 
 <!-- Action buttons -->
-<div class="d-flex gap-2" id="action-buttons">
+<div class="d-flex gap-2 mt-3" id="action-buttons">
   {% if not run or run.status not in ('running', 'queued') %}
     <form method="post" action="{{ url_for('pipeline.start') }}">
       <button type="submit" class="btn btn-primary"
@@ -151,77 +135,99 @@
   {% else %}
     <form method="post" action="{{ url_for('pipeline.stop') }}">
       <input type="hidden" name="run_id" value="{{ run.id }}">
-      <button type="submit" class="btn btn-warning text-dark">
-        Interrompi pipeline
-      </button>
+      <button type="submit" class="btn btn-warning text-dark">Interrompi pipeline</button>
     </form>
   {% endif %}
 
   {% if run and run.status == 'success' %}
-    <a href="{{ url_for('pipeline.explore') }}" class="btn btn-outline-success">
-      Esplora risultati
-    </a>
-    <a href="{{ url_for('pipeline.clinical') }}" class="btn btn-outline-primary">
-      Consulta previsioni
-    </a>
+    <a href="{{ url_for('pipeline.explore') }}" class="btn btn-outline-success">Esplora risultati</a>
+    <a href="{{ url_for('pipeline.clinical') }}" class="btn btn-outline-primary">Consulta previsioni</a>
   {% endif %}
 </div>
 {% endblock %}
 
 {% block scripts %}
 <script>
-const STATUS_COLORS = {
-  pending: 'bg-secondary',
-  running: 'bg-primary',
-  done:    'bg-success',
-  error:   'bg-danger',
-  skipped: 'bg-secondary',
+const STATUS_MAP = {
+  pending: { cls: 'pending', label: 'In attesa', msgCls: 'text-muted' },
+  running: { cls: 'running', label: 'In corso…', msgCls: 'text-primary' },
+  done:    { cls: 'done',    label: 'Completato', msgCls: 'text-success' },
+  error:   { cls: 'error',   label: 'Errore', msgCls: 'text-danger' },
+  skipped: { cls: 'skipped', label: 'Saltato', msgCls: 'text-muted' },
 };
 
-function applyStepBadge(badgeEl, spinnerEl, status) {
-  for (const cls of Object.values(STATUS_COLORS)) badgeEl.classList.remove(cls);
-  badgeEl.classList.add(STATUS_COLORS[status] || 'bg-secondary');
-  if (spinnerEl) {
-    spinnerEl.classList.toggle('d-none', status !== 'running');
+function fmtSeconds(s) {
+  if (!s || s < 0) return '—';
+  s = Math.round(s);
+  const h = Math.floor(s / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  const sec = s % 60;
+  if (h > 0) return `${h}h ${m}m`;
+  if (m > 0) return `${m}m ${sec}s`;
+  return `${sec}s`;
+}
+
+function applyStep(key, status) {
+  const num = document.getElementById(key + '-num');
+  const spinner = document.getElementById(key + '-spinner');
+  const msg = document.getElementById(key + '-msg');
+  const card = document.getElementById(key + '-card');
+  const info = STATUS_MAP[status] || STATUS_MAP.pending;
+
+  if (num) {
+    num.className = 'step-num ' + info.cls;
+    num.textContent = status === 'done' ? '✓' : status === 'error' ? '✕' :
+                      key === 'step2' ? '2' : key === 'step3' ? '3' : '4';
   }
+  if (spinner) spinner.classList.toggle('d-none', status !== 'running');
+  if (msg) {
+    msg.textContent = info.label;
+    msg.className = 'step-status-msg ' + info.msgCls;
+  }
+  if (card) card.classList.toggle('step-running', status === 'running');
 }
 
 function applyAll(data) {
-  // Progress bar
   const pct = data.progress ?? 0;
-  document.getElementById('progress-bar').style.width = pct + '%';
-  document.getElementById('progress-bar').setAttribute('aria-valuenow', pct);
+  const bar = document.getElementById('progress-bar');
+  bar.style.width = pct + '%';
+  bar.setAttribute('aria-valuenow', pct);
   document.getElementById('progress-pct').textContent = pct + '%';
   document.getElementById('progress-msg').textContent = data.message ?? '';
 
-  // Status badge
   const sb = document.getElementById('status-badge');
-  const statusText = { running: 'In esecuzione', queued: 'In coda', success: 'Completata',
-                        error: 'Errore', stopped: 'Interrotta', interrupted: 'Interrotta' };
-  sb.textContent = statusText[data.status] || data.status;
+  const labelMap = { running: 'In esecuzione', queued: 'In esecuzione', success: 'Completata',
+                     error: 'Errore', stopped: 'Interrotta', interrupted: 'Interrotta' };
+  sb.innerHTML = (data.status === 'running' || data.status === 'queued')
+    ? '<span class="spinner-border spinner-border-sm me-1"></span>' + (labelMap[data.status] || data.status)
+    : (labelMap[data.status] || data.status);
   sb.className = 'badge fs-6';
   if (data.status === 'running' || data.status === 'queued') sb.classList.add('bg-primary');
   else if (data.status === 'success') sb.classList.add('bg-success');
   else if (data.status === 'error') sb.classList.add('bg-danger');
   else sb.classList.add('bg-warning', 'text-dark');
 
-  // Steps
-  ['step2', 'step3', 'step4'].forEach(s => {
-    const badge = document.getElementById(s + '-badge');
-    const spinner = document.getElementById(s + '-spinner');
-    const msg = document.getElementById(s + '-msg');
-    const status = data[s + '_status'] || 'pending';
-    if (badge) applyStepBadge(badge, spinner, status);
-    if (msg) msg.textContent = status === 'done' ? 'Completato ✓' :
-                               status === 'running' ? 'In corso...' :
-                               status === 'error' ? 'Errore' : '';
-  });
+  ['step2', 'step3', 'step4'].forEach(s => applyStep(s, data[s + '_status'] || 'pending'));
 
-  // Show/hide reload button when done
-  if (data.status === 'success' || data.status === 'error' || data.status === 'stopped') {
+  // Timing
+  const timingRow = document.getElementById('timing-row');
+  if (data.elapsed_seconds != null) {
+    timingRow.style.display = '';
+    document.getElementById('timing-elapsed').textContent = fmtSeconds(data.elapsed_seconds);
+    const etaEl = document.getElementById('timing-eta');
+    const etaWrap = document.getElementById('timing-eta-wrap');
+    if (data.status === 'running' || data.status === 'queued') {
+      etaWrap.style.display = '';
+      etaEl.textContent = data.eta_seconds != null ? fmtSeconds(data.eta_seconds) : '…';
+    } else {
+      etaWrap.style.display = 'none';
+    }
+  }
+
+  if (!['running', 'queued'].includes(data.status)) {
     clearInterval(pollInterval);
-    if (data.status === 'success' || data.status === 'error') {
-      setTimeout(() => location.reload(), 1000);
+    if (['success', 'error', 'stopped'].includes(data.status)) {
+      setTimeout(() => location.reload(), 1200);
     }
   }
 }
@@ -235,15 +241,10 @@ pollInterval = setInterval(async () => {
     if (!resp.ok) return;
     const data = await resp.json();
     applyAll(data);
-    if (!['running', 'queued'].includes(data.status)) {
-      clearInterval(pollInterval);
-      setTimeout(() => location.reload(), 1200);
-    }
-  } catch (e) { /* network hiccup, ignore */ }
+  } catch (e) { /* network hiccup */ }
 }, 3000);
 {% endif %}
 
-// Apply initial state
 {% if run %}
 applyAll({{ run | tojson }});
 {% endif %}

@@ -8,37 +8,148 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}">
   </head>
   <body>
-    <nav class="navbar navbar-expand-lg border-bottom bg-white">
-      <div class="container-fluid">
-        <a class="navbar-brand fw-bold text-primary" href="{{ url_for('dashboard.dashboard') }}">MIC RES Sicilia</a>
-        <div class="navbar-nav ms-auto gap-1">
-          <a class="nav-link" href="{{ url_for('pipeline.wizard') }}">Analisi</a>
-          <a class="nav-link" href="{{ url_for('upload.upload') }}">Dati</a>
-          <a class="nav-link" href="{{ url_for('pipeline.explore') }}">Esplora</a>
-          <a class="nav-link" href="{{ url_for('pipeline.clinical') }}">Consulta</a>
-          <a class="nav-link text-muted small" href="{{ url_for('dashboard.validation_report') }}">Rapporto tecnico</a>
-        </div>
-      </div>
-    </nav>
 
-    <main class="container-fluid py-4">
-      {% with messages = get_flashed_messages(with_categories=true) %}
-        {% if messages %}
-          <div class="mb-3">
-            {% for category, message in messages %}
-              <div class="alert alert-{{ category }} alert-dismissible mb-2">
-                {{ message }}
-                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-              </div>
-            {% endfor %}
-          </div>
-        {% endif %}
-      {% endwith %}
-      {% block content %}{% endblock %}
-    </main>
+    <!-- Mobile top bar -->
+    <div class="mobile-topbar d-lg-none">
+      <button class="sidebar-toggle" id="sidebarToggle" aria-label="Menu">
+        <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
+          <rect x="2" y="4" width="16" height="2" rx="1"/>
+          <rect x="2" y="9" width="16" height="2" rx="1"/>
+          <rect x="2" y="14" width="16" height="2" rx="1"/>
+        </svg>
+      </button>
+      <span class="mobile-brand">MIC RES Sicilia</span>
+    </div>
+
+    <!-- Sidebar backdrop (mobile) -->
+    <div class="sidebar-backdrop d-lg-none" id="sidebarBackdrop"></div>
+
+    <div class="app-shell">
+
+      <!-- Sidebar -->
+      <nav class="sidebar" id="sidebar">
+        <div class="sidebar-brand">
+          <svg width="28" height="28" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <circle cx="14" cy="14" r="13" fill="#3b82f6" opacity=".15"/>
+            <path d="M7 14 Q14 6 21 14 Q14 22 7 14Z" fill="#3b82f6"/>
+            <circle cx="14" cy="14" r="3" fill="#fff"/>
+          </svg>
+          <span>MIC RES Sicilia</span>
+        </div>
+
+        <div class="sidebar-section-label">Analisi</div>
+        <ul class="sidebar-nav">
+          <li>
+            <a href="{{ url_for('pipeline.wizard') }}"
+               class="sidebar-link {% if request.endpoint == 'pipeline.wizard' %}active{% endif %}">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+              </svg>
+              Pipeline
+            </a>
+          </li>
+          <li>
+            <a href="{{ url_for('pipeline.explore') }}"
+               class="sidebar-link {% if request.endpoint == 'pipeline.explore' %}active{% endif %}">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+              </svg>
+              Esplora previsioni
+            </a>
+          </li>
+          <li>
+            <a href="{{ url_for('pipeline.clinical') }}"
+               class="sidebar-link {% if request.endpoint in ('pipeline.clinical', 'pipeline.clinical_query') %}active{% endif %}">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M22 12h-4l-3 9L9 3l-3 9H2"/>
+              </svg>
+              Consulta clinica
+            </a>
+          </li>
+        </ul>
+
+        <div class="sidebar-section-label">Dati</div>
+        <ul class="sidebar-nav">
+          <li>
+            <a href="{{ url_for('upload.upload') }}"
+               class="sidebar-link {% if request.endpoint == 'upload.upload' %}active{% endif %}">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/>
+                <polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
+              </svg>
+              Carica dati
+            </a>
+          </li>
+          <li>
+            <a href="{{ url_for('dashboard.dashboard') }}"
+               class="sidebar-link {% if request.endpoint == 'dashboard.dashboard' %}active{% endif %}">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/>
+                <rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/>
+              </svg>
+              Dashboard
+            </a>
+          </li>
+        </ul>
+
+        <div class="sidebar-section-label">Report</div>
+        <ul class="sidebar-nav">
+          <li>
+            <a href="{{ url_for('dashboard.validation_report') }}"
+               class="sidebar-link {% if request.endpoint == 'dashboard.validation_report' %}active{% endif %}">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/>
+                <polyline points="14 2 14 8 20 8"/>
+                <line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/>
+                <polyline points="10 9 9 9 8 9"/>
+              </svg>
+              Rapporto tecnico
+            </a>
+          </li>
+        </ul>
+
+        <div class="sidebar-footer">
+          <span class="text-muted" style="font-size:0.72rem;">Rete MIC Sicilia · UniCT</span>
+        </div>
+      </nav>
+
+      <!-- Main content -->
+      <main class="main-content">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+          {% if messages %}
+            <div class="mb-3">
+              {% for category, message in messages %}
+                <div class="alert alert-{{ category }} alert-dismissible mb-2">
+                  {{ message }}
+                  <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>
+              {% endfor %}
+            </div>
+          {% endif %}
+        {% endwith %}
+        {% block content %}{% endblock %}
+      </main>
+
+    </div><!-- /.app-shell -->
 
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+      // Sidebar mobile toggle
+      const toggleBtn = document.getElementById('sidebarToggle');
+      const sidebar = document.getElementById('sidebar');
+      const backdrop = document.getElementById('sidebarBackdrop');
+      if (toggleBtn) {
+        toggleBtn.addEventListener('click', () => {
+          sidebar.classList.toggle('open');
+          backdrop.classList.toggle('visible');
+        });
+        backdrop.addEventListener('click', () => {
+          sidebar.classList.remove('open');
+          backdrop.classList.remove('visible');
+        });
+      }
+    </script>
     {% block scripts %}{% endblock %}
   </body>
 </html>
