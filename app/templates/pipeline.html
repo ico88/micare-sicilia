@@ -220,7 +220,7 @@ function applyStep(key, status) {
   if (card) card.classList.toggle('step-running', status === 'running');
 }
 
-function applyAll(data) {
+function applyAll(data, allowReload = true) {
   const pct = data.progress ?? 0;
   const bar = document.getElementById('progress-bar');
   bar.style.width = pct + '%';
@@ -259,15 +259,18 @@ function applyAll(data) {
 
   if (!['running', 'queued'].includes(data.status)) {
     clearInterval(pollInterval);
-    if (['success', 'error', 'stopped'].includes(data.status)) {
+    if (allowReload && isPolling && ['success', 'error', 'stopped'].includes(data.status)) {
+      isPolling = false;
       setTimeout(() => location.reload(), 1200);
     }
   }
 }
 
 let pollInterval = null;
+let isPolling = false;   // only reload when we were actively polling
 
 {% if run and run.status in ('running', 'queued') %}
+isPolling = true;
 pollInterval = setInterval(async () => {
   try {
     const resp = await fetch('{{ url_for("pipeline.status_json") }}');
@@ -279,7 +282,8 @@ pollInterval = setInterval(async () => {
 {% endif %}
 
 {% if run %}
-applyAll({{ run | tojson }});
+// Initial render — pass isPolling=false so no reload is triggered on load
+applyAll({{ run | tojson }}, false);
 {% endif %}
 
 {% if run and run.status == 'success' and run.summary %}

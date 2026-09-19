@@ -9,6 +9,30 @@ from sqlalchemy import inspect, text as sql_text
 db = SQLAlchemy()
 
 
+def _read_version() -> str:
+    """Return version string: VERSION file + short git hash if available."""
+    try:
+        v = (base_dir_for_version() / "VERSION").read_text().strip()
+    except Exception:
+        v = "dev"
+    try:
+        import subprocess
+        sha = subprocess.check_output(
+            ["git", "rev-parse", "--short", "HEAD"],
+            cwd=str(base_dir_for_version()), stderr=subprocess.DEVNULL,
+        ).decode().strip()
+        return f"{v} ({sha})"
+    except Exception:
+        return v
+
+
+def base_dir_for_version() -> Path:
+    return Path(__file__).resolve().parent.parent
+
+
+APP_VERSION: str = _read_version()
+
+
 def create_app(test_config: dict | None = None) -> Flask:
     app = Flask(__name__, instance_relative_config=True)
     base_dir = Path(__file__).resolve().parent.parent
@@ -30,6 +54,10 @@ def create_app(test_config: dict | None = None) -> Flask:
     Path(app.config["MODEL_FOLDER"]).mkdir(exist_ok=True)
 
     db.init_app(app)
+
+    @app.context_processor
+    def inject_version():
+        return {"app_version": APP_VERSION}
 
     from . import models  # noqa: F401
     from .routes.dashboard import bp as dashboard_bp
