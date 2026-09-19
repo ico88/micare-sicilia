@@ -183,23 +183,40 @@ def explore():
 # ---------------------------------------------------------------------------
 
 def _forecast_months() -> list[str]:
-    """Return sorted list of available forecast months as 'YYYY-MM' strings."""
     rows = db.session.query(CombinationForecast.forecast_month).distinct().order_by(CombinationForecast.forecast_month).all()
     return [r[0].strftime("%Y-%m") for r in rows if r[0]]
 
 
+def _combo_map() -> dict:
+    """Return nested map: {pathogen: {antibiotic: [laboratory, ...]}} for all available forecasts."""
+    rows = (
+        db.session.query(
+            CombinationForecast.pathogen,
+            CombinationForecast.antibiotic,
+            CombinationForecast.laboratory,
+        )
+        .distinct()
+        .order_by(
+            CombinationForecast.pathogen,
+            CombinationForecast.antibiotic,
+            CombinationForecast.laboratory,
+        )
+        .all()
+    )
+    result: dict = {}
+    for pathogen, antibiotic, laboratory in rows:
+        result.setdefault(pathogen, {}).setdefault(antibiotic, []).append(laboratory)
+    return result
+
+
 @bp.route("/clinical")
 def clinical():
-    pathogens = db.session.query(CombinationForecast.pathogen).distinct().order_by(CombinationForecast.pathogen).all()
-    antibiotics = db.session.query(CombinationForecast.antibiotic).distinct().order_by(CombinationForecast.antibiotic).all()
-    laboratories = db.session.query(CombinationForecast.laboratory).distinct().order_by(CombinationForecast.laboratory).all()
     return render_template(
         "clinical.html",
-        pathogens=[p[0] for p in pathogens],
-        antibiotics=[a[0] for a in antibiotics],
-        laboratories=[l[0] for l in laboratories],
+        combo_map=_combo_map(),
         months=_forecast_months(),
         result=None,
+        error=None,
         form={},
     )
 
@@ -253,9 +270,7 @@ def clinical_query():
 
     return render_template(
         "clinical.html",
-        pathogens=[p[0] for p in pathogens],
-        antibiotics=[a[0] for a in antibiotics],
-        laboratories=[l[0] for l in laboratories],
+        combo_map=_combo_map(),
         months=_forecast_months(),
         result=result,
         error=error,

@@ -6,21 +6,29 @@
   <div class="col-lg-7">
 
     <div class="mb-4">
-      <h1 class="h4 mb-1">Consulta previsioni AMR</h1>
+      <h1 class="page-heading mb-1">Consulta previsioni AMR</h1>
       <p class="text-muted small">
-        Seleziona patogeno, antibiotico, struttura e mese per ottenere la stima previsionale
-        di sensibilità, resistenza intermedia e resistenza.
+        Seleziona patogeno, antibiotico e struttura: i menu si aggiornano
+        mostrando solo le combinazioni per cui esistono previsioni.
       </p>
     </div>
 
+    {% if not combo_map %}
+    <div class="alert alert-info">
+      Nessuna previsione disponibile.
+      <a href="{{ url_for('pipeline.wizard') }}">Avvia prima la pipeline di analisi.</a>
+    </div>
+    {% else %}
+
     <!-- Query form -->
     <div class="panel mb-4">
-      <form method="post" action="{{ url_for('pipeline.clinical_query') }}">
+      <form method="post" action="{{ url_for('pipeline.clinical_query') }}" id="clinicalForm">
+
         <div class="mb-3">
           <label class="form-label fw-semibold">Patogeno</label>
-          <select name="pathogen" class="form-select" required>
-            <option value="">— seleziona —</option>
-            {% for p in pathogens %}
+          <select name="pathogen" id="selPathogen" class="form-select" required>
+            <option value="">— seleziona patogeno —</option>
+            {% for p in combo_map.keys() | sort %}
               <option value="{{ p }}" {% if form.pathogen == p %}selected{% endif %}>{{ p }}</option>
             {% endfor %}
           </select>
@@ -28,52 +36,47 @@
 
         <div class="mb-3">
           <label class="form-label fw-semibold">Antibiotico</label>
-          <select name="antibiotic" class="form-select" required>
-            <option value="">— seleziona —</option>
-            {% for a in antibiotics %}
-              <option value="{{ a }}" {% if form.antibiotic == a %}selected{% endif %}>{{ a }}</option>
-            {% endfor %}
+          <select name="antibiotic" id="selAntibiotic" class="form-select" required disabled>
+            <option value="">— seleziona prima il patogeno —</option>
           </select>
         </div>
 
         <div class="mb-3">
           <label class="form-label fw-semibold">Laboratorio / Ospedale</label>
-          <select name="laboratory" class="form-select" required>
-            <option value="">— seleziona —</option>
-            {% for l in laboratories %}
-              <option value="{{ l }}" {% if form.laboratory == l %}selected{% endif %}>{{ l }}</option>
-            {% endfor %}
+          <select name="laboratory" id="selLaboratory" class="form-select" required disabled>
+            <option value="">— seleziona prima l'antibiotico —</option>
           </select>
         </div>
 
         <div class="mb-3">
           <label class="form-label fw-semibold">Mese di riferimento</label>
           {% if months %}
-          <select name="month" class="form-select" required>
+          <select name="month" id="selMonth" class="form-select" required>
             <option value="">— seleziona mese —</option>
             {% for m in months %}
-              <option value="{{ m }}" {% if form.month == m %}selected{% endif %}>
-                {{ m }}
-              </option>
+              <option value="{{ m }}" {% if form.month == m %}selected{% endif %}>{{ m }}</option>
             {% endfor %}
           </select>
           {% else %}
-          <div class="alert alert-info mb-0 py-2 small">
-            Nessuna previsione disponibile. <a href="{{ url_for('pipeline.wizard') }}">Avvia prima la pipeline.</a>
+          <div class="alert alert-warning mb-0 py-2 small">
+            Nessun mese disponibile. Ri-esegui la pipeline.
           </div>
           {% endif %}
         </div>
 
-        <button type="submit" class="btn btn-primary w-100">Calcola previsione</button>
+        <button type="submit" class="btn btn-primary w-100" id="submitBtn" disabled>
+          Calcola previsione
+        </button>
       </form>
     </div>
+
+    {% endif %}
 
     {% if error %}
     <div class="alert alert-warning">{{ error }}</div>
     {% endif %}
 
     {% if result %}
-    <!-- Result tiles -->
     <div class="panel mb-3">
       <div class="mb-3">
         <div class="fw-semibold">{{ result.pathogen }}</div>
@@ -85,56 +88,41 @@
           <div class="metric s">
             {{ '%.1f'|format(result.sensitive_pct or 0) }}%
             <span>Sensibile</span>
+            {% if result.sensitive_lower is not none %}
+            <small class="ci-band">IC {{ '%.1f'|format(result.sensitive_lower) }}–{{ '%.1f'|format(result.sensitive_upper) }}</small>
+            {% endif %}
           </div>
-          {% if result.sensitive_lower is not none %}
-          <div class="text-center text-muted small mt-1">
-            IC: {{ '%.1f'|format(result.sensitive_lower) }}–{{ '%.1f'|format(result.sensitive_upper) }}
-          </div>
-          {% endif %}
         </div>
         <div class="col-4">
           <div class="metric i">
             {{ '%.1f'|format(result.intermediate_pct or 0) }}%
             <span>Intermedio</span>
+            {% if result.intermediate_lower is not none %}
+            <small class="ci-band">IC {{ '%.1f'|format(result.intermediate_lower) }}–{{ '%.1f'|format(result.intermediate_upper) }}</small>
+            {% endif %}
           </div>
-          {% if result.intermediate_lower is not none %}
-          <div class="text-center text-muted small mt-1">
-            IC: {{ '%.1f'|format(result.intermediate_lower) }}–{{ '%.1f'|format(result.intermediate_upper) }}
-          </div>
-          {% endif %}
         </div>
         <div class="col-4">
           <div class="metric r">
             {{ '%.1f'|format(result.resistant_pct or 0) }}%
             <span>Resistente</span>
+            {% if result.resistant_lower is not none %}
+            <small class="ci-band">IC {{ '%.1f'|format(result.resistant_lower) }}–{{ '%.1f'|format(result.resistant_upper) }}</small>
+            {% endif %}
           </div>
-          {% if result.resistant_lower is not none %}
-          <div class="text-center text-muted small mt-1">
-            IC: {{ '%.1f'|format(result.resistant_lower) }}–{{ '%.1f'|format(result.resistant_upper) }}
-          </div>
-          {% endif %}
         </div>
       </div>
 
-      <!-- Mini bar chart -->
-      <div style="height:60px;position:relative;">
+      <div style="height:70px;position:relative;">
         <canvas id="resultBar"></canvas>
       </div>
     </div>
 
     <div class="alert alert-secondary small">
       <strong>Nota per il clinico:</strong>
-      Questi valori sono previsioni statistiche basate sui dati storici del laboratorio selezionato,
-      elaborate con modello Prophet. Non sostituiscono l'antibiogramma individuale del paziente.
-      L'intervallo di confidenza (IC) indica l'incertezza della stima.
-      Per uso decisionale clinico fare sempre riferimento all'antibiogramma attuale.
-    </div>
-    {% endif %}
-
-    {% if not pathogens %}
-    <div class="alert alert-info">
-      Nessuna previsione disponibile.
-      <a href="{{ url_for('pipeline.wizard') }}">Eseguire prima la pipeline di analisi.</a>
+      Previsioni statistiche basate sui dati storici del laboratorio selezionato (modello Prophet).
+      Non sostituiscono l'antibiogramma individuale del paziente.
+      L'intervallo di confidenza (IC 80%) indica l'incertezza della stima.
     </div>
     {% endif %}
 
@@ -143,10 +131,80 @@
 {% endblock %}
 
 {% block scripts %}
+<script>
+// Combo map: {pathogen: {antibiotic: [lab, ...]}}
+const COMBOS = {{ combo_map | tojson }};
+
+const selP = document.getElementById('selPathogen');
+const selA = document.getElementById('selAntibiotic');
+const selL = document.getElementById('selLaboratory');
+const selM = document.getElementById('selMonth');
+const btn  = document.getElementById('submitBtn');
+
+function populateSelect(sel, options, placeholder) {
+  sel.innerHTML = `<option value="">${placeholder}</option>`;
+  options.forEach(v => {
+    const o = document.createElement('option');
+    o.value = v; o.textContent = v;
+    sel.appendChild(o);
+  });
+}
+
+function checkReady() {
+  const ready = selP?.value && selA?.value && selL?.value && selM?.value;
+  if (btn) btn.disabled = !ready;
+}
+
+if (selP) {
+  selP.addEventListener('change', () => {
+    const p = selP.value;
+    selA.disabled = !p;
+    selL.disabled = true;
+    selL.innerHTML = '<option value="">— seleziona prima l\'antibiotico —</option>';
+    if (p && COMBOS[p]) {
+      populateSelect(selA, Object.keys(COMBOS[p]).sort(), '— seleziona antibiotico —');
+      selA.disabled = false;
+    } else {
+      populateSelect(selA, [], '— seleziona prima il patogeno —');
+      selA.disabled = true;
+    }
+    checkReady();
+  });
+
+  selA.addEventListener('change', () => {
+    const p = selP.value, a = selA.value;
+    if (p && a && COMBOS[p]?.[a]) {
+      populateSelect(selL, COMBOS[p][a].sort(), '— seleziona laboratorio —');
+      selL.disabled = false;
+    } else {
+      populateSelect(selL, [], '— seleziona prima l\'antibiotico —');
+      selL.disabled = true;
+    }
+    checkReady();
+  });
+
+  selL.addEventListener('change', checkReady);
+  if (selM) selM.addEventListener('change', checkReady);
+
+  // Restore previous form selection after POST
+  {% if form.pathogen %}
+  selP.value = {{ form.pathogen | tojson }};
+  selP.dispatchEvent(new Event('change'));
+  setTimeout(() => {
+    selA.value = {{ form.antibiotic | tojson }};
+    selA.dispatchEvent(new Event('change'));
+    setTimeout(() => {
+      selL.value = {{ form.laboratory | tojson }};
+      checkReady();
+    }, 0);
+  }, 0);
+  {% endif %}
+}
+</script>
+
 {% if result %}
 <script>
-const barCtx = document.getElementById('resultBar').getContext('2d');
-new Chart(barCtx, {
+new Chart(document.getElementById('resultBar').getContext('2d'), {
   type: 'bar',
   data: {
     labels: ['Sensibile', 'Intermedio', 'Resistente'],
@@ -156,7 +214,7 @@ new Chart(barCtx, {
         {{ result.intermediate_pct or 0 }},
         {{ result.resistant_pct or 0 }},
       ],
-      backgroundColor: ['#198754', '#d99b00', '#dc3545'],
+      backgroundColor: ['#16a34a', '#ca8a04', '#dc2626'],
       borderRadius: 4,
     }],
   },
