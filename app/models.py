@@ -109,6 +109,46 @@ class ValidationMetric(db.Model):
     metadata_json = db.Column(db.Text, default="{}", nullable=False)
 
 
+class PipelineRun(db.Model):
+    __tablename__ = "pipeline_runs"
+
+    id = db.Column(db.Integer, primary_key=True)
+    status = db.Column(db.String(20), default="queued")
+    current_step = db.Column(db.Integer, default=0)
+    step2_status = db.Column(db.String(20), default="pending")
+    step3_status = db.Column(db.String(20), default="pending")
+    step4_status = db.Column(db.String(20), default="pending")
+    progress = db.Column(db.Integer, default=0)
+    message = db.Column(db.Text, default="")
+    error = db.Column(db.Text, default="")
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow)
+    finished_at = db.Column(db.DateTime, nullable=True)
+    summary_json = db.Column(db.Text, default="{}")
+    stop_requested = db.Column(db.Boolean, default=False)
+
+
+class CombinationForecast(db.Model):
+    __tablename__ = "combination_forecasts"
+
+    id = db.Column(db.Integer, primary_key=True)
+    pathogen = db.Column(db.String(120), nullable=False, index=True)
+    antibiotic = db.Column(db.String(80), nullable=False, index=True)
+    laboratory = db.Column(db.String(80), nullable=False, index=True)
+    forecast_month = db.Column(db.Date, nullable=False, index=True)
+    sensitive_pct = db.Column(db.Float)
+    intermediate_pct = db.Column(db.Float)
+    resistant_pct = db.Column(db.Float)
+    sensitive_lower = db.Column(db.Float, nullable=True)
+    sensitive_upper = db.Column(db.Float, nullable=True)
+    intermediate_lower = db.Column(db.Float, nullable=True)
+    intermediate_upper = db.Column(db.Float, nullable=True)
+    resistant_lower = db.Column(db.Float, nullable=True)
+    resistant_upper = db.Column(db.Float, nullable=True)
+    pipeline_run_id = db.Column(db.Integer, db.ForeignKey("pipeline_runs.id"), nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+
 class Breakpoint(db.Model):
     __tablename__ = "breakpoints"
 

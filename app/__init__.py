@@ -33,16 +33,32 @@ def create_app(test_config: dict | None = None) -> Flask:
 
     from . import models  # noqa: F401
     from .routes.dashboard import bp as dashboard_bp
+    from .routes.pipeline import bp as pipeline_bp
     from .routes.upload import bp as upload_bp
 
     app.register_blueprint(upload_bp)
     app.register_blueprint(dashboard_bp)
+    app.register_blueprint(pipeline_bp)
 
     with app.app_context():
         db.create_all()
         _ensure_schema_migrations()
+        _mark_interrupted_runs()
 
     return app
+
+
+def _mark_interrupted_runs() -> None:
+    """Mark any pipeline runs left in running/queued state as interrupted on startup."""
+    from .models import PipelineRun
+    from datetime import datetime
+    stale = PipelineRun.query.filter(PipelineRun.status.in_(["queued", "running"])).all()
+    for r in stale:
+        r.status = "interrupted"
+        r.message = "Interrotto al riavvio del server."
+        r.updated_at = datetime.utcnow()
+    if stale:
+        db.session.commit()
 
 
 def _ensure_schema_migrations() -> None:

@@ -1,0 +1,165 @@
+{% extends "base.html" %}
+{% block title %}Consulta previsioni — MIC RES Sicilia{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-lg-7">
+
+    <div class="mb-4">
+      <h1 class="h4 mb-1">Consulta previsioni AMR</h1>
+      <p class="text-muted small">
+        Seleziona patogeno, antibiotico, struttura e mese per ottenere la stima previsionale
+        di sensibilità, resistenza intermedia e resistenza.
+      </p>
+    </div>
+
+    <!-- Query form -->
+    <div class="panel mb-4">
+      <form method="post" action="{{ url_for('pipeline.clinical_query') }}">
+        <div class="mb-3">
+          <label class="form-label fw-semibold">Patogeno</label>
+          <select name="pathogen" class="form-select" required>
+            <option value="">— seleziona —</option>
+            {% for p in pathogens %}
+              <option value="{{ p }}" {% if form.pathogen == p %}selected{% endif %}>{{ p }}</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label fw-semibold">Antibiotico</label>
+          <select name="antibiotic" class="form-select" required>
+            <option value="">— seleziona —</option>
+            {% for a in antibiotics %}
+              <option value="{{ a }}" {% if form.antibiotic == a %}selected{% endif %}>{{ a }}</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label fw-semibold">Laboratorio / Ospedale</label>
+          <select name="laboratory" class="form-select" required>
+            <option value="">— seleziona —</option>
+            {% for l in laboratories %}
+              <option value="{{ l }}" {% if form.laboratory == l %}selected{% endif %}>{{ l }}</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label fw-semibold">Mese di riferimento</label>
+          <input type="month" name="month" class="form-control"
+                 value="{{ form.month }}" required>
+          <div class="form-text">Seleziona un mese nei prossimi 24 mesi.</div>
+        </div>
+
+        <button type="submit" class="btn btn-primary w-100">Calcola previsione</button>
+      </form>
+    </div>
+
+    {% if error %}
+    <div class="alert alert-warning">{{ error }}</div>
+    {% endif %}
+
+    {% if result %}
+    <!-- Result tiles -->
+    <div class="panel mb-3">
+      <div class="mb-3">
+        <div class="fw-semibold">{{ result.pathogen }}</div>
+        <div class="text-muted small">{{ result.antibiotic }} · {{ result.laboratory }} · {{ result.month }}</div>
+      </div>
+
+      <div class="row g-3 mb-3">
+        <div class="col-4">
+          <div class="metric s">
+            {{ '%.1f'|format(result.sensitive_pct or 0) }}%
+            <span>Sensibile</span>
+          </div>
+          {% if result.sensitive_lower is not none %}
+          <div class="text-center text-muted small mt-1">
+            IC: {{ '%.1f'|format(result.sensitive_lower) }}–{{ '%.1f'|format(result.sensitive_upper) }}
+          </div>
+          {% endif %}
+        </div>
+        <div class="col-4">
+          <div class="metric i">
+            {{ '%.1f'|format(result.intermediate_pct or 0) }}%
+            <span>Intermedio</span>
+          </div>
+          {% if result.intermediate_lower is not none %}
+          <div class="text-center text-muted small mt-1">
+            IC: {{ '%.1f'|format(result.intermediate_lower) }}–{{ '%.1f'|format(result.intermediate_upper) }}
+          </div>
+          {% endif %}
+        </div>
+        <div class="col-4">
+          <div class="metric r">
+            {{ '%.1f'|format(result.resistant_pct or 0) }}%
+            <span>Resistente</span>
+          </div>
+          {% if result.resistant_lower is not none %}
+          <div class="text-center text-muted small mt-1">
+            IC: {{ '%.1f'|format(result.resistant_lower) }}–{{ '%.1f'|format(result.resistant_upper) }}
+          </div>
+          {% endif %}
+        </div>
+      </div>
+
+      <!-- Mini bar chart -->
+      <div style="height:60px;position:relative;">
+        <canvas id="resultBar"></canvas>
+      </div>
+    </div>
+
+    <div class="alert alert-secondary small">
+      <strong>Nota per il clinico:</strong>
+      Questi valori sono previsioni statistiche basate sui dati storici del laboratorio selezionato,
+      elaborate con modello Prophet. Non sostituiscono l'antibiogramma individuale del paziente.
+      L'intervallo di confidenza (IC) indica l'incertezza della stima.
+      Per uso decisionale clinico fare sempre riferimento all'antibiogramma attuale.
+    </div>
+    {% endif %}
+
+    {% if not pathogens %}
+    <div class="alert alert-info">
+      Nessuna previsione disponibile.
+      <a href="{{ url_for('pipeline.wizard') }}">Eseguire prima la pipeline di analisi.</a>
+    </div>
+    {% endif %}
+
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+{% if result %}
+<script>
+const barCtx = document.getElementById('resultBar').getContext('2d');
+new Chart(barCtx, {
+  type: 'bar',
+  data: {
+    labels: ['Sensibile', 'Intermedio', 'Resistente'],
+    datasets: [{
+      data: [
+        {{ result.sensitive_pct or 0 }},
+        {{ result.intermediate_pct or 0 }},
+        {{ result.resistant_pct or 0 }},
+      ],
+      backgroundColor: ['#198754', '#d99b00', '#dc3545'],
+      borderRadius: 4,
+    }],
+  },
+  options: {
+    indexAxis: 'y',
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: { legend: { display: false } },
+    scales: {
+      x: { min: 0, max: 100, ticks: { callback: v => v + '%' } },
+      y: { ticks: { font: { size: 11 } } },
+    },
+  },
+});
+</script>
+{% endif %}
+{% endblock %}

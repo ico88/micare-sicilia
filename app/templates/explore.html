@@ -1,0 +1,235 @@
+{% extends "base.html" %}
+{% block title %}Esplora previsioni — MIC RES Sicilia{% endblock %}
+
+{% block content %}
+<div class="mb-3">
+  <h1 class="h4 mb-0">Esplora previsioni AMR</h1>
+  <p class="text-muted small mb-0">Visualizza le previsioni Prophet pre-calcolate per tutte le combinazioni.</p>
+</div>
+
+<!-- Filter bar -->
+<form method="get" action="{{ url_for('pipeline.explore') }}" class="panel mb-4">
+  <div class="row g-2 align-items-end">
+    <div class="col-md-3">
+      <label class="form-label small mb-1">Patogeno</label>
+      <select name="pathogen" class="form-select form-select-sm">
+        <option value="">Tutti</option>
+        {% for p in pathogens %}
+          <option value="{{ p }}" {% if p == f_pathogen %}selected{% endif %}>{{ p }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="col-md-3">
+      <label class="form-label small mb-1">Antibiotico</label>
+      <select name="antibiotic" class="form-select form-select-sm">
+        <option value="">Tutti</option>
+        {% for a in antibiotics %}
+          <option value="{{ a }}" {% if a == f_antibiotic %}selected{% endif %}>{{ a }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="col-md-3">
+      <label class="form-label small mb-1">Laboratorio</label>
+      <select name="laboratory" class="form-select form-select-sm">
+        <option value="">Tutti</option>
+        {% for l in laboratories %}
+          <option value="{{ l }}" {% if l == f_laboratory %}selected{% endif %}>{{ l }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="col-md-2">
+      <label class="form-label small mb-1">Mese previsione</label>
+      <input type="month" name="month" class="form-control form-control-sm"
+             value="{{ f_month }}">
+    </div>
+    <div class="col-md-1">
+      <button type="submit" class="btn btn-primary btn-sm w-100">Filtra</button>
+    </div>
+  </div>
+</form>
+
+{% if not forecasts %}
+  <div class="alert alert-info">
+    Nessuna previsione trovata con i filtri selezionati.
+    {% if not pathogens %}
+      <a href="{{ url_for('pipeline.wizard') }}">Eseguire prima la pipeline</a>.
+    {% endif %}
+  </div>
+{% else %}
+
+  <!-- Forest plot: comparativa resistenza -->
+  {% if f_month %}
+  <div class="panel mb-4">
+    <div class="panel-titlebar mb-3">
+      <span class="fw-semibold">Vista comparativa — % Resistenti ({{ f_month }})</span>
+      <span class="text-muted small">Barre con intervallo di confidenza, ordinate per %R</span>
+    </div>
+    <div class="chart-frame chart-frame-lg">
+      <canvas id="forestChart"></canvas>
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- Time series chart for selected combo -->
+  {% if timeseries %}
+  <div class="panel mb-4">
+    <div class="panel-titlebar mb-3">
+      <span class="fw-semibold">Serie temporale — {{ f_pathogen }} / {{ f_antibiotic }} / {{ f_laboratory }}</span>
+    </div>
+    <div class="chart-frame chart-frame-lg">
+      <canvas id="tsChart"></canvas>
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- Table -->
+  <div class="panel">
+    <div class="panel-titlebar mb-2">
+      <span class="fw-semibold">Previsioni ({{ forecasts | length }})</span>
+    </div>
+    <div class="table-responsive preview-table">
+      <table class="table table-sm table-hover mb-0">
+        <thead class="table-light sticky-top">
+          <tr>
+            <th>Mese</th>
+            <th>Patogeno</th>
+            <th>Antibiotico</th>
+            <th>Laboratorio</th>
+            <th class="text-end text-success">%S</th>
+            <th class="text-end text-warning">%I</th>
+            <th class="text-end text-danger">%R</th>
+            <th class="text-end text-muted small">%R CI</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for f in forecasts %}
+          <tr>
+            <td>{{ f.forecast_month.strftime('%Y-%m') }}</td>
+            <td><small>{{ f.pathogen }}</small></td>
+            <td><small>{{ f.antibiotic }}</small></td>
+            <td><small>{{ f.laboratory }}</small></td>
+            <td class="text-end text-success">{{ '%.1f'|format(f.sensitive_pct or 0) }}</td>
+            <td class="text-end text-warning">{{ '%.1f'|format(f.intermediate_pct or 0) }}</td>
+            <td class="text-end text-danger fw-semibold">{{ '%.1f'|format(f.resistant_pct or 0) }}</td>
+            <td class="text-end text-muted small">
+              {% if f.resistant_lower is not none and f.resistant_upper is not none %}
+                {{ '%.1f'|format(f.resistant_lower) }}–{{ '%.1f'|format(f.resistant_upper) }}
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+{% if forecasts and f_month %}
+<script>
+// Forest plot data — sorted by %R desc
+const forestData = [
+  {% for f in forecasts | sort(attribute='resistant_pct', reverse=True) %}
+  {
+    label: "{{ f.pathogen | replace('"','') }} / {{ f.antibiotic | replace('"','') }}\n{{ f.laboratory | replace('"','') }}",
+    r: {{ f.resistant_pct or 0 }},
+    rLo: {{ f.resistant_lower or f.resistant_pct or 0 }},
+    rHi: {{ f.resistant_upper or f.resistant_pct or 0 }},
+  },
+  {% endfor %}
+].slice(0, 30);
+
+const forestCtx = document.getElementById('forestChart').getContext('2d');
+new Chart(forestCtx, {
+  type: 'bar',
+  data: {
+    labels: forestData.map(d => d.label),
+    datasets: [{
+      label: '% Resistenti',
+      data: forestData.map(d => d.r),
+      backgroundColor: 'rgba(220,53,69,0.7)',
+      borderColor: 'rgb(220,53,69)',
+      borderWidth: 1,
+    }],
+  },
+  options: {
+    indexAxis: 'y',
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        callbacks: {
+          label: (ctx) => {
+            const d = forestData[ctx.dataIndex];
+            return ` ${d.r.toFixed(1)}% (IC: ${d.rLo.toFixed(1)}–${d.rHi.toFixed(1)})`;
+          }
+        }
+      }
+    },
+    scales: {
+      x: { min: 0, max: 100, title: { display: true, text: '% Resistenti' } },
+      y: { ticks: { font: { size: 10 } } },
+    },
+  },
+});
+</script>
+{% endif %}
+
+{% if timeseries %}
+<script>
+const tsData = {{ timeseries | tojson }};
+const months = tsData.map(d => d.month);
+const tsCtx = document.getElementById('tsChart').getContext('2d');
+
+new Chart(tsCtx, {
+  type: 'line',
+  data: {
+    labels: months,
+    datasets: [
+      {
+        label: '% Sensibili',
+        data: tsData.map(d => d.s),
+        borderColor: '#198754',
+        backgroundColor: 'rgba(25,135,84,0.08)',
+        fill: false,
+        tension: 0.3,
+        pointRadius: 3,
+      },
+      {
+        label: '% Intermedi',
+        data: tsData.map(d => d.i),
+        borderColor: '#d99b00',
+        backgroundColor: 'rgba(217,155,0,0.08)',
+        fill: false,
+        tension: 0.3,
+        pointRadius: 3,
+      },
+      {
+        label: '% Resistenti',
+        data: tsData.map(d => d.r),
+        borderColor: '#dc3545',
+        backgroundColor: 'rgba(220,53,69,0.08)',
+        fill: false,
+        tension: 0.3,
+        pointRadius: 3,
+      },
+    ],
+  },
+  options: {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      tooltip: { mode: 'index', intersect: false },
+      legend: { position: 'top' },
+    },
+    scales: {
+      y: { min: 0, max: 100, title: { display: true, text: '%' } },
+      x: { ticks: { maxTicksLimit: 12 } },
+    },
+  },
+});
+</script>
+{% endif %}
+{% endblock %}

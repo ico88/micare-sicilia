@@ -12,8 +12,10 @@
       <div class="container-fluid">
         <a class="navbar-brand fw-bold text-primary" href="{{ url_for('dashboard.dashboard') }}">MIC RES Sicilia</a>
         <div class="navbar-nav ms-auto gap-1">
-          <a class="nav-link" href="{{ url_for('dashboard.dashboard') }}">Analisi</a>
+          <a class="nav-link" href="{{ url_for('pipeline.wizard') }}">Analisi</a>
           <a class="nav-link" href="{{ url_for('upload.upload') }}">Dati</a>
+          <a class="nav-link" href="{{ url_for('pipeline.explore') }}">Esplora</a>
+          <a class="nav-link" href="{{ url_for('pipeline.clinical') }}">Consulta</a>
           <a class="nav-link text-muted small" href="{{ url_for('dashboard.validation_report') }}">Rapporto tecnico</a>
         </div>
       </div>
