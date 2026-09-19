@@ -159,9 +159,9 @@ step "5/9 · Dipendenze Python"
 info "Aggiorno pip, setuptools, wheel..."
 "$PIP" install --upgrade pip setuptools wheel --quiet
 
-# numpy < 2 richiesto da prophet/pystan
-info "Installo numpy (compatibile con Prophet)..."
-"$PIP" install "numpy>=1.26,<2" --quiet
+# Lascia pip risolvere numpy autonomamente (Prophet 1.1.6+ supporta numpy 2.x)
+info "Installo numpy..."
+"$PIP" install "numpy>=1.26" --quiet
 
 # pystan (dipendenza di prophet) compila Stan in C++ — può richiedere 5-15 min
 info "Installo pystan (compilazione C++ Stan — può richiedere diversi minuti)..."
