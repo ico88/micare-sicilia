@@ -352,24 +352,38 @@ def _run_pipeline(app: Flask, run_id: int, model_folder: str) -> None:
 
         _check_stop(app, run_id)
 
-        # Pre-compute combination forecasts for next 24 months
+        # Pre-compute combination forecasts for all trained months
+        from micare_sicilia.config import FORECAST_PERIODS_MONTHS
         forecasts = load_forecasts(final_dir)
         combinations = sorted(forecasts["resistenti"].keys())
         today = datetime.utcnow().date().replace(day=1)
+        n_months = FORECAST_PERIODS_MONTHS
         future_months = [
             (today.replace(month=((today.month - 1 + i) % 12) + 1,
                            year=today.year + ((today.month - 1 + i) // 12)))
-            for i in range(1, 25)
+            for i in range(1, n_months + 1)
         ]
+
+        # Build safe reverse-map combo_key → (pathogen, laboratory, antibiotic)
+        # Avoids parsing the key string which breaks on names containing underscores
+        combo_meta: dict[str, tuple[str, str, str]] = {}
+        for _, row in (
+            model_df.drop_duplicates(subset=["pathogen", "laboratory", "antibiotic"])
+            [["pathogen", "laboratory", "antibiotic", "combinazione_unica"]]
+            .iterrows()
+        ):
+            combo_meta[row["combinazione_unica"]] = (
+                str(row["pathogen"]), str(row["laboratory"]), str(row["antibiotic"])
+            )
 
         n_combinations = len(combinations)
         _update_run(app, run_id,
                     progress=82,
-                    message=f"Pre-calcolo {n_combinations} combinazioni × 24 mesi...")
+                    message=f"Pre-calcolo {n_combinations} combinazioni × {n_months} mesi...")
 
-        # Delete old forecasts for this run (clean slate)
+        # Delete ALL old forecasts — clean slate before inserting new ones
         with app.app_context():
-            CombinationForecast.query.filter_by(pipeline_run_id=run_id).delete()
+            CombinationForecast.query.delete()
             db.session.commit()
 
         batch: list[CombinationForecast] = []
@@ -379,11 +393,11 @@ def _run_pipeline(app: Flask, run_id: int, model_folder: str) -> None:
         for combo in combinations:
             _check_stop(app, run_id)
 
-            # Parse combination key: pathogen_laboratory_antibiotic
-            parts = combo.split("_", 2)
-            if len(parts) < 3:
+            # Use reverse-map for safe field extraction (handles underscores in names)
+            if combo not in combo_meta:
+                logger.warning("Combo '%s' non trovata nella mappa, salto.", combo)
                 continue
-            pathogen, laboratory, antibiotic = parts[0], parts[1], parts[2]
+            pathogen, laboratory, antibiotic = combo_meta[combo]
 
             for month_date in future_months:
                 year = month_date.year
@@ -472,7 +486,7 @@ def _run_pipeline(app: Flask, run_id: int, model_folder: str) -> None:
             "n_combinations_step2": summary2.trained_resistant_models,
             "n_combinations_step3": summary3.trained_resistant_models,
             "n_combinations_final": summary4.trained_resistant_models,
-            "n_forecasts": processed * 24,
+            "n_forecasts": processed * n_months,
         }
 
         _update_run(app, run_id,
@@ -482,7 +496,7 @@ def _run_pipeline(app: Flask, run_id: int, model_folder: str) -> None:
                     progress=100,
                     message=(
                         f"Pipeline completata! {summary4.trained_resistant_models} combinazioni, "
-                        f"{processed * 24} previsioni pre-calcolate per i prossimi 24 mesi."
+                        f"{processed * n_months} previsioni pre-calcolate per i prossimi {n_months} mesi."
                     ),
                     summary_json=json.dumps(summary_data),
                     finished_at=datetime.utcnow())
