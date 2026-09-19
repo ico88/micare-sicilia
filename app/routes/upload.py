@@ -18,7 +18,7 @@ bp = Blueprint("upload", __name__)
 
 @bp.get("/")
 def index():
-    return redirect(url_for("upload.upload"))
+    return redirect(url_for("pipeline.wizard"))
 
 
 @bp.route("/upload", methods=["GET", "POST"])
