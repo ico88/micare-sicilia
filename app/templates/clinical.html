@@ -1,15 +1,14 @@
 {% extends "base.html" %}
-{% block title %}Consulta previsioni — MIC RES Sicilia{% endblock %}
+{% block title %}Consulta clinica — MIC RES Sicilia{% endblock %}
 
 {% block content %}
 <div class="row justify-content-center">
-  <div class="col-lg-7">
+  <div class="col-lg-8">
 
     <div class="mb-4">
-      <h1 class="page-heading mb-1">Consulta previsioni AMR</h1>
+      <h1 class="page-heading mb-1">Consulta clinica AMR</h1>
       <p class="text-muted small">
-        Seleziona patogeno, antibiotico e struttura: i menu si aggiornano
-        mostrando solo le combinazioni per cui esistono previsioni.
+        Visualizza le previsioni di resistenza antibiotica per guidare la terapia empirica.
       </p>
     </div>
 
@@ -20,110 +19,283 @@
     </div>
     {% else %}
 
-    <!-- Query form -->
-    <div class="panel mb-4">
-      <form method="post" action="{{ url_for('pipeline.clinical_query') }}" id="clinicalForm">
-
-        <div class="mb-3">
-          <label class="form-label fw-semibold">Patogeno</label>
-          <select name="pathogen" id="selPathogen" class="form-select" required>
-            <option value="">— seleziona patogeno —</option>
-            {% for p in combo_map.keys() | sort %}
-              <option value="{{ p }}" {% if form.pathogen == p %}selected{% endif %}>{{ p }}</option>
-            {% endfor %}
-          </select>
-        </div>
-
-        <div class="mb-3">
-          <label class="form-label fw-semibold">Antibiotico</label>
-          <select name="antibiotic" id="selAntibiotic" class="form-select" required disabled>
-            <option value="">— seleziona prima il patogeno —</option>
-          </select>
-        </div>
-
-        <div class="mb-3">
-          <label class="form-label fw-semibold">Laboratorio / Ospedale</label>
-          <select name="laboratory" id="selLaboratory" class="form-select" required disabled>
-            <option value="">— seleziona prima l'antibiotico —</option>
-          </select>
-        </div>
-
-        <div class="mb-3">
-          <label class="form-label fw-semibold">Mese di riferimento</label>
-          {% if months %}
-          <select name="month" id="selMonth" class="form-select" required>
-            <option value="">— seleziona mese —</option>
-            {% for m in months %}
-              <option value="{{ m }}" {% if form.month == m %}selected{% endif %}>{{ m }}</option>
-            {% endfor %}
-          </select>
-          {% else %}
-          <div class="alert alert-warning mb-0 py-2 small">
-            Nessun mese disponibile. Ri-esegui la pipeline.
-          </div>
-          {% endif %}
-        </div>
-
-        <button type="submit" class="btn btn-primary w-100" id="submitBtn" disabled>
-          Calcola previsione
+    <!-- Tab navigation -->
+    <ul class="nav nav-tabs mb-4" id="clinicalTabs" role="tablist">
+      <li class="nav-item" role="presentation">
+        <button class="nav-link {% if active_tab == 'osservazionale' %}active{% endif %}"
+                id="tab-osserv" data-bs-toggle="tab" data-bs-target="#panel-osserv"
+                type="button" role="tab">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="me-1" style="vertical-align:-2px">
+            <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+          </svg>
+          Osservazionale
         </button>
-      </form>
-    </div>
+      </li>
+      <li class="nav-item" role="presentation">
+        <button class="nav-link {% if active_tab == 'predittiva' %}active{% endif %}"
+                id="tab-pred" data-bs-toggle="tab" data-bs-target="#panel-pred"
+                type="button" role="tab">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="me-1" style="vertical-align:-2px">
+            <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+          </svg>
+          Predittiva
+          <span class="badge bg-primary ms-1" style="font-size:.65rem;vertical-align:1px;">Nuova</span>
+        </button>
+      </li>
+    </ul>
 
-    {% endif %}
+    <div class="tab-content" id="clinicalTabContent">
 
-    {% if error %}
-    <div class="alert alert-warning">{{ error }}</div>
-    {% endif %}
+      <!-- ================================================================ -->
+      <!-- TAB 1: Osservazionale                                           -->
+      <!-- ================================================================ -->
+      <div class="tab-pane fade {% if active_tab == 'osservazionale' %}show active{% endif %}"
+           id="panel-osserv" role="tabpanel">
 
-    {% if result %}
-    <div class="panel mb-3">
-      <div class="mb-3">
-        <div class="fw-semibold">{{ result.pathogen }}</div>
-        <div class="text-muted small">{{ result.antibiotic }} · {{ result.laboratory }} · {{ result.month }}</div>
-      </div>
+        <p class="text-muted small mb-3">
+          Seleziona patogeno, antibiotico e struttura: i menu si aggiornano mostrando solo
+          le combinazioni per cui esistono previsioni pre-calcolate.
+        </p>
 
-      <div class="row g-3 mb-3">
-        <div class="col-4">
-          <div class="metric s">
-            {{ '%.1f'|format(result.sensitive_pct or 0) }}%
-            <span>Sensibile</span>
-            {% if result.sensitive_lower is not none %}
-            <small class="ci-band">IC {{ '%.1f'|format(result.sensitive_lower) }}–{{ '%.1f'|format(result.sensitive_upper) }}</small>
-            {% endif %}
+        <div class="panel mb-4">
+          <form method="post" action="{{ url_for('pipeline.clinical_query') }}" id="clinicalForm">
+
+            <div class="mb-3">
+              <label class="form-label fw-semibold">Patogeno</label>
+              <select name="pathogen" id="selPathogen" class="form-select" required>
+                <option value="">— seleziona patogeno —</option>
+                {% for p in combo_map.keys() | sort %}
+                  <option value="{{ p }}" {% if form.pathogen == p %}selected{% endif %}>{{ p }}</option>
+                {% endfor %}
+              </select>
+            </div>
+
+            <div class="mb-3">
+              <label class="form-label fw-semibold">Antibiotico</label>
+              <select name="antibiotic" id="selAntibiotic" class="form-select" required disabled>
+                <option value="">— seleziona prima il patogeno —</option>
+              </select>
+            </div>
+
+            <div class="mb-3">
+              <label class="form-label fw-semibold">Laboratorio / Ospedale</label>
+              <select name="laboratory" id="selLaboratory" class="form-select" required disabled>
+                <option value="">— seleziona prima l'antibiotico —</option>
+              </select>
+            </div>
+
+            <div class="mb-3">
+              <label class="form-label fw-semibold">Mese di riferimento</label>
+              {% if months %}
+              <select name="month" id="selMonth" class="form-select" required>
+                <option value="">— seleziona mese —</option>
+                {% for m in months %}
+                  <option value="{{ m }}" {% if form.month == m %}selected{% endif %}>{{ m }}</option>
+                {% endfor %}
+              </select>
+              {% else %}
+              <div class="alert alert-warning mb-0 py-2 small">
+                Nessun mese disponibile. Ri-esegui la pipeline.
+              </div>
+              {% endif %}
+            </div>
+
+            <button type="submit" class="btn btn-primary w-100" id="submitBtn" disabled>
+              Calcola previsione
+            </button>
+          </form>
+        </div>
+
+        {% if error %}
+        <div class="alert alert-warning">{{ error }}</div>
+        {% endif %}
+
+        {% if result %}
+        <div class="panel mb-3">
+          <div class="mb-3">
+            <div class="fw-semibold">{{ result.pathogen }}</div>
+            <div class="text-muted small">{{ result.antibiotic }} · {{ result.laboratory }} · {{ result.month }}</div>
+          </div>
+
+          <div class="row g-3 mb-3">
+            <div class="col-4">
+              <div class="metric s">
+                {{ '%.1f'|format(result.sensitive_pct or 0) }}%
+                <span>Sensibile</span>
+                {% if result.sensitive_lower is not none %}
+                <small class="ci-band">IC {{ '%.1f'|format(result.sensitive_lower) }}–{{ '%.1f'|format(result.sensitive_upper) }}</small>
+                {% endif %}
+              </div>
+            </div>
+            <div class="col-4">
+              <div class="metric i">
+                {{ '%.1f'|format(result.intermediate_pct or 0) }}%
+                <span>Intermedio</span>
+                {% if result.intermediate_lower is not none %}
+                <small class="ci-band">IC {{ '%.1f'|format(result.intermediate_lower) }}–{{ '%.1f'|format(result.intermediate_upper) }}</small>
+                {% endif %}
+              </div>
+            </div>
+            <div class="col-4">
+              <div class="metric r">
+                {{ '%.1f'|format(result.resistant_pct or 0) }}%
+                <span>Resistente</span>
+                {% if result.resistant_lower is not none %}
+                <small class="ci-band">IC {{ '%.1f'|format(result.resistant_lower) }}–{{ '%.1f'|format(result.resistant_upper) }}</small>
+                {% endif %}
+              </div>
+            </div>
+          </div>
+
+          <div style="height:70px;position:relative;">
+            <canvas id="resultBar"></canvas>
           </div>
         </div>
-        <div class="col-4">
-          <div class="metric i">
-            {{ '%.1f'|format(result.intermediate_pct or 0) }}%
-            <span>Intermedio</span>
-            {% if result.intermediate_lower is not none %}
-            <small class="ci-band">IC {{ '%.1f'|format(result.intermediate_lower) }}–{{ '%.1f'|format(result.intermediate_upper) }}</small>
-            {% endif %}
+
+        <div class="alert alert-secondary small">
+          <strong>Nota per il clinico:</strong>
+          Previsioni statistiche basate sui dati storici del laboratorio selezionato (modello Prophet + trasformazione logit).
+          Non sostituiscono l'antibiogramma individuale del paziente.
+          L'intervallo di confidenza (IC 80%) indica l'incertezza della stima.
+        </div>
+        {% endif %}
+
+      </div><!-- /tab osservazionale -->
+
+
+      <!-- ================================================================ -->
+      <!-- TAB 2: Predittiva                                               -->
+      <!-- ================================================================ -->
+      <div class="tab-pane fade {% if active_tab == 'predittiva' %}show active{% endif %}"
+           id="panel-pred" role="tabpanel">
+
+        <p class="text-muted small mb-3">
+          Scegli un patogeno e un orizzonte temporale: il sistema confronta tutti gli
+          antibiotici disponibili e li classifica per <strong>efficacia attesa</strong>
+          (% resistenza prevista più bassa = antibiotico migliore).
+        </p>
+
+        <div class="panel mb-4">
+          <form method="post" action="{{ url_for('pipeline.predictive') }}" id="predForm">
+
+            <div class="mb-3">
+              <label class="form-label fw-semibold">Patogeno</label>
+              <select name="pathogen" id="predPathogen" class="form-select" required>
+                <option value="">— seleziona patogeno —</option>
+                {% for p in combo_map.keys() | sort %}
+                  <option value="{{ p }}" {% if pred_form.pathogen == p %}selected{% endif %}>{{ p }}</option>
+                {% endfor %}
+              </select>
+            </div>
+
+            <div class="mb-3">
+              <label class="form-label fw-semibold">Laboratorio / Ospedale
+                <span class="text-muted fw-normal">(opzionale — lascia vuoto per tutti)</span>
+              </label>
+              <select name="laboratory" id="predLaboratory" class="form-select" disabled>
+                <option value="">— tutti i laboratori —</option>
+              </select>
+            </div>
+
+            <div class="mb-3">
+              <label class="form-label fw-semibold">Orizzonte previsivo</label>
+              <select name="horizon" class="form-select" required>
+                <option value="3"  {% if pred_form.horizon == '3'  %}selected{% endif %}>3 mesi</option>
+                <option value="6"  {% if pred_form.horizon == '6'  or not pred_form.horizon %}selected{% endif %}>6 mesi</option>
+                <option value="12" {% if pred_form.horizon == '12' %}selected{% endif %}>12 mesi</option>
+                <option value="24" {% if pred_form.horizon == '24' %}selected{% endif %}>24 mesi</option>
+              </select>
+            </div>
+
+            <button type="submit" class="btn btn-primary w-100" id="predSubmitBtn" disabled>
+              Confronta antibiotici
+            </button>
+          </form>
+        </div>
+
+        {% if pred_error %}
+        <div class="alert alert-warning">{{ pred_error }}</div>
+        {% endif %}
+
+        {% if pred_results %}
+        <div class="panel mb-3">
+          <div class="d-flex align-items-center justify-content-between mb-3">
+            <div>
+              <div class="fw-semibold">{{ pred_form.pathogen }}</div>
+              <div class="text-muted small">
+                Previsione al <strong>{{ pred_form.target_month }}</strong>
+                {% if pred_form.laboratory %} · {{ pred_form.laboratory }}{% else %} · tutti i laboratori{% endif %}
+              </div>
+            </div>
+            <div class="text-muted small">{{ pred_results | length }} antibiotici confrontati</div>
+          </div>
+
+          <div class="table-responsive">
+            <table class="table table-sm table-hover align-middle mb-0">
+              <thead class="table-light">
+                <tr>
+                  <th style="width:2.5rem">#</th>
+                  <th>Antibiotico</th>
+                  <th class="text-center" style="width:100px">% Sensibile</th>
+                  <th class="text-center" style="width:100px">% Resistente</th>
+                  <th class="text-center" style="width:130px">Efficacia attesa</th>
+                  <th class="text-muted small" style="width:80px">Lab</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for ab in pred_results %}
+                {% set r = ab.resistant_pct %}
+                {% if r < 25 %}
+                  {% set eff_cls = 'pred-green' %}{% set eff_label = 'Ottima' %}
+                {% elif r < 50 %}
+                  {% set eff_cls = 'pred-yellow' %}{% set eff_label = 'Buona' %}
+                {% elif r < 75 %}
+                  {% set eff_cls = 'pred-orange' %}{% set eff_label = 'Ridotta' %}
+                {% else %}
+                  {% set eff_cls = 'pred-red' %}{% set eff_label = 'Scarsa' %}
+                {% endif %}
+                <tr {% if loop.first %}class="table-success fw-semibold"{% endif %}>
+                  <td class="text-muted">
+                    {% if loop.first %}
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="#16a34a" style="vertical-align:-2px">
+                      <polygon points="12,2 15.09,8.26 22,9.27 17,14.14 18.18,21.02 12,17.77 5.82,21.02 7,14.14 2,9.27 8.91,8.26"/>
+                    </svg>
+                    {% else %}{{ loop.index }}{% endif %}
+                  </td>
+                  <td>{{ ab.antibiotic }}</td>
+                  <td class="text-center">{{ '%.1f'|format(ab.sensitive_pct) }}%</td>
+                  <td class="text-center">
+                    {{ '%.1f'|format(r) }}%
+                    {% if ab.resistant_lower is not none %}
+                    <div class="text-muted" style="font-size:.7rem">
+                      IC {{ '%.0f'|format(ab.resistant_lower) }}–{{ '%.0f'|format(ab.resistant_upper) }}%
+                    </div>
+                    {% endif %}
+                  </td>
+                  <td class="text-center">
+                    <span class="pred-badge {{ eff_cls }}">{{ eff_label }}</span>
+                  </td>
+                  <td class="text-muted small">{{ ab.n_labs }}</td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
           </div>
         </div>
-        <div class="col-4">
-          <div class="metric r">
-            {{ '%.1f'|format(result.resistant_pct or 0) }}%
-            <span>Resistente</span>
-            {% if result.resistant_lower is not none %}
-            <small class="ci-band">IC {{ '%.1f'|format(result.resistant_lower) }}–{{ '%.1f'|format(result.resistant_upper) }}</small>
-            {% endif %}
-          </div>
+
+        <div class="alert alert-secondary small">
+          <strong>Come leggere la tabella:</strong>
+          Gli antibiotici sono ordinati per % di resistenza prevista (crescente).
+          Il primo in lista è quello con la <em>minore resistenza attesa</em> per questo patogeno
+          all'orizzonte scelto. Le stime sono medie su
+          {% if pred_form.laboratory %}il laboratorio selezionato{% else %}tutti i laboratori disponibili{% endif %}.
+          Non sostituiscono l'antibiogramma individuale del paziente.
         </div>
-      </div>
+        {% endif %}
 
-      <div style="height:70px;position:relative;">
-        <canvas id="resultBar"></canvas>
-      </div>
-    </div>
+      </div><!-- /tab predittiva -->
 
-    <div class="alert alert-secondary small">
-      <strong>Nota per il clinico:</strong>
-      Previsioni statistiche basate sui dati storici del laboratorio selezionato (modello Prophet).
-      Non sostituiscono l'antibiogramma individuale del paziente.
-      L'intervallo di confidenza (IC 80%) indica l'incertezza della stima.
-    </div>
+    </div><!-- /tab-content -->
     {% endif %}
 
   </div>
@@ -131,10 +303,36 @@
 {% endblock %}
 
 {% block scripts %}
+<style>
+.pred-badge {
+  display: inline-block;
+  padding: .2rem .55rem;
+  border-radius: 99px;
+  font-size: .75rem;
+  font-weight: 600;
+}
+.pred-green  { background: #dcfce7; color: #15803d; }
+.pred-yellow { background: #fef9c3; color: #a16207; }
+.pred-orange { background: #ffedd5; color: #c2410c; }
+.pred-red    { background: #fee2e2; color: #b91c1c; }
+</style>
 <script>
-// Combo map: {pathogen: {antibiotic: [lab, ...]}}
+// ---------------------------------------------------------------------------
+// Combo map for both tabs
+// ---------------------------------------------------------------------------
 const COMBOS = {{ combo_map | tojson }};
 
+// {pathogen: [lab, ...]} — union of all antibiotics' labs
+const PRED_LABS = {};
+for (const [p, abs] of Object.entries(COMBOS)) {
+  const labs = new Set();
+  Object.values(abs).forEach(ls => ls.forEach(l => labs.add(l)));
+  PRED_LABS[p] = [...labs].sort();
+}
+
+// ---------------------------------------------------------------------------
+// Tab 1: Osservazionale cascading selects
+// ---------------------------------------------------------------------------
 const selP = document.getElementById('selPathogen');
 const selA = document.getElementById('selAntibiotic');
 const selL = document.getElementById('selLaboratory');
@@ -186,7 +384,6 @@ if (selP) {
   selL.addEventListener('change', checkReady);
   if (selM) selM.addEventListener('change', checkReady);
 
-  // Restore previous form selection after POST
   {% if form.pathogen %}
   selP.value = {{ form.pathogen | tojson }};
   selP.dispatchEvent(new Event('change'));
@@ -199,6 +396,45 @@ if (selP) {
     }, 0);
   }, 0);
   {% endif %}
+}
+
+// ---------------------------------------------------------------------------
+// Tab 2: Predittiva selects
+// ---------------------------------------------------------------------------
+const predP = document.getElementById('predPathogen');
+const predL = document.getElementById('predLaboratory');
+const predBtn = document.getElementById('predSubmitBtn');
+
+function checkPredReady() {
+  if (predBtn) predBtn.disabled = !predP?.value;
+}
+
+if (predP) {
+  predP.addEventListener('change', () => {
+    const p = predP.value;
+    predL.innerHTML = '<option value="">— tutti i laboratori —</option>';
+    if (p && PRED_LABS[p]) {
+      PRED_LABS[p].forEach(lab => {
+        const o = document.createElement('option');
+        o.value = lab; o.textContent = lab;
+        predL.appendChild(o);
+      });
+      predL.disabled = false;
+    } else {
+      predL.disabled = true;
+    }
+    checkPredReady();
+  });
+
+  {% if pred_form.pathogen %}
+  predP.value = {{ pred_form.pathogen | tojson }};
+  predP.dispatchEvent(new Event('change'));
+  {% if pred_form.laboratory %}
+  setTimeout(() => { predL.value = {{ pred_form.laboratory | tojson }}; }, 0);
+  {% endif %}
+  {% endif %}
+
+  checkPredReady();
 }
 </script>
 

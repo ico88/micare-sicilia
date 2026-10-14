@@ -209,24 +209,32 @@ def _combo_map() -> dict:
     return result
 
 
-@bp.route("/clinical")
-def clinical():
-    return render_template(
-        "clinical.html",
+def _render_clinical(**kwargs):
+    """Render clinical.html with sane defaults for both tabs."""
+    defaults = dict(
         combo_map=_combo_map(),
         months=_forecast_months(),
+        # Observational tab
         result=None,
         error=None,
         form={},
+        active_tab="osservazionale",
+        # Predictive tab
+        pred_form={},
+        pred_results=None,
+        pred_error=None,
     )
+    defaults.update(kwargs)
+    return render_template("clinical.html", **defaults)
+
+
+@bp.route("/clinical")
+def clinical():
+    return _render_clinical()
 
 
 @bp.route("/clinical/query", methods=["POST"])
 def clinical_query():
-    pathogens = db.session.query(CombinationForecast.pathogen).distinct().order_by(CombinationForecast.pathogen).all()
-    antibiotics = db.session.query(CombinationForecast.antibiotic).distinct().order_by(CombinationForecast.antibiotic).all()
-    laboratories = db.session.query(CombinationForecast.laboratory).distinct().order_by(CombinationForecast.laboratory).all()
-
     form = {
         "pathogen": request.form.get("pathogen", ""),
         "antibiotic": request.form.get("antibiotic", ""),
@@ -268,11 +276,83 @@ def clinical_query():
     except Exception as exc:
         error = f"Errore nella ricerca: {exc}"
 
-    return render_template(
-        "clinical.html",
-        combo_map=_combo_map(),
-        months=_forecast_months(),
-        result=result,
-        error=error,
-        form=form,
+    return _render_clinical(result=result, error=error, form=form, active_tab="osservazionale")
+
+
+@bp.route("/clinical/predictive", methods=["GET", "POST"])
+def predictive():
+    pred_form: dict = {}
+    pred_results = None
+    pred_error = None
+
+    if request.method == "POST":
+        import numpy as _np
+        from collections import defaultdict
+
+        pred_form = {
+            "pathogen": request.form.get("pathogen", ""),
+            "laboratory": request.form.get("laboratory", ""),
+            "horizon": request.form.get("horizon", "6"),
+        }
+
+        try:
+            from datetime import date as _date
+            horizon_months = int(pred_form["horizon"])
+            today = _date.today()
+            m = today.month - 1 + horizon_months
+            target_date = _date(today.year + m // 12, m % 12 + 1, 1)
+            pred_form["target_month"] = target_date.strftime("%B %Y")
+            pred_form["target_date_str"] = target_date.strftime("%Y-%m")
+
+            q = CombinationForecast.query.filter_by(
+                pathogen=pred_form["pathogen"],
+                forecast_month=target_date,
+            )
+            if pred_form.get("laboratory"):
+                q = q.filter_by(laboratory=pred_form["laboratory"])
+
+            rows = q.all()
+            if not rows:
+                pred_error = (
+                    f"Nessuna previsione disponibile per {pred_form['pathogen']} "
+                    f"a {pred_form.get('target_month', '')}. Eseguire prima la pipeline."
+                )
+            else:
+                ab_data: dict = defaultdict(list)
+                for r in rows:
+                    ab_data[r.antibiotic].append({
+                        "lab": r.laboratory,
+                        "s": r.sensitive_pct or 0.0,
+                        "i": r.intermediate_pct or 0.0,
+                        "r": r.resistant_pct or 0.0,
+                        "r_lo": r.resistant_lower,
+                        "r_hi": r.resistant_upper,
+                    })
+
+                pred_results = []
+                for ab, entries in ab_data.items():
+                    r_vals = [e["r"] for e in entries]
+                    s_vals = [e["s"] for e in entries]
+                    r_lo_vals = [e["r_lo"] for e in entries if e["r_lo"] is not None]
+                    r_hi_vals = [e["r_hi"] for e in entries if e["r_hi"] is not None]
+                    pred_results.append({
+                        "antibiotic": ab,
+                        "resistant_pct": float(_np.mean(r_vals)),
+                        "sensitive_pct": float(_np.mean(s_vals)),
+                        "resistant_lower": float(_np.mean(r_lo_vals)) if r_lo_vals else None,
+                        "resistant_upper": float(_np.mean(r_hi_vals)) if r_hi_vals else None,
+                        "labs": sorted({e["lab"] for e in entries}),
+                        "n_labs": len(entries),
+                    })
+
+                pred_results.sort(key=lambda x: x["resistant_pct"])
+
+        except Exception as exc:
+            pred_error = f"Errore nella ricerca: {exc}"
+
+    return _render_clinical(
+        active_tab="predittiva",
+        pred_form=pred_form,
+        pred_results=pred_results,
+        pred_error=pred_error,
     )
