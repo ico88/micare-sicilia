@@ -37,5 +37,8 @@ models/
 # Generated exports/reports
 *.csv
 
+# Update script log
+update.log
+
 # Build artifacts
 *.egg-info/
