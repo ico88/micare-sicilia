@@ -191,14 +191,34 @@ fi
 log "──────────────────────────────────────────"
 log "Riavvio servizio..."
 
-if command -v systemctl &>/dev/null && systemctl is-enabled "$SERVICE" &>/dev/null 2>&1; then
-  sudo systemctl restart "$SERVICE"
-  sleep 2
-  STATUS=$(systemctl is-active "$SERVICE" 2>/dev/null || echo "unknown")
-  log "Servizio systemd '$SERVICE': $STATUS"
+if command -v systemctl &>/dev/null && systemctl list-unit-files "${SERVICE}.service" &>/dev/null 2>&1 | grep -q "$SERVICE"; then
+  # Pulisce eventuale stato "failed" (StartLimitBurst raggiunto) prima di riavviare
+  sudo systemctl reset-failed "$SERVICE" 2>/dev/null || true
+
+  if ! sudo systemctl restart "$SERVICE"; then
+    log "ERRORE: systemctl restart fallito — controlla: sudo journalctl -fu $SERVICE"
+  else
+    log "Attendo avvio gunicorn (max 60 s)..."
+    WAITED=0
+    while [[ $WAITED -lt 60 ]]; do
+      sleep 3
+      WAITED=$((WAITED + 3))
+      STATUS=$(systemctl is-active "$SERVICE" 2>/dev/null || echo "unknown")
+      if [[ "$STATUS" = "active" ]]; then
+        break
+      elif [[ "$STATUS" = "failed" ]]; then
+        break
+      fi
+    done
+    STATUS=$(systemctl is-active "$SERVICE" 2>/dev/null || echo "unknown")
+    log "Servizio systemd '$SERVICE': $STATUS (atteso ${WAITED}s)"
+    if [[ "$STATUS" != "active" ]]; then
+      log "  → Dettagli: sudo journalctl -fu $SERVICE"
+    fi
+  fi
 
 elif [[ "$(uname)" = "Darwin" ]]; then
-  PLIST="$HOME/Library/LaunchAgents/com.mic-res-sicilia.plist"
+  PLIST="$HOME/Library/LaunchAgents/com.micare-sicilia.plist"
   if [[ -f "$PLIST" ]]; then
     launchctl unload "$PLIST" 2>/dev/null || true
     sleep 1
