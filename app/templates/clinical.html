@@ -189,15 +189,6 @@
             </div>
 
             <div class="mb-3">
-              <label class="form-label fw-semibold">Laboratorio / Ospedale
-                <span class="text-muted fw-normal">(opzionale — lascia vuoto per tutti)</span>
-              </label>
-              <select name="laboratory" id="predLaboratory" class="form-select" disabled>
-                <option value="">— tutti i laboratori —</option>
-              </select>
-            </div>
-
-            <div class="mb-3">
               <label class="form-label fw-semibold">Orizzonte previsivo</label>
               <select name="horizon" class="form-select" required>
                 <option value="3"  {% if pred_form.horizon == '3'  %}selected{% endif %}>3 mesi</option>
@@ -223,8 +214,7 @@
             <div>
               <div class="fw-semibold">{{ pred_form.pathogen }}</div>
               <div class="text-muted small">
-                Previsione al <strong>{{ pred_form.target_month }}</strong>
-                {% if pred_form.laboratory %} · {{ pred_form.laboratory }}{% else %} · tutti i laboratori{% endif %}
+                Previsione al <strong>{{ pred_form.target_month }}</strong> · aggregato regionale
               </div>
             </div>
             <div class="text-muted small">{{ pred_results | length }} antibiotici confrontati</div>
@@ -236,10 +226,10 @@
                 <tr>
                   <th style="width:2.5rem">#</th>
                   <th>Antibiotico</th>
-                  <th class="text-center" style="width:100px">% Sensibile</th>
-                  <th class="text-center" style="width:100px">% Resistente</th>
-                  <th class="text-center" style="width:130px">Efficacia attesa</th>
-                  <th class="text-muted small" style="width:80px">Lab</th>
+                  <th class="text-center" style="width:110px">% S prevista</th>
+                  <th class="text-center" style="width:110px">Storico 12m</th>
+                  <th class="text-center" style="width:80px">Tendenza</th>
+                  <th class="text-center" style="width:120px">Efficacia attesa</th>
                 </tr>
               </thead>
               <tbody>
@@ -263,19 +253,34 @@
                     {% else %}{{ loop.index }}{% endif %}
                   </td>
                   <td>{{ ab.antibiotic }}</td>
-                  <td class="text-center">{{ '%.1f'|format(ab.sensitive_pct) }}%</td>
                   <td class="text-center">
-                    {{ '%.1f'|format(ab.resistant_pct) }}%
-                    {% if ab.resistant_lower is not none %}
-                    <div class="text-muted" style="font-size:.7rem">
-                      IC {{ '%.0f'|format(ab.resistant_lower) }}–{{ '%.0f'|format(ab.resistant_upper) }}%
-                    </div>
+                    {{ '%.1f'|format(ab.sensitive_pct) }}%
+                    {% if ab.sensitive_lower is not none %}
+                    <div class="text-muted" style="font-size:.7rem">IC {{ '%.0f'|format(ab.sensitive_lower) }}–{{ '%.0f'|format(ab.sensitive_upper) }}%</div>
+                    {% endif %}
+                  </td>
+                  <td class="text-center">
+                    {% if ab.hist_sensitive_pct is not none %}
+                      {{ '%.1f'|format(ab.hist_sensitive_pct) }}%
+                      {% if ab.hist_n_isolates %}
+                      <div class="text-muted" style="font-size:.7rem">{{ ab.hist_n_isolates }} isolati</div>
+                      {% endif %}
+                    {% else %}
+                      <span class="text-muted">—</span>
+                    {% endif %}
+                  </td>
+                  <td class="text-center">
+                    {% if ab.trend == 'better' %}
+                      <span title="Sensibilità in miglioramento (>5% vs storico)" style="color:#16a34a;font-size:1.1rem;">↑</span>
+                    {% elif ab.trend == 'worse' %}
+                      <span title="Resistenza in aumento (>5% vs storico)" style="color:#dc2626;font-size:1.1rem;">↓</span>
+                    {% else %}
+                      <span title="Stabile rispetto allo storico" style="color:#6b7280;font-size:1.1rem;">→</span>
                     {% endif %}
                   </td>
                   <td class="text-center">
                     <span class="pred-badge {{ eff_cls }}">{{ eff_label }}</span>
                   </td>
-                  <td class="text-muted small">{{ ab.n_labs }}</td>
                 </tr>
                 {% endfor %}
               </tbody>
@@ -285,10 +290,11 @@
 
         <div class="alert alert-secondary small">
           <strong>Come leggere la tabella:</strong>
-          Gli antibiotici sono ordinati per % di sensibilità prevista (decrescente).
-          Il primo in lista è quello con la <em>maggiore probabilità di efficacia</em> per questo patogeno
-          all'orizzonte scelto. Il badge indica: Ottima ≥75% S · Buona ≥50% S · Ridotta ≥25% S · Scarsa &lt;25% S. Le stime sono medie su
-          {% if pred_form.laboratory %}il laboratorio selezionato{% else %}tutti i laboratori disponibili{% endif %}.
+          Ordinati per % sensibilità prevista (decrescente) — il primo è l'antibiotico con la
+          <em>maggiore probabilità di efficacia</em> all'orizzonte scelto.
+          <strong>Storico 12m</strong>: media ponderata per isolati degli ultimi 12 mesi su tutti i laboratori siciliani.
+          <strong>Tendenza</strong>: ↑ sensibilità in miglioramento · ↓ resistenza in aumento · → stabile (soglia ±5%).
+          Badge: Ottima ≥75%S · Buona ≥50%S · Ridotta ≥25%S · Scarsa &lt;25%S.
           Non sostituiscono l'antibiogramma individuale del paziente.
         </div>
         {% endif %}
@@ -321,14 +327,6 @@
 // Combo map for both tabs
 // ---------------------------------------------------------------------------
 const COMBOS = {{ combo_map | tojson }};
-
-// {pathogen: [lab, ...]} — union of all antibiotics' labs
-const PRED_LABS = {};
-for (const [p, abs] of Object.entries(COMBOS)) {
-  const labs = new Set();
-  Object.values(abs).forEach(ls => ls.forEach(l => labs.add(l)));
-  PRED_LABS[p] = [...labs].sort();
-}
 
 // ---------------------------------------------------------------------------
 // Tab 1: Osservazionale cascading selects
@@ -402,7 +400,6 @@ if (selP) {
 // Tab 2: Predittiva selects
 // ---------------------------------------------------------------------------
 const predP = document.getElementById('predPathogen');
-const predL = document.getElementById('predLaboratory');
 const predBtn = document.getElementById('predSubmitBtn');
 
 function checkPredReady() {
@@ -410,28 +407,10 @@ function checkPredReady() {
 }
 
 if (predP) {
-  predP.addEventListener('change', () => {
-    const p = predP.value;
-    predL.innerHTML = '<option value="">— tutti i laboratori —</option>';
-    if (p && PRED_LABS[p]) {
-      PRED_LABS[p].forEach(lab => {
-        const o = document.createElement('option');
-        o.value = lab; o.textContent = lab;
-        predL.appendChild(o);
-      });
-      predL.disabled = false;
-    } else {
-      predL.disabled = true;
-    }
-    checkPredReady();
-  });
+  predP.addEventListener('change', checkPredReady);
 
   {% if pred_form.pathogen %}
   predP.value = {{ pred_form.pathogen | tojson }};
-  predP.dispatchEvent(new Event('change'));
-  {% if pred_form.laboratory %}
-  setTimeout(() => { predL.value = {{ pred_form.laboratory | tojson }}; }, 0);
-  {% endif %}
   {% endif %}
 
   checkPredReady();

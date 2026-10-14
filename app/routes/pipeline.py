@@ -291,7 +291,6 @@ def predictive():
 
         pred_form = {
             "pathogen": request.form.get("pathogen", ""),
-            "laboratory": request.form.get("laboratory", ""),
             "horizon": request.form.get("horizon", "6"),
         }
 
@@ -304,56 +303,93 @@ def predictive():
             pred_form["target_month"] = target_date.strftime("%B %Y")
             pred_form["target_date_str"] = target_date.strftime("%Y-%m")
 
-            q = CombinationForecast.query.filter_by(
+            # Previsioni: tutti i laboratori aggregati a livello regionale
+            rows = CombinationForecast.query.filter_by(
                 pathogen=pred_form["pathogen"],
                 forecast_month=target_date,
-            )
-            if pred_form.get("laboratory"):
-                q = q.filter_by(laboratory=pred_form["laboratory"])
+            ).all()
 
-            rows = q.all()
             if not rows:
                 pred_error = (
                     f"Nessuna previsione disponibile per {pred_form['pathogen']} "
                     f"a {pred_form.get('target_month', '')}. Eseguire prima la pipeline."
                 )
             else:
+                # Media storica 12 mesi — pesata per numero di isolati (non media di percentuali)
+                cutoff = _date(today.year - 1, today.month, 1)
+                hist_rows = AggregatedObservation.query.filter(
+                    AggregatedObservation.pathogen == pred_form["pathogen"],
+                    AggregatedObservation.month >= cutoff,
+                ).all()
+
+                hist_acc: dict = defaultdict(lambda: {"s": 0.0, "r": 0.0, "n": 0})
+                for h in hist_rows:
+                    n = h.samples or 0
+                    if n > 0:
+                        hist_acc[h.antibiotic]["s"] += h.sensitive_count or 0.0
+                        hist_acc[h.antibiotic]["r"] += h.resistant_count or 0.0
+                        hist_acc[h.antibiotic]["n"] += n
+
+                hist_summary: dict = {
+                    ab: {
+                        "s": d["s"] / d["n"] * 100,
+                        "r": d["r"] / d["n"] * 100,
+                        "n": d["n"],
+                    }
+                    for ab, d in hist_acc.items() if d["n"] > 0
+                }
+
+                # Aggrega previsioni per antibiotico (media su tutti i laboratori)
                 ab_data: dict = defaultdict(list)
                 for r in rows:
                     ab_data[r.antibiotic].append({
-                        "lab": r.laboratory,
                         "s": r.sensitive_pct or 0.0,
-                        "i": r.intermediate_pct or 0.0,
                         "r": r.resistant_pct or 0.0,
                         "r_lo": r.resistant_lower,
                         "r_hi": r.resistant_upper,
+                        "s_lo": r.sensitive_lower,
+                        "s_hi": r.sensitive_upper,
                     })
 
                 pred_results = []
                 for ab, entries in ab_data.items():
-                    r_vals = [e["r"] for e in entries]
                     s_vals = [e["s"] for e in entries]
+                    r_vals = [e["r"] for e in entries]
                     r_lo_vals = [e["r_lo"] for e in entries if e["r_lo"] is not None]
                     r_hi_vals = [e["r_hi"] for e in entries if e["r_hi"] is not None]
+                    s_lo_vals = [e["s_lo"] for e in entries if e["s_lo"] is not None]
+                    s_hi_vals = [e["s_hi"] for e in entries if e["s_hi"] is not None]
                     mean_s = float(_np.mean(s_vals))
                     mean_r = float(_np.mean(r_vals))
 
-                    # Scarta combinazioni con dati degeneri (S≈0 e R≈0 → nessun dato reale)
                     if mean_s < 1.0 and mean_r < 1.0:
                         continue
 
+                    hist = hist_summary.get(ab)
+                    hist_r = hist["r"] if hist else None
+                    trend = "stable"
+                    if hist_r is not None:
+                        delta = mean_r - hist_r
+                        if delta > 5:
+                            trend = "worse"
+                        elif delta < -5:
+                            trend = "better"
+
                     pred_results.append({
                         "antibiotic": ab,
-                        "resistant_pct": mean_r,
                         "sensitive_pct": mean_s,
+                        "resistant_pct": mean_r,
+                        "sensitive_lower": float(_np.mean(s_lo_vals)) if s_lo_vals else None,
+                        "sensitive_upper": float(_np.mean(s_hi_vals)) if s_hi_vals else None,
                         "resistant_lower": float(_np.mean(r_lo_vals)) if r_lo_vals else None,
                         "resistant_upper": float(_np.mean(r_hi_vals)) if r_hi_vals else None,
-                        "labs": sorted({e["lab"] for e in entries}),
                         "n_labs": len(entries),
+                        "hist_sensitive_pct": hist["s"] if hist else None,
+                        "hist_resistant_pct": hist_r,
+                        "hist_n_isolates": hist["n"] if hist else None,
+                        "trend": trend,
                     })
 
-                # Ordina per % sensibile decrescente (più sensibile = antibiotico migliore).
-                # Tiebreak per % resistente crescente.
                 pred_results.sort(key=lambda x: (-x["sensitive_pct"], x["resistant_pct"]))
 
         except Exception as exc:
