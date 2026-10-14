@@ -191,7 +191,7 @@ fi
 log "──────────────────────────────────────────"
 log "Riavvio servizio..."
 
-if command -v systemctl &>/dev/null && systemctl list-unit-files "${SERVICE}.service" &>/dev/null 2>&1 | grep -q "$SERVICE"; then
+if [[ -f "/etc/systemd/system/${SERVICE}.service" ]]; then
   # Pulisce eventuale stato "failed" (StartLimitBurst raggiunto) prima di riavviare
   sudo systemctl reset-failed "$SERVICE" 2>/dev/null || true
 
