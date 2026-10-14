@@ -41,13 +41,25 @@ CODE_COLUMNS = [
 MAX_ISSUE_ROWS = 100_000
 MIN_DATE = pd.Timestamp("2000-01-01")
 
-_MIC_RE = re.compile(r"^\s*(<=|>=|<|>|=)?\s*([0-9]+(?:[.,][0-9]+)?)\s*$")
+# Operator, first number (primary drug), optional "/inhibitor" part: "<=0,25/4", ">32/2", "1."
+_MIC_RE = re.compile(r"^(<=|>=|=<|=>|<|>|=)?(\d+(?:[.,]\d*)?|[.,]\d+)(?:[/\\]\d+(?:[.,]\d+)?)?$")
+# Excel turns "16/4" into a date shown as "16-apr": recover day/month as MIC/inhibitor
+_EXCEL_DATE_MIC_RE = re.compile(
+    r"^(\d{1,2})-(gen|feb|mar|apr|mag|giu|lug|ago|set|ott|nov|dic|jan|may|jun|jul|aug|sep|oct|dec)$",
+    re.IGNORECASE,
+)
 _RESULT_MAP = {
     "S": "S", "I": "I", "R": "R",
+    "R*": "R", "S*": "S", "I*": "I",  # asterisk = expert rule / edited result
     "SENSIBILE": "S", "SENSITIVE": "S", "SUSCEPTIBLE": "S",
     "INTERMEDIO": "I", "INTERMEDIATE": "I",
     "RESISTENTE": "R", "RESISTANT": "R",
 }
+# Recognised non-S/I/R codes: kept in result_raw / mic_raw, reported as info only
+NOT_AVAILABLE_CODES = {"ND", "N/D", "NR", "N/R", "NA", "N/A", "NULL", "X", "-", "--", "---", "(-)", "-)", ".", "INTERR"}
+INSUFFICIENT_EVIDENCE_CODES = {"IE", "E"}  # EUCAST "insufficient evidence"
+SCREENING_CODES = {"+", "POS", "NEG"}  # e.g. cefoxitin screen; "-" is ambiguous and treated as not available
+SYNERGY_MAP = {"SYN-S": "S", "SIN-S": "S", "SYN-R": "R", "SIN-R": "R"}  # high-level aminoglycoside synergy
 
 
 class DatasetValidationError(ValueError):
@@ -99,8 +111,10 @@ def _clean_cell(value) -> str:
 def parse_dates(series: pd.Series) -> pd.Series:
     """Parse dd/mm/yyyy and ISO dates without day/month swaps."""
     text = series.astype(str).str.strip()
+    # "2019-10-09 00:00:00.0" (database exports) -> drop fractional seconds
+    text = text.str.replace(r"(\d{2}:\d{2}:\d{2})\.\d+$", r"\1", regex=True)
     out = pd.to_datetime(text, format="%d/%m/%Y", errors="coerce")
-    for fmt in ("%Y-%m-%d %H:%M:%S", "%Y-%m-%d", "%d/%m/%Y %H:%M:%S", "%d-%m-%Y", "%d/%m/%y"):
+    for fmt in ("%Y-%m-%d %H:%M:%S", "%Y-%m-%d", "%d/%m/%Y %H:%M:%S", "%d/%m/%Y %H:%M", "%d-%m-%Y", "%d/%m/%y"):
         missing = out.isna() & text.ne("")
         if not missing.any():
             break
@@ -114,15 +128,43 @@ def parse_dates(series: pd.Series) -> pd.Series:
 
 
 def parse_mic(series: pd.Series) -> tuple[pd.Series, pd.Series]:
-    """Split '<=0.5' into ('<=', 0.5). Unparseable values give (None, NaN)."""
-    parts = series.astype(str).str.extract(_MIC_RE)
-    operator = parts[0].fillna("=").where(parts[1].notna())
-    value = pd.to_numeric(parts[1].str.replace(",", ".", regex=False), errors="coerce")
+    """Split '<=0.5' into ('<=', 0.5). Unparseable values give (None, NaN).
+
+    For combinations ('<=0,25/4', '>32/2') the value is the primary drug's MIC.
+    """
+    filled = series.astype(str).ne("")
+    operator = pd.Series(np.nan, index=series.index, dtype=object)
+    value = pd.Series(np.nan, index=series.index, dtype=float)
+    if not filled.any():
+        return operator, value
+    # Most cells are empty: parse only the filled ones
+    text = series[filled].astype(str).str.replace(r"\s+", "", regex=True)
+    text = text.str.replace("≤", "<=", regex=False).str.replace("≥", ">=", regex=False)
+    excel_date = text.str.extract(_EXCEL_DATE_MIC_RE)[0]
+    # ...or into a full date ("4/2" -> 2021-02-04 00:00:00): the day is the MIC
+    excel_date = excel_date.fillna(text.str.extract(r"^\d{4}-\d{2}-(\d{2})00:00:00$")[0].str.lstrip("0"))
+    text = text.where(excel_date.isna(), excel_date)
+    parts = text.str.extract(_MIC_RE)
+    operator[filled] = parts[0].replace({"=<": "<=", "=>": ">="}).fillna("=").where(parts[1].notna())
+    value[filled] = pd.to_numeric(parts[1].str.replace(",", ".", regex=False), errors="coerce")
     return operator, value
 
 
 def normalize_result(series: pd.Series) -> pd.Series:
     return series.astype(str).str.strip().str.upper().map(_RESULT_MAP)
+
+
+def parse_age(series: pd.Series) -> pd.Series:
+    """Age in years; understands '<1', '7 Mesi', '11 giorni', '1 Anno'."""
+    text = series.astype(str).str.strip().str.lower().str.replace(",", ".", regex=False)
+    years = pd.to_numeric(text, errors="coerce")
+    parts = text.str.extract(r"^(\d+(?:\.\d+)?)\s*(anno|anni|mese|mesi|giorno|giorni|settimana|settimane)$")
+    factor = parts[1].map({
+        "anno": 1.0, "anni": 1.0, "mese": 1 / 12, "mesi": 1 / 12,
+        "giorno": 1 / 365, "giorni": 1 / 365, "settimana": 7 / 365, "settimane": 7 / 365,
+    })
+    years = years.fillna(pd.to_numeric(parts[0], errors="coerce") * factor)
+    return years.mask(text.eq("<1"), 0.0)
 
 
 def _code(series: pd.Series) -> pd.Series:
@@ -181,7 +223,7 @@ def build_and_validate(raw: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame, d
 
     isolates["data_prelievo"] = parse_dates(raw["DATA_PRELIEVO"])
     isolates["data_ricovero"] = parse_dates(raw["DATA_RICOVERO"]) if "DATA_RICOVERO" in columns else pd.NaT
-    isolates["eta"] = pd.to_numeric(raw["ETA"].str.replace(",", ".", regex=False), errors="coerce") if "ETA" in columns else np.nan
+    isolates["eta"] = parse_age(raw["ETA"]) if "ETA" in columns else np.nan
 
     empty_row = raw.eq("").all(axis=1)
     issues.add(empty_row, excel_row, "-", raw.iloc[:, 0], "Riga vuota", "info")
@@ -206,8 +248,11 @@ def build_and_validate(raw: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame, d
         adm_after = isolates["data_ricovero"] > isolates["data_prelievo"]
         issues.add(adm_after, excel_row, "DATA_RICOVERO", raw["DATA_RICOVERO"], "Data ricovero successiva al prelievo", "avviso")
     if "SESSO" in columns:
-        bad_sex = ~isolates["sesso"].isin(["M", "F", ""])
+        unknown_sex = isolates["sesso"].isin(["U", "N", "X", "ND", "I"])
+        issues.add(unknown_sex, excel_row, "SESSO", raw["SESSO"], "Sesso non noto (U/N): registrato come mancante", "info")
+        bad_sex = ~isolates["sesso"].isin(["M", "F", ""]) & ~unknown_sex
         issues.add(bad_sex, excel_row, "SESSO", raw["SESSO"], "Sesso diverso da M/F", "avviso")
+        isolates.loc[unknown_sex | bad_sex, "sesso"] = ""
     if "ETA" in columns:
         bad_age = raw["ETA"].ne("") & (isolates["eta"].isna() | (isolates["eta"] < 0) | (isolates["eta"] > 120))
         issues.add(bad_age, excel_row, "ETA", raw["ETA"], "Età non numerica o fuori 0-120", "avviso")
@@ -232,24 +277,58 @@ def build_and_validate(raw: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame, d
         qual_col, quant_col = f"{abx}{QUAL_SUFFIX}", f"{abx}{QUANT_SUFFIX}"
         qual_raw = raw[qual_col]
         quant_raw = raw[quant_col] if quant_col in columns else pd.Series("", index=raw.index)
+        qual_code = qual_raw.str.strip().str.upper()
+        quant_code = quant_raw.str.strip().str.upper()
         result = normalize_result(qual_raw)
         mic_op, mic_val = parse_mic(quant_raw)
+        has_qual, has_quant = qual_raw.ne("") & valid_row, quant_raw.ne("") & valid_row
 
-        bad_qual = qual_raw.ne("") & result.isna() & valid_row
+        # Qualitative column: recognised codes are info, anything else a warning
+        qual_na = qual_code.isin(NOT_AVAILABLE_CODES) & has_qual
+        qual_ie = qual_code.isin(INSUFFICIENT_EVIDENCE_CODES) & has_qual
+        qual_screen = qual_code.isin(SCREENING_CODES) & has_qual
+        qual_op, qual_mic = parse_mic(qual_raw)
+        qual_is_mic = qual_mic.notna() & result.isna() & has_qual
+        issues.add(qual_na, excel_row, qual_col, qual_raw, "Antibiotico non testato / non disponibile", "info")
+        issues.add(qual_ie, excel_row, qual_col, qual_raw, "IE: evidenza insufficiente (EUCAST), nessuna categoria S/I/R", "info")
+        issues.add(qual_screen, excel_row, qual_col, qual_raw, "Risultato di screening (Pos/Neg), non convertito in S/I/R", "info")
+        issues.add(qual_is_mic, excel_row, qual_col, qual_raw,
+                   "MIC nella colonna qualitativa (usata come MIC se la colonna MIC è vuota)", "info")
+        bad_qual = has_qual & result.isna() & ~(qual_na | qual_ie | qual_screen | qual_is_mic)
         issues.add(bad_qual, excel_row, qual_col, qual_raw, "Valore qualitativo diverso da S/I/R", "avviso")
-        bad_quant = quant_raw.ne("") & mic_val.isna() & valid_row
-        issues.add(bad_quant, excel_row, quant_col, quant_raw, "MIC non interpretabile", "avviso")
-        quant_only = quant_raw.ne("") & qual_raw.eq("") & valid_row
-        issues.add(quant_only, excel_row, quant_col, quant_raw, "MIC presente senza interpretazione S/I/R", "info")
+        # A MIC typed in the qualitative column is kept when the MIC column is empty
+        move = qual_is_mic & quant_raw.eq("")
+        mic_op, mic_val = mic_op.where(~move, qual_op), mic_val.where(~move, qual_mic)
+        mic_raw = quant_raw.where(~move, qual_raw)
 
-        tested = valid_row & (result.notna() | mic_val.notna())
+        # Quantitative column
+        quant_na = quant_code.isin(NOT_AVAILABLE_CODES) & has_quant
+        quant_screen = quant_code.isin(SCREENING_CODES) & has_quant
+        synergy = quant_code.map(SYNERGY_MAP)
+        quant_syn = synergy.notna() & has_quant
+        issues.add(quant_na, excel_row, quant_col, quant_raw, "MIC non disponibile (ND, N/R, (-), ...)", "info")
+        issues.add(quant_screen, excel_row, quant_col, quant_raw, "Risultato di screening (Pos/Neg) al posto della MIC", "info")
+        syn_fill = quant_syn & result.isna()
+        issues.add(syn_fill, excel_row, quant_col, quant_raw, "Test di sinergia (SYN-S/SYN-R) usato come risultato S/R", "info")
+        result = result.where(~syn_fill, synergy)
+        quant_sir = normalize_result(quant_raw).where(has_quant)
+        sir_fill = quant_sir.notna() & result.isna()
+        issues.add(sir_fill, excel_row, quant_col, quant_raw, "S/I/R nella colonna MIC: usato come risultato", "info")
+        result = result.where(~sir_fill, quant_sir)
+        bad_quant = has_quant & mic_val.isna() & ~(quant_na | quant_screen | quant_syn | quant_sir.notna())
+        issues.add(bad_quant, excel_row, quant_col, quant_raw, "MIC non interpretabile", "avviso")
+        quant_only = mic_val.notna() & result.isna() & ~(qual_ie | qual_screen) & valid_row
+        issues.add(quant_only, excel_row, quant_col, mic_raw, "MIC presente senza interpretazione S/I/R", "info")
+
+        tested = valid_row & (result.notna() | mic_val.notna() | qual_ie | qual_screen)
         if not tested.any():
             continue
         ast_parts.append(pd.DataFrame({
             "isolate_id": raw.index[tested],
             "antibiotic": abx,
             "result": result[tested],
-            "mic_raw": quant_raw[tested],
+            "result_raw": qual_raw[tested],
+            "mic_raw": mic_raw[tested],
             "mic_operator": mic_op[tested],
             "mic_value": mic_val[tested],
         }))
@@ -260,7 +339,7 @@ def build_and_validate(raw: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame, d
     ast = (
         pd.concat(ast_parts, ignore_index=True)
         if ast_parts
-        else pd.DataFrame(columns=["isolate_id", "antibiotic", "result", "mic_raw", "mic_operator", "mic_value"])
+        else pd.DataFrame(columns=["isolate_id", "antibiotic", "result", "result_raw", "mic_raw", "mic_operator", "mic_value"])
     )
 
     if isolates.empty or ast["result"].notna().sum() == 0:

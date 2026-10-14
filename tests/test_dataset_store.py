@@ -33,7 +33,10 @@ ROWS = [
     _row("70157604", "0905347402", "05/09/2022", AMK=("S", "8"), COL=("S", "")),
     _row("70157604", "0905347402", "05/09/2022", AMK=("S", "8"), COL=("S", "")),          # exact duplicate
     _row("99999999", "0101010101", "31/02/2022", AMK=("R", ">32")),                        # invalid date
-    _row("88888888", "0202020202", "10/10/2022", AMK=("X", "abc"), CIP=("", "4")),        # bad values
+    _row("88888888", "0202020202", "10/10/2022", AMK=("Q", "abc"), CIP=("", "4")),        # bad values
+    # Real-export quirks: fractional-second dates, combination MIC, Excel-mangled MIC, codes
+    _row("77777777", "0303030303", "2019-10-09 00:00:00.0", AMK=("R*", ">32/2"), CIP=("IE", "16-apr"),
+         COL=("ND", "(-)"), MEM=("<=0.5", "")),
 ]
 
 
@@ -59,10 +62,10 @@ def test_read_and_validate_keeps_codes_and_parses_mic(xlsx_path):
     raw = dataset_store.read_raw_file(xlsx_path)
     isolates, ast, report, issues = dataset_store.build_and_validate(raw)
 
-    assert report["stats"]["rows_read"] == 7
-    assert report["stats"]["isolates_valid"] == 5  # invalid date + exact duplicate excluded
+    assert report["stats"]["rows_read"] == 8
+    assert report["stats"]["isolates_valid"] == 6  # invalid date + exact duplicate excluded
     assert "00006267" in set(isolates["codice_paziente"])
-    assert isolates["data_prelievo"].min() == pd.Timestamp("2022-01-12")
+    assert isolates["data_prelievo"].min() == pd.Timestamp("2019-10-09")  # "...00:00:00.0" format
 
     mem = ast[ast["antibiotic"] == "MEM"].iloc[0]
     assert (mem["mic_operator"], mem["mic_value"]) == (">", 8.0)
@@ -76,7 +79,16 @@ def test_read_and_validate_keeps_codes_and_parses_mic(xlsx_path):
     assert "MIC non interpretabile" in problems
     assert "MIC presente senza interpretazione S/I/R" in problems
     assert report["stats"]["repeat_isolates"] == 1
-    assert report["stats"]["first_isolates"] == 4
+    assert report["stats"]["first_isolates"] == 5
+
+    quirky = ast[ast["isolate_id"] == 7].set_index("antibiotic")
+    assert quirky.loc["AMK", "result"] == "R" and quirky.loc["AMK", "mic_value"] == 32.0
+    assert pd.isna(quirky.loc["CIP", "result"]) and quirky.loc["CIP", "result_raw"] == "IE"
+    assert quirky.loc["CIP", "mic_value"] == 16.0
+    assert "COL" not in quirky.index  # not tested
+    assert (quirky.loc["MEM", "mic_operator"], quirky.loc["MEM", "mic_value"]) == ("<=", 0.5)
+    quirky_issues = set(issues.loc[issues["riga_excel"] == 9, "gravita"])
+    assert quirky_issues == {"info"}
 
 
 def test_missing_required_columns_blocks_import(tmp_path):
@@ -86,6 +98,12 @@ def test_missing_required_columns_blocks_import(tmp_path):
     with pytest.raises(dataset_store.DatasetValidationError) as exc:
         dataset_store.build_and_validate(dataset_store.read_raw_file(path))
     assert "MICROORGANISMO" in str(exc.value)
+
+
+def test_age_units_are_converted_to_years():
+    ages = dataset_store.parse_age(pd.Series(["<1", "6 Mesi", "73 giorni", "1 Anno", "76", "abc"]))
+    assert ages.round(2).tolist()[:5] == [0.0, 0.5, 0.2, 1.0, 76.0]
+    assert pd.isna(ages.iloc[5])
 
 
 def test_iso_dates_are_not_swapped():
@@ -102,9 +120,10 @@ def test_upload_stores_dataset_for_models(tmp_path):
         "DATASET_FOLDER": str(tmp_path / "dataset"),
     })
     client = app.test_client()
+    content = _xlsx_bytes()
     response = client.post(
         "/upload",
-        data={"dataset": (io.BytesIO(_xlsx_bytes()), "rete_mic.xlsx")},
+        data={"dataset": (io.BytesIO(content), "rete_mic.xlsx")},
         content_type="multipart/form-data",
     )
     assert response.status_code == 200
@@ -118,8 +137,8 @@ def test_upload_stores_dataset_for_models(tmp_path):
 
     folder = tmp_path / "dataset"
     isolates = dataset_store.load_isolates(folder)
-    assert len(isolates) == 5
-    assert len(dataset_store.load_isolates(folder, first_isolate_only=True)) == 4
+    assert len(isolates) == 6
+    assert len(dataset_store.load_isolates(folder, first_isolate_only=True)) == 5
     ast = dataset_store.load_ast_results(folder)
     assert {"eta", "sesso", "reparto_di_ricovero", "mic_value", "result"} <= set(ast.columns)
 
@@ -129,7 +148,7 @@ def test_upload_stores_dataset_for_models(tmp_path):
     # Same file again is skipped, not imported twice
     client.post(
         "/upload",
-        data={"dataset": (io.BytesIO(_xlsx_bytes()), "rete_mic_copy.xlsx")},
+        data={"dataset": (io.BytesIO(content), "rete_mic_copy.xlsx")},
         content_type="multipart/form-data",
     )
-    assert len(dataset_store.load_isolates(folder)) == 5
+    assert len(dataset_store.load_isolates(folder)) == 6
