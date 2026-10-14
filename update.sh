@@ -114,15 +114,56 @@ else
     log "  · $l"
   done
 
+  # ── verifica modifiche locali prima del pull ─────────────────────────────
+  DIRTY=$(git status --porcelain 2>/dev/null)
+  if [[ -n "$DIRTY" ]]; then
+    log "ATTENZIONE: file modificati localmente (potrebbero creare conflitti):"
+    echo "$DIRTY" | while IFS= read -r l; do log "  $l"; done
+    log "Metto da parte le modifiche locali (git stash)..."
+    git stash push -u -m "update.sh auto-stash $(date '+%Y%m%d-%H%M%S')"
+    STASHED=1
+  else
+    STASHED=0
+  fi
+
+  # ── pull ──────────────────────────────────────────────────────────────────
   log "Applico aggiornamenti (git pull --rebase)..."
   if ! git pull --rebase origin "$CURRENT_BRANCH"; then
     log "ERRORE: git pull fallito — risolvere i conflitti manualmente."
+    if [[ $STASHED -eq 1 ]]; then
+      log "Ripristino modifiche locali (git stash pop)..."
+      git stash pop || true
+    fi
     exit 1
   fi
 
   NEW_SHA=$(git rev-parse HEAD)
   log "Aggiornato: ${LOCAL_SHA:0:8} → ${NEW_SHA:0:8}"
   log "Nuova versione: $(version_string)"
+
+  # ── verifica che i file su disco siano effettivamente aggiornati ──────────
+  log "──────────────────────────────────────────"
+  log "Verifica file aggiornati su disco..."
+
+  CHANGED_FILES=$(git diff --name-only "$LOCAL_SHA" "$NEW_SHA" 2>/dev/null || echo "")
+  if [[ -n "$CHANGED_FILES" ]]; then
+    FILE_COUNT=$(echo "$CHANGED_FILES" | wc -l | tr -d ' ')
+    log "$FILE_COUNT file modificati:"
+    echo "$CHANGED_FILES" | while IFS= read -r f; do log "  · $f"; done
+  else
+    log "Nessun file di testo cambiato (solo metadati o merge)."
+  fi
+
+  # Controlla che il working tree sia pulito dopo il pull
+  POST_DIRTY=$(git status --porcelain 2>/dev/null)
+  if [[ -n "$POST_DIRTY" ]]; then
+    log "ATTENZIONE: working tree non pulito dopo il pull:"
+    echo "$POST_DIRTY" | while IFS= read -r l; do log "  $l"; done
+    log "Questo indica file su disco non allineati con il repository."
+  else
+    log "✓ Working tree pulito — tutti i file su disco sono aggiornati."
+  fi
+
   UPDATED=1
 fi
 
