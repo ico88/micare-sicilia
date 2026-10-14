@@ -104,6 +104,7 @@ class ValidationMetric(db.Model):
     mape = db.Column(db.Float, nullable=True)
     mase = db.Column(db.Float, nullable=True)
     rmse_arima = db.Column(db.Float, nullable=True)
+    rmse_glm = db.Column(db.Float, nullable=True)
     accuracy = db.Column(db.Float, nullable=True)
     f1_macro = db.Column(db.Float, nullable=True)
     metadata_json = db.Column(db.Text, default="{}", nullable=False)

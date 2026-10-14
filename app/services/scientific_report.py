@@ -151,6 +151,7 @@ def _metrics_table(metrics_rows) -> list[dict]:
             "mape": row.mape,
             "mase": row.mase,
             "rmse_arima": row.rmse_arima,
+            "rmse_glm": row.rmse_glm,
             "accuracy": row.accuracy,
             "f1_macro": row.f1_macro,
         }

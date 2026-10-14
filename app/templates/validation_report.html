@@ -208,6 +208,7 @@
             <th>MAE</th><th>RMSE</th><th>MAPE</th>
             <th title="Mean Absolute Scaled Error: valori < 1 indicano che il modello supera la previsione naive">MASE ℹ</th>
             <th title="RMSE baseline ARIMA(1,1,1) sulla stessa serie — confronto competitivo con Prophet">RMSE ARIMA ℹ</th>
+            <th title="RMSE baseline GLM binomiale (trend + stagionalità, pesato sul numero di isolati testati) sulla stessa serie">RMSE GLM ℹ</th>
             <th>Accuracy</th><th>F1 macro</th>
           </tr>
         </thead>
@@ -239,11 +240,19 @@
                   {{ row.rmse_arima|round(3) }}
                 {% endif %}
               </td>
+              <td>
+                {% if row.rmse_glm is not none %}
+                  {{ row.rmse_glm|round(3) }}
+                  {% if row.rmse is not none and row.rmse_glm < row.rmse %}
+                    <span class="text-danger small">↑ GLM migliore di Prophet</span>
+                  {% endif %}
+                {% endif %}
+              </td>
               <td>{{ row.accuracy|round(3) if row.accuracy is not none else '' }}</td>
               <td>{{ row.f1_macro|round(3) if row.f1_macro is not none else '' }}</td>
             </tr>
           {% else %}
-            <tr><td colspan="9" class="text-muted">Nessun training eseguito.</td></tr>
+            <tr><td colspan="10" class="text-muted">Nessun training eseguito.</td></tr>
           {% endfor %}
         </tbody>
       </table>

@@ -9,6 +9,7 @@ import numpy as np
 import pandas as pd
 from joblib import Parallel, delayed
 from prophet import Prophet
+import statsmodels.api as sm
 from sklearn.metrics import mean_squared_error
 from statsmodels.tsa.statespace.sarimax import SARIMAX
 from tqdm.auto import tqdm
@@ -21,6 +22,9 @@ from .config import (
 )
 
 COVARIATE_COLS = ["pct_icu", "pct_inpatient"]
+
+# Optional count columns (from db_to_model_format) used by the binomial GLM baseline
+COUNT_COLS = {target: f"n_{target}" for target in TARGETS}
 
 # Clip percentages to this range before logit transform to avoid ±∞
 _EPS = 0.5
@@ -105,6 +109,68 @@ def _arima_cv_rmse(series: pd.Series, cv_dates: list[pd.Timestamp]) -> float:
 
 
 # ---------------------------------------------------------------------------
+# Binomial GLM baseline
+# ---------------------------------------------------------------------------
+
+def _glm_design(ds: pd.Series, origin: pd.Timestamp) -> np.ndarray:
+    """Intercept + linear trend (years) + one yearly Fourier harmonic."""
+    ds = pd.to_datetime(ds)
+    t = ((ds.dt.year - origin.year) * 12 + ds.dt.month - origin.month).to_numpy(dtype=float) / 12.0
+    angle = 2 * np.pi * ds.dt.month.to_numpy(dtype=float) / 12.0
+    return np.column_stack([np.ones_like(t), t, np.sin(angle), np.cos(angle)])
+
+
+def _glm_binomial_cv_rmse(counts: pd.DataFrame, cv_dates: list[pd.Timestamp]) -> float:
+    """Walk-forward binomial GLM (logit link) RMSE on the percentage scale.
+
+    `counts` has columns ds, successes, trials and the same rows Prophet and
+    ARIMA are evaluated on. Unlike them, the fit weights each row by its number
+    of tested isolates and the prediction is bounded in [0, 100] by construction.
+    """
+    rmse_values: list[float] = []
+    for end_date in cv_dates:
+        train = counts[counts["ds"] <= end_date]
+        test = counts[
+            (counts["ds"] > end_date) & (counts["ds"] <= end_date + pd.DateOffset(months=6))
+        ]
+        if train["ds"].nunique() < 6 or test.empty:
+            continue
+        origin = train["ds"].min()
+        successes = train["successes"].to_numpy(dtype=float)
+        endog = np.column_stack([successes, train["trials"].to_numpy(dtype=float) - successes])
+        try:
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore")
+                fit = sm.GLM(endog, _glm_design(train["ds"], origin),
+                             family=sm.families.Binomial()).fit()
+                pred = 100.0 * fit.predict(_glm_design(test["ds"], origin))
+        except Exception:
+            continue
+        y_true = 100.0 * test["successes"].to_numpy(dtype=float) / test["trials"].to_numpy(dtype=float)
+        valid = np.isfinite(pred) & np.isfinite(y_true)
+        if valid.sum() == 0:
+            continue
+        rmse_values.append(float(np.sqrt(mean_squared_error(y_true[valid], pred[valid]))))
+    return float(np.mean(rmse_values)) if rmse_values else np.nan
+
+
+def _binomial_counts(data: pd.DataFrame, target: str) -> pd.DataFrame | None:
+    """Per-row (successes, trials) for `target`; None when counts are unavailable.
+
+    Trials are S+I+R, the same denominator used to compute the percentages.
+    """
+    if not all(col in data.columns for col in COUNT_COLS.values()):
+        return None
+    counts = pd.DataFrame({
+        "ds": data["data"],
+        "successes": data[COUNT_COLS[target]].astype(float),
+        "trials": data[list(COUNT_COLS.values())].astype(float).sum(axis=1),
+    })
+    counts = counts[counts["trials"] > 0]
+    return counts if not counts.empty else None
+
+
+# ---------------------------------------------------------------------------
 # Core per-combination training + CV
 # ---------------------------------------------------------------------------
 
@@ -138,7 +204,7 @@ def process_combination(
     local_forecasts: dict[str, pd.DataFrame] = {}
     local_metrics: dict[str, dict[str, float]] = {
         "rmse": {}, "mape": {}, "mase": {},
-        "rmse_arima": {},
+        "rmse_arima": {}, "rmse_glm": {},
     }
 
     data = data[data["data"] <= max_training_date].copy()
@@ -254,6 +320,13 @@ def process_combination(
         if not np.isnan(arima_rmse):
             local_metrics["rmse_arima"][target] = arima_rmse
 
+        # Binomial GLM baseline on the same rows, weighted by tested isolates
+        counts = _binomial_counts(data.loc[prophet_data.index], target)
+        if counts is not None:
+            glm_rmse = _glm_binomial_cv_rmse(counts, list(cv_dates))
+            if not np.isnan(glm_rmse):
+                local_metrics["rmse_glm"][target] = glm_rmse
+
     return combination, local_forecasts, local_metrics
 
 
@@ -276,7 +349,7 @@ def train_forecasts(
     combinations = sorted(valid_data["combinazione_unica"].unique())
 
     forecasts = {target: {} for target in TARGETS}
-    metrics = {target: {"rmse": {}, "mape": {}, "mase": {}, "rmse_arima": {}} for target in TARGETS}
+    metrics = {target: {"rmse": {}, "mape": {}, "mase": {}, "rmse_arima": {}, "rmse_glm": {}} for target in TARGETS}
 
     results = Parallel(n_jobs=n_jobs)(
         delayed(process_combination)(
@@ -317,13 +390,17 @@ def _summarize_baseline_comparison(
     target = "resistenti"
     prophet_rmses = list(metrics[target]["rmse"].values())
     arima_rmses = list(metrics[target]["rmse_arima"].values())
+    glm_rmses = list(metrics[target].get("rmse_glm", {}).values())
     return {
         "prophet_rmse_mean": float(np.mean(prophet_rmses)) if prophet_rmses else np.nan,
         "arima_rmse_mean": float(np.mean(arima_rmses)) if arima_rmses else np.nan,
+        "glm_rmse_mean": float(np.mean(glm_rmses)) if glm_rmses else np.nan,
         "prophet_rmse_median": float(np.median(prophet_rmses)) if prophet_rmses else np.nan,
         "arima_rmse_median": float(np.median(arima_rmses)) if arima_rmses else np.nan,
+        "glm_rmse_median": float(np.median(glm_rmses)) if glm_rmses else np.nan,
         "n_combinations_prophet": len(prophet_rmses),
         "n_combinations_arima": len(arima_rmses),
+        "n_combinations_glm": len(glm_rmses),
     }
 
 

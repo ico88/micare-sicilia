@@ -28,6 +28,14 @@ def db_to_model_format(aggregated: pd.DataFrame) -> pd.DataFrame:
     df["sensibili"] = df["sensitive_pct"]
     df["intermedi"] = df["intermediate_pct"]
     df["resistenti"] = df["resistant_pct"]
+    # Raw counts (when loaded) feed the binomial GLM baseline
+    for src, dst in [
+        ("sensitive_count", "n_sensibili"),
+        ("intermediate_count", "n_intermedi"),
+        ("resistant_count", "n_resistenti"),
+    ]:
+        if src in df.columns:
+            df[dst] = df[src]
     df["combinazione_unica"] = (
         df["pathogen"].astype(str)
         + "_"

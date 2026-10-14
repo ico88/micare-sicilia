@@ -174,6 +174,9 @@ def _load_aggregated(app: Flask) -> pd.DataFrame:
                 "sensitive_pct": r.sensitive_pct,
                 "intermediate_pct": r.intermediate_pct,
                 "resistant_pct": r.resistant_pct,
+                "sensitive_count": r.sensitive_count,
+                "intermediate_count": r.intermediate_count,
+                "resistant_count": r.resistant_count,
                 "pct_icu": r.pct_icu,
                 "pct_inpatient": r.pct_inpatient,
             }
@@ -201,6 +204,7 @@ def _save_step_metrics(app: Flask, run_id: int, model_name: str, summary: Any) -
                 mape_vals = list(cv.get(target, {}).get("mape", {}).values())
                 mase_vals = list(cv.get(target, {}).get("mase", {}).values())
                 rmse_arima_vals = list(cv.get(target, {}).get("rmse_arima", {}).values())
+                rmse_glm_vals = list(cv.get(target, {}).get("rmse_glm", {}).values())
                 if not rmse_vals:
                     continue
                 import numpy as np
@@ -211,6 +215,7 @@ def _save_step_metrics(app: Flask, run_id: int, model_name: str, summary: Any) -
                     mape=float(np.mean(mape_vals)) if mape_vals else None,
                     mase=float(np.mean(mase_vals)) if mase_vals else None,
                     rmse_arima=float(np.mean(rmse_arima_vals)) if rmse_arima_vals else None,
+                    rmse_glm=float(np.mean(rmse_glm_vals)) if rmse_glm_vals else None,
                     metadata_json=json.dumps({
                         "pipeline_run_id": run_id,
                         "n_combinations": len(rmse_vals),

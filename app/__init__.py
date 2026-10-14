@@ -108,6 +108,7 @@ def _ensure_schema_migrations() -> None:
     _migrate_table(inspector, tables, "validation_metrics", {
         "mase": "FLOAT",
         "rmse_arima": "FLOAT",
+        "rmse_glm": "FLOAT",
     })
     _migrate_table(inspector, tables, "aggregated_observations", {
         "pct_icu": "FLOAT",
