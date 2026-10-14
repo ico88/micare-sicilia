@@ -20,6 +20,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
+from app.services.breakpoints import BREAKPOINTS_VERSION, interpret_mic
 from micare_sicilia.config import ANTIBIOTIC_CLASS_CODES, INTRINSIC_RESISTANCE_EXCLUSIONS
 
 QUAL_SUFFIX = "_QUALITATIVO"
@@ -58,7 +59,9 @@ _RESULT_MAP = {
 # Recognised non-S/I/R codes: kept in result_raw / mic_raw, reported as info only
 NOT_AVAILABLE_CODES = {"ND", "N/D", "NR", "N/R", "NA", "N/A", "NULL", "X", "-", "--", "---", "(-)", "-)", ".", "INTERR"}
 INSUFFICIENT_EVIDENCE_CODES = {"IE", "E"}  # EUCAST "insufficient evidence"
-SCREENING_CODES = {"+", "POS", "NEG"}  # e.g. cefoxitin screen; "-" is ambiguous and treated as not available
+SCREENING_CODES = {"+", "POS", "NEG"}  # "-" is ambiguous and treated as not available, except for FOX
+# Cefoxitin screen (methicillin resistance in staphylococci): positive = R, negative = S
+FOX_SCREEN_MAP = {"+": "R", "POS": "R", "-": "S", "NEG": "S"}
 SYNERGY_MAP = {"SYN-S": "S", "SIN-S": "S", "SYN-R": "R", "SIN-R": "R"}  # high-level aminoglycoside synergy
 
 
@@ -282,11 +285,26 @@ def build_and_validate(raw: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame, d
         result = normalize_result(qual_raw)
         mic_op, mic_val = parse_mic(quant_raw)
         has_qual, has_quant = qual_raw.ne("") & valid_row, quant_raw.ne("") & valid_row
+        source = pd.Series("laboratorio", index=raw.index)
+        fox_fill = pd.Series(False, index=raw.index)
+
+        if abx == "FOX":
+            fox = qual_code.map(FOX_SCREEN_MAP).where(has_qual & result.isna())
+            fox = fox.fillna(quant_code.map(FOX_SCREEN_MAP).where(has_quant & result.isna() & ~has_qual))
+            fox_fill = fox.notna()
+            issues.add(fox_fill, excel_row, qual_col, qual_raw.where(has_qual, quant_raw),
+                       "Screening cefoxitina convertito (+/POS = R, -/NEG = S)", "info")
+            result = result.where(~fox_fill, fox)
+            source = source.mask(fox_fill, "screening_fox")
+            # Screen values in the MIC column are not MICs
+            quant_raw = quant_raw.mask(quant_code.isin(FOX_SCREEN_MAP) & fox_fill, "")
+            quant_code = quant_raw.str.strip().str.upper()
+            has_quant = quant_raw.ne("") & valid_row
 
         # Qualitative column: recognised codes are info, anything else a warning
-        qual_na = qual_code.isin(NOT_AVAILABLE_CODES) & has_qual
+        qual_na = qual_code.isin(NOT_AVAILABLE_CODES) & has_qual & ~fox_fill
         qual_ie = qual_code.isin(INSUFFICIENT_EVIDENCE_CODES) & has_qual
-        qual_screen = qual_code.isin(SCREENING_CODES) & has_qual
+        qual_screen = qual_code.isin(SCREENING_CODES) & has_qual & ~fox_fill
         qual_op, qual_mic = parse_mic(qual_raw)
         qual_is_mic = qual_mic.notna() & result.isna() & has_qual
         issues.add(qual_na, excel_row, qual_col, qual_raw, "Antibiotico non testato / non disponibile", "info")
@@ -311,14 +329,13 @@ def build_and_validate(raw: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame, d
         syn_fill = quant_syn & result.isna()
         issues.add(syn_fill, excel_row, quant_col, quant_raw, "Test di sinergia (SYN-S/SYN-R) usato come risultato S/R", "info")
         result = result.where(~syn_fill, synergy)
+        source = source.mask(syn_fill, "sinergia")
         quant_sir = normalize_result(quant_raw).where(has_quant)
         sir_fill = quant_sir.notna() & result.isna()
         issues.add(sir_fill, excel_row, quant_col, quant_raw, "S/I/R nella colonna MIC: usato come risultato", "info")
         result = result.where(~sir_fill, quant_sir)
         bad_quant = has_quant & mic_val.isna() & ~(quant_na | quant_screen | quant_syn | quant_sir.notna())
         issues.add(bad_quant, excel_row, quant_col, quant_raw, "MIC non interpretabile", "avviso")
-        quant_only = mic_val.notna() & result.isna() & ~(qual_ie | qual_screen) & valid_row
-        issues.add(quant_only, excel_row, quant_col, mic_raw, "MIC presente senza interpretazione S/I/R", "info")
 
         tested = valid_row & (result.notna() | mic_val.notna() | qual_ie | qual_screen)
         if not tested.any():
@@ -328,6 +345,7 @@ def build_and_validate(raw: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame, d
             "antibiotic": abx,
             "result": result[tested],
             "result_raw": qual_raw[tested],
+            "result_source": source[tested].where(result[tested].notna()),
             "mic_raw": mic_raw[tested],
             "mic_operator": mic_op[tested],
             "mic_value": mic_val[tested],
@@ -339,8 +357,10 @@ def build_and_validate(raw: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame, d
     ast = (
         pd.concat(ast_parts, ignore_index=True)
         if ast_parts
-        else pd.DataFrame(columns=["isolate_id", "antibiotic", "result", "result_raw", "mic_raw", "mic_operator", "mic_value"])
+        else pd.DataFrame(columns=["isolate_id", "antibiotic", "result", "result_raw", "result_source",
+                                   "mic_raw", "mic_operator", "mic_value"])
     )
+    _interpret_missing_categories(ast, isolates, report)
 
     if isolates.empty or ast["result"].notna().sum() == 0:
         report["errors"].append("Nessun isolato valido con risultati S/I/R dopo la validazione.")
@@ -375,6 +395,32 @@ def build_and_validate(raw: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame, d
         if item["gravita"] == "errore":
             report["warnings"].append(f"{item['righe']} righe escluse: {item['problema']}")
     return isolates, ast, report, issues.frame()
+
+
+def _interpret_missing_categories(ast: pd.DataFrame, isolates: pd.DataFrame, report: dict) -> None:
+    """Fill S/I/R from EUCAST breakpoints where only the MIC was reported (in place)."""
+    pending = ast["result"].isna() & ast["mic_value"].notna() & ~ast["result_raw"].str.upper().isin(INSUFFICIENT_EVIDENCE_CODES)
+    if not pending.any():
+        return
+    pathogen = ast.loc[pending, "isolate_id"].map(isolates.set_index("isolate_id")["microorganismo"])
+    derived = interpret_mic(ast.loc[pending, "antibiotic"], pathogen,
+                            ast.loc[pending, "mic_operator"], ast.loc[pending, "mic_value"])
+    filled = derived.dropna()
+    ast.loc[filled.index, "result"] = filled
+    ast.loc[filled.index, "result_source"] = "eucast_calcolato"
+    if not filled.empty:
+        per_abx = ast.loc[filled.index].groupby("antibiotic").size()
+        report["info"].append(
+            f"Categoria S/I/R calcolata con breakpoint {BREAKPOINTS_VERSION} per {len(filled)} MIC refertate senza "
+            "interpretazione: " + ", ".join(f"{a} ({n})" for a, n in per_abx.items())
+        )
+    left = int(pending.sum() - len(filled))
+    if left:
+        per_abx = ast.loc[pending & ast["result"].isna()].groupby("antibiotic").size().sort_values(ascending=False)
+        report["info"].append(
+            f"{left} MIC restano senza categoria (breakpoint assente/IE per quel microrganismo o MIC censurata ambigua): "
+            + ", ".join(f"{a} ({n})" for a, n in per_abx.head(15).items())
+        )
 
 
 def _stats(n_rows: int, isolates: pd.DataFrame, ast: pd.DataFrame, antibiotics: list[str]) -> dict:

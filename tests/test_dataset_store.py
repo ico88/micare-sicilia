@@ -13,7 +13,7 @@ BASE = [
     "PROVINCIA_RESIDENZA", "PAZIENTE_RICOVERATO", "DATA_RICOVERO", "REPARTO_DI_RICOVERO",
     "CODICE_CAMPIONE", "DATA_PRELIEVO", "MATERIALE", "MICROORGANISMO",
 ]
-ABX = ["AMK", "CIP", "COL", "MEM"]
+ABX = ["AMK", "CIP", "COL", "FOX", "MEM"]
 HEADER = BASE + [f"{a}_{kind}" for a in ABX for kind in ("QUALITATIVO", "QUANTITATIVO")]
 
 
@@ -37,6 +37,9 @@ ROWS = [
     # Real-export quirks: fractional-second dates, combination MIC, Excel-mangled MIC, codes
     _row("77777777", "0303030303", "2019-10-09 00:00:00.0", AMK=("R*", ">32/2"), CIP=("IE", "16-apr"),
          COL=("ND", "(-)"), MEM=("<=0.5", "")),
+    # MIC without category (EUCAST interpretation) and cefoxitin screen
+    _row("66666666", "0404040404", "11/11/2022", COL=("", "<=0.5"), MEM=("", ">8"), FOX=("+", "")),
+    _row("55555555", "0505050505", "12/11/2022", COL=("", "4"), FOX=("", "Neg")),
 ]
 
 
@@ -62,8 +65,8 @@ def test_read_and_validate_keeps_codes_and_parses_mic(xlsx_path):
     raw = dataset_store.read_raw_file(xlsx_path)
     isolates, ast, report, issues = dataset_store.build_and_validate(raw)
 
-    assert report["stats"]["rows_read"] == 8
-    assert report["stats"]["isolates_valid"] == 6  # invalid date + exact duplicate excluded
+    assert report["stats"]["rows_read"] == 10
+    assert report["stats"]["isolates_valid"] == 8  # invalid date + exact duplicate excluded
     assert "00006267" in set(isolates["codice_paziente"])
     assert isolates["data_prelievo"].min() == pd.Timestamp("2019-10-09")  # "...00:00:00.0" format
 
@@ -77,9 +80,8 @@ def test_read_and_validate_keeps_codes_and_parses_mic(xlsx_path):
     assert "Riga duplicata identica: esclusa" in problems
     assert "Valore qualitativo diverso da S/I/R" in problems
     assert "MIC non interpretabile" in problems
-    assert "MIC presente senza interpretazione S/I/R" in problems
     assert report["stats"]["repeat_isolates"] == 1
-    assert report["stats"]["first_isolates"] == 5
+    assert report["stats"]["first_isolates"] == 7
 
     quirky = ast[ast["isolate_id"] == 7].set_index("antibiotic")
     assert quirky.loc["AMK", "result"] == "R" and quirky.loc["AMK", "mic_value"] == 32.0
@@ -89,6 +91,15 @@ def test_read_and_validate_keeps_codes_and_parses_mic(xlsx_path):
     assert (quirky.loc["MEM", "mic_operator"], quirky.loc["MEM", "mic_value"]) == ("<=", 0.5)
     quirky_issues = set(issues.loc[issues["riga_excel"] == 9, "gravita"])
     assert quirky_issues == {"info"}
+
+    derived = ast[ast["isolate_id"].isin([8, 9])].set_index(["isolate_id", "antibiotic"])
+    assert derived.loc[(8, "COL"), ["result", "result_source"]].tolist() == ["S", "eucast_calcolato"]
+    assert derived.loc[(9, "COL"), ["result", "result_source"]].tolist() == ["R", "eucast_calcolato"]
+    assert pd.isna(derived.loc[(8, "MEM"), "result"])  # no breakpoint in the table: left uninterpreted
+    assert derived.loc[(8, "FOX"), ["result", "result_source"]].tolist() == ["R", "screening_fox"]
+    assert derived.loc[(9, "FOX"), "result"] == "S"
+    assert pd.isna(derived.loc[(9, "FOX"), "mic_value"])
+    assert ast.loc[ast["isolate_id"] == 0, "result_source"].eq("laboratorio").all()
 
 
 def test_missing_required_columns_blocks_import(tmp_path):
@@ -137,8 +148,8 @@ def test_upload_stores_dataset_for_models(tmp_path):
 
     folder = tmp_path / "dataset"
     isolates = dataset_store.load_isolates(folder)
-    assert len(isolates) == 6
-    assert len(dataset_store.load_isolates(folder, first_isolate_only=True)) == 5
+    assert len(isolates) == 8
+    assert len(dataset_store.load_isolates(folder, first_isolate_only=True)) == 7
     ast = dataset_store.load_ast_results(folder)
     assert {"eta", "sesso", "reparto_di_ricovero", "mic_value", "result"} <= set(ast.columns)
 
@@ -151,4 +162,16 @@ def test_upload_stores_dataset_for_models(tmp_path):
         data={"dataset": (io.BytesIO(content), "rete_mic_copy.xlsx")},
         content_type="multipart/form-data",
     )
-    assert len(dataset_store.load_isolates(folder)) == 6
+    assert len(dataset_store.load_isolates(folder)) == 8
+
+
+def test_censored_mic_interpretation_is_conservative():
+    from app.services.breakpoints import interpret_mic
+
+    ops = pd.Series(["<=", ">", "=", "=", "<=", ">", ">="])
+    vals = pd.Series([0.5, 2.0, 2.0, 4.0, 4.0, 1.0, 4.0])
+    out = interpret_mic(pd.Series(["COL"] * 7), pd.Series(["KLEPNE"] * 7), ops, vals)
+    # <=0.5 S, >2 R, 2 S, 4 R, <=4 ambiguous, >1 ambiguous, >=4 R
+    assert out.tolist()[:4] == ["S", "R", "S", "R"]
+    assert pd.isna(out.iloc[4]) and pd.isna(out.iloc[5])
+    assert out.iloc[6] == "R"
