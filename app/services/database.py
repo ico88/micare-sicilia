@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 
 import pandas as pd
+import sqlalchemy as sa
 
 from app import db
 from app.models import (
@@ -15,59 +16,79 @@ from app.models import (
 )
 
 
-def observations_to_db(df: pd.DataFrame, uploaded_file: UploadedFile) -> None:
-    rows = []
-    for item in df.to_dict(orient="records"):
-        rows.append(
-            Observation(
-                uploaded_file_id=uploaded_file.id,
-                observed_at=pd.to_datetime(item["date"]).date(),
-                pathogen=item["pathogen"],
-                antibiotic=item["antibiotic"],
-                laboratory=item["laboratory"],
-                ward=item.get("ward") or "",
-                result=item.get("result"),
-                samples=int(item.get("samples") or 1),
-                sensitive_count=float(item.get("sensitive_count") or 0),
-                intermediate_count=float(item.get("intermediate_count") or 0),
-                resistant_count=float(item.get("resistant_count") or 0),
-            )
-        )
-    db.session.bulk_save_objects(rows)
+def observations_to_db(df: pd.DataFrame, uploaded_file: UploadedFile, chunk_size: int = 50_000) -> None:
+    # Core bulk insert: ORM objects are too slow for multi-million-row uploads
+    frame = pd.DataFrame({
+        "uploaded_file_id": uploaded_file.id,
+        # ISO text is what SQLAlchemy's Date type stores on SQLite
+        "observed_at": pd.to_datetime(df["date"]).dt.strftime("%Y-%m-%d"),
+        "pathogen": df["pathogen"],
+        "antibiotic": df["antibiotic"],
+        "laboratory": df["laboratory"],
+        "ward": df["ward"].fillna("") if "ward" in df else "",
+        "result": df["result"].where(df["result"].notna(), None) if "result" in df else None,
+        "samples": pd.to_numeric(df["samples"], errors="coerce").fillna(1).astype(int) if "samples" in df else 1,
+        "sensitive_count": pd.to_numeric(df["sensitive_count"], errors="coerce").fillna(0).astype(float),
+        "intermediate_count": pd.to_numeric(df["intermediate_count"], errors="coerce").fillna(0).astype(float),
+        "resistant_count": pd.to_numeric(df["resistant_count"], errors="coerce").fillna(0).astype(float),
+    })
+    frame = frame.astype(object).where(frame.notna(), None)
+    table = Observation.__table__
+    columns = list(frame.columns)
+    connection = db.session.connection()
+    for start in range(0, len(frame), chunk_size):
+        chunk = frame.iloc[start : start + chunk_size]
+        # Positional tuples straight to the driver: noticeably faster than dict executemany
+        rows = list(chunk.itertuples(index=False, name=None))
+        connection.exec_driver_sql(_positional_insert_sql(table, columns), rows)
+
+
+def _positional_insert_sql(table, columns: list[str]) -> str:
+    placeholders = ", ".join("?" for _ in columns)
+    return f"INSERT INTO {table.name} ({', '.join(columns)}) VALUES ({placeholders})"
 
 
 def observations_from_db() -> pd.DataFrame:
-    rows = Observation.query.order_by(Observation.observed_at.asc()).all()
-    columns = [
-        "date",
-        "pathogen",
-        "antibiotic",
-        "laboratory",
-        "ward",
-        "result",
-        "samples",
-        "sensitive_count",
-        "intermediate_count",
-        "resistant_count",
-    ]
-    return pd.DataFrame(
-        [
-            {
-                "date": row.observed_at,
-                "pathogen": row.pathogen,
-                "antibiotic": row.antibiotic,
-                "laboratory": row.laboratory,
-                "ward": row.ward or "",
-                "result": row.result,
-                "samples": row.samples,
-                "sensitive_count": row.sensitive_count,
-                "intermediate_count": row.intermediate_count,
-                "resistant_count": row.resistant_count,
-            }
-            for row in rows
-        ],
-        columns=columns,
+    table = Observation.__table__
+    query = sa.select(
+        table.c.observed_at.label("date"),
+        table.c.pathogen,
+        table.c.antibiotic,
+        table.c.laboratory,
+        sa.func.coalesce(table.c.ward, "").label("ward"),
+        table.c.result,
+        table.c.samples,
+        table.c.sensitive_count,
+        table.c.intermediate_count,
+        table.c.resistant_count,
+    ).order_by(table.c.observed_at)
+    return pd.read_sql(query, db.session.connection())
+
+
+def observation_month_totals_from_db() -> pd.DataFrame:
+    """Observations pre-summed per month in SQL, in the shape aggregate_observations expects.
+
+    Equivalent to aggregating observations_from_db() but avoids loading
+    millions of isolate-level rows into memory.
+    """
+    table = Observation.__table__
+    month = sa.func.strftime("%Y-%m-01", table.c.observed_at)
+    ward = sa.func.coalesce(table.c.ward, "")
+    query = (
+        sa.select(
+            month.label("date"),
+            table.c.pathogen,
+            table.c.antibiotic,
+            table.c.laboratory,
+            ward.label("ward"),
+            sa.func.sum(table.c.samples).label("samples"),
+            sa.func.sum(table.c.sensitive_count).label("sensitive_count"),
+            sa.func.sum(table.c.intermediate_count).label("intermediate_count"),
+            sa.func.sum(table.c.resistant_count).label("resistant_count"),
+        )
+        .group_by(month, table.c.pathogen, table.c.antibiotic, table.c.laboratory, ward)
     )
+    return pd.read_sql(query, db.session.connection())
 
 
 def aggregated_to_db(df: pd.DataFrame) -> None:

@@ -182,6 +182,8 @@ info "Installo scikit-learn, statsmodels, pandas, matplotlib, plotly..."
     "joblib>=1.3" \
     "tqdm>=4.66" \
     "openpyxl>=3.1" \
+    "pyarrow>=15.0" \
+    "python-calamine>=0.2" \
     --quiet
 
 # Flask e server

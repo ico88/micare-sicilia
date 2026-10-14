@@ -103,6 +103,28 @@ Input files should be Excel or CSV with columns (names are flexible; the system 
 | Result | `S` / `I` / `R` |
 | Sample count | `42` |
 
+### Rete MIC isolate-level export
+
+The network export (one row per isolate, `<ABX>_QUALITATIVO` / `<ABX>_QUANTITATIVO`
+column pairs, e.g. `DATA_PRELIEVO`, `CODICE_PAZIENTE`, `REPARTO_DI_RICOVERO`, `MICROORGANISMO`)
+is uploaded once (a 40 MB workbook imports in about a minute) and:
+
+1. **validated**: required columns, dates (no day/month swaps), age, sex, S/I/R values,
+   MIC syntax, duplicate rows/samples, repeat isolates, intrinsic-resistance tests.
+   The report is shown after upload and row-level anomalies can be downloaded as CSV;
+2. **archived in full** as Parquet under `instance/dataset/` (codes keep leading zeros,
+   MIC split into operator + value);
+3. aggregated into the monthly S/I/R table used by the forecasting pipeline.
+
+Any model can reuse the full records:
+
+```python
+from app.services.dataset_store import load_isolates, load_ast_results
+
+isolates = load_isolates("instance/dataset", first_isolate_only=True)   # one row per isolate
+ast = load_ast_results("instance/dataset", first_isolate_only=True)     # isolate x antibiotic, with patient/ward fields
+```
+
 ---
 
 ## Project structure

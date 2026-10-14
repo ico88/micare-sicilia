@@ -1,0 +1,67 @@
+<section class="panel mb-4">
+  <div class="d-flex justify-content-between align-items-center mb-2">
+    <h2 class="h6 mb-0">Validazione dati</h2>
+    {% if has_issues %}
+      <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('upload.validation_issues', upload_id=uploaded.id) }}">Scarica anomalie (CSV)</a>
+    {% endif %}
+  </div>
+
+  {% for msg in report.errors %}
+    <div class="alert alert-danger py-2 small mb-2">{{ msg }}</div>
+  {% endfor %}
+  {% for msg in report.warnings %}
+    <div class="alert alert-warning py-2 small mb-2">{{ msg }}</div>
+  {% endfor %}
+  {% for msg in report.info %}
+    <div class="alert alert-info py-2 small mb-2">{{ msg }}</div>
+  {% endfor %}
+
+  {% set st = report.stats %}
+  {% if st.isolates_valid is defined %}
+  <div class="row g-2 my-2">
+    {% for label, value in [
+        ("Righe lette", st.rows_read),
+        ("Isolati validi", st.isolates_valid),
+        ("Righe escluse", st.rows_excluded),
+        ("Risultati S/I/R", st.ast_results),
+        ("Valori MIC", st.mic_values),
+        ("Pazienti", st.patients if st.patients is defined else "-"),
+        ("Primi isolati", st.first_isolates if st.first_isolates is defined else "-"),
+        ("Laboratori / ospedali", st.laboratories ~ " / " ~ st.hospitals),
+      ] %}
+      <div class="col-6 col-md-3">
+        <div class="border rounded p-2 h-100">
+          <div class="text-muted small">{{ label }}</div>
+          <div class="fw-semibold">{{ "{:,}".format(value).replace(",", ".") if value is number else value }}</div>
+        </div>
+      </div>
+    {% endfor %}
+  </div>
+  <p class="small text-muted mb-2">
+    Periodo {{ st.date_from }} → {{ st.date_to }} ·
+    isolati per anno:
+    {% for year, n in st.isolates_per_year.items() %}{{ year }}: {{ n }}{% if not loop.last %}, {% endif %}{% endfor %} ·
+    antibiotici: {{ st.antibiotics|length }}
+  </p>
+  {% endif %}
+
+  {% if report.issue_summary %}
+  <div class="table-responsive">
+    <table class="table table-sm align-middle mb-0">
+      <thead><tr><th>Gravità</th><th>Problema</th><th>Colonna</th><th class="text-end">Righe</th></tr></thead>
+      <tbody>
+        {% for item in report.issue_summary %}
+          <tr>
+            <td><span class="badge text-bg-{{ 'danger' if item.gravita == 'errore' else 'warning' if item.gravita == 'avviso' else 'secondary' }}">{{ item.gravita }}</span></td>
+            <td>{{ item.problema }}</td>
+            <td><code>{{ item.colonna }}</code></td>
+            <td class="text-end">{{ item.righe }}</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% elif not report.errors %}
+    <div class="text-success small">Nessuna anomalia rilevata.</div>
+  {% endif %}
+</section>

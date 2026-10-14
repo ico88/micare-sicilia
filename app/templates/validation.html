@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block title %}Validazione dati - MIC RES Sicilia{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <div>
+    <h1 class="h4 mb-1">Validazione dati</h1>
+    <div class="text-muted">{{ uploaded.original_name }} · {{ uploaded.message }}</div>
+  </div>
+  <a class="btn btn-outline-secondary" href="{{ url_for('upload.upload') }}">Gestione dati</a>
+</div>
+{% include "_validation_report.html" %}
+{% endblock %}

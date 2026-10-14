@@ -11,7 +11,7 @@
 
     <section class="panel">
       <h2 class="h6 mb-1">1 · Carica file Excel</h2>
-      <p class="text-muted small mb-3">Seleziona un file annuale della Rete MIC (formato .xlsx). Puoi caricare più anni in sequenza.</p>
+      <p class="text-muted small mb-3">Seleziona l'export della Rete MIC (.xlsx, anche più anni in un unico file). Il file viene validato e archiviato integralmente (paziente, reparto, materiale, MIC) per tutti i modelli. Un file da ~40 MB può richiedere qualche minuto.</p>
       <form method="post" enctype="multipart/form-data">
         <input class="form-control" id="dataset" name="dataset" type="file" accept=".csv,.xls,.xlsx" required>
         <button class="btn btn-primary mt-3 w-100" type="submit">Carica e importa</button>
@@ -79,7 +79,12 @@
                   </span>
                 </td>
                 <td>{{ file.row_count if file.row_count else '—' }}</td>
-                <td class="text-muted small">{{ file.message }}</td>
+                <td class="text-muted small">
+                  {{ file.message }}
+                  {% if file.id in validated_ids %}
+                    <a class="ms-1" href="{{ url_for('upload.validation_report', upload_id=file.id) }}">Report validazione</a>
+                  {% endif %}
+                </td>
               </tr>
             {% else %}
               <tr><td colspan="4" class="text-muted">Nessun file caricato.</td></tr>

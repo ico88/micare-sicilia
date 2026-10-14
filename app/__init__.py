@@ -50,6 +50,7 @@ def create_app(test_config: dict | None = None) -> Flask:
         SQLALCHEMY_TRACK_MODIFICATIONS=False,
         UPLOAD_FOLDER=str(base_dir / "data"),
         MODEL_FOLDER=str(base_dir / "models"),
+        DATASET_FOLDER=str(instance_dir / "dataset"),
         MAX_CONTENT_LENGTH=128 * 1024 * 1024,
     )
     if test_config:
@@ -57,6 +58,7 @@ def create_app(test_config: dict | None = None) -> Flask:
 
     Path(app.config["UPLOAD_FOLDER"]).mkdir(exist_ok=True)
     Path(app.config["MODEL_FOLDER"]).mkdir(exist_ok=True)
+    Path(app.config["DATASET_FOLDER"]).mkdir(parents=True, exist_ok=True)
 
     db.init_app(app)
 
