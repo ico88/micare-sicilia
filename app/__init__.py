@@ -10,18 +10,23 @@ db = SQLAlchemy()
 
 
 def _read_version() -> str:
-    """Return version string: VERSION file + short git hash if available."""
+    """Return version string: VERSION file + branch@sha if available."""
     try:
         v = (base_dir_for_version() / "VERSION").read_text().strip()
     except Exception:
         v = "dev"
     try:
         import subprocess
+        cwd = str(base_dir_for_version())
         sha = subprocess.check_output(
             ["git", "rev-parse", "--short", "HEAD"],
-            cwd=str(base_dir_for_version()), stderr=subprocess.DEVNULL,
+            cwd=cwd, stderr=subprocess.DEVNULL,
         ).decode().strip()
-        return f"{v} ({sha})"
+        branch = subprocess.check_output(
+            ["git", "rev-parse", "--abbrev-ref", "HEAD"],
+            cwd=cwd, stderr=subprocess.DEVNULL,
+        ).decode().strip()
+        return f"{v} ({branch}@{sha})"
     except Exception:
         return v
 
