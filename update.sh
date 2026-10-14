@@ -9,7 +9,7 @@
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 LOG="$SCRIPT_DIR/update.log"
-SERVICE="mic-res-sicilia"
+SERVICE="micare-sicilia"
 VENV="$SCRIPT_DIR/.venv"
 
 # ── argomenti ──────────────────────────────────────────────────────────────
