@@ -335,17 +335,26 @@ def predictive():
                     s_vals = [e["s"] for e in entries]
                     r_lo_vals = [e["r_lo"] for e in entries if e["r_lo"] is not None]
                     r_hi_vals = [e["r_hi"] for e in entries if e["r_hi"] is not None]
+                    mean_s = float(_np.mean(s_vals))
+                    mean_r = float(_np.mean(r_vals))
+
+                    # Scarta combinazioni con dati degeneri (S≈0 e R≈0 → nessun dato reale)
+                    if mean_s < 1.0 and mean_r < 1.0:
+                        continue
+
                     pred_results.append({
                         "antibiotic": ab,
-                        "resistant_pct": float(_np.mean(r_vals)),
-                        "sensitive_pct": float(_np.mean(s_vals)),
+                        "resistant_pct": mean_r,
+                        "sensitive_pct": mean_s,
                         "resistant_lower": float(_np.mean(r_lo_vals)) if r_lo_vals else None,
                         "resistant_upper": float(_np.mean(r_hi_vals)) if r_hi_vals else None,
                         "labs": sorted({e["lab"] for e in entries}),
                         "n_labs": len(entries),
                     })
 
-                pred_results.sort(key=lambda x: x["resistant_pct"])
+                # Ordina per % sensibile decrescente (più sensibile = antibiotico migliore).
+                # Tiebreak per % resistente crescente.
+                pred_results.sort(key=lambda x: (-x["sensitive_pct"], x["resistant_pct"]))
 
         except Exception as exc:
             pred_error = f"Errore nella ricerca: {exc}"

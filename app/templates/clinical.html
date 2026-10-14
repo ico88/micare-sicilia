@@ -172,7 +172,7 @@
         <p class="text-muted small mb-3">
           Scegli un patogeno e un orizzonte temporale: il sistema confronta tutti gli
           antibiotici disponibili e li classifica per <strong>efficacia attesa</strong>
-          (% resistenza prevista più bassa = antibiotico migliore).
+          (% sensibilità prevista più alta = antibiotico migliore).
         </p>
 
         <div class="panel mb-4">
@@ -244,12 +244,12 @@
               </thead>
               <tbody>
                 {% for ab in pred_results %}
-                {% set r = ab.resistant_pct %}
-                {% if r < 25 %}
+                {% set s = ab.sensitive_pct %}
+                {% if s >= 75 %}
                   {% set eff_cls = 'pred-green' %}{% set eff_label = 'Ottima' %}
-                {% elif r < 50 %}
+                {% elif s >= 50 %}
                   {% set eff_cls = 'pred-yellow' %}{% set eff_label = 'Buona' %}
-                {% elif r < 75 %}
+                {% elif s >= 25 %}
                   {% set eff_cls = 'pred-orange' %}{% set eff_label = 'Ridotta' %}
                 {% else %}
                   {% set eff_cls = 'pred-red' %}{% set eff_label = 'Scarsa' %}
@@ -285,9 +285,9 @@
 
         <div class="alert alert-secondary small">
           <strong>Come leggere la tabella:</strong>
-          Gli antibiotici sono ordinati per % di resistenza prevista (crescente).
-          Il primo in lista è quello con la <em>minore resistenza attesa</em> per questo patogeno
-          all'orizzonte scelto. Le stime sono medie su
+          Gli antibiotici sono ordinati per % di sensibilità prevista (decrescente).
+          Il primo in lista è quello con la <em>maggiore probabilità di efficacia</em> per questo patogeno
+          all'orizzonte scelto. Il badge indica: Ottima ≥75% S · Buona ≥50% S · Ridotta ≥25% S · Scarsa &lt;25% S. Le stime sono medie su
           {% if pred_form.laboratory %}il laboratorio selezionato{% else %}tutti i laboratori disponibili{% endif %}.
           Non sostituiscono l'antibiogramma individuale del paziente.
         </div>
