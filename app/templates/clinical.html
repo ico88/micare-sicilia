@@ -265,7 +265,7 @@
                   <td>{{ ab.antibiotic }}</td>
                   <td class="text-center">{{ '%.1f'|format(ab.sensitive_pct) }}%</td>
                   <td class="text-center">
-                    {{ '%.1f'|format(r) }}%
+                    {{ '%.1f'|format(ab.resistant_pct) }}%
                     {% if ab.resistant_lower is not none %}
                     <div class="text-muted" style="font-size:.7rem">
                       IC {{ '%.0f'|format(ab.resistant_lower) }}–{{ '%.0f'|format(ab.resistant_upper) }}%
