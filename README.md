@@ -116,6 +116,17 @@ is uploaded once (a 40 MB workbook imports in about a minute) and:
    MIC split into operator + value);
 3. aggregated into the monthly S/I/R table used by the forecasting pipeline.
 
+Each result is kept in two readings: as reported by the laboratory (breakpoints in force
+that year) and harmonised (MIC re-read with EUCAST v16.1, `app/resources/breakpoints/`).
+To update the breakpoints, download the official EUCAST workbook and run
+`python scripts/import_eucast_breakpoints.py <file.xlsx> <version>`; review the chosen rows
+in the generated CSV.
+
+`app/services/series.py` builds the quarterly/monthly series per laboratory × pathogen ×
+antibiotic (first isolate, wards pooled, intrinsic resistance excluded) and the annual
+cumulative antibiogram. **Gestione dati → Scarica file diagnostico** exports them, with the
+breakpoint effects and import anomalies, as one Excel file of aggregated figures only.
+
 Any model can reuse the full records:
 
 ```python

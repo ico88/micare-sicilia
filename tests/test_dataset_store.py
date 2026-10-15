@@ -161,6 +161,14 @@ def test_upload_stores_dataset_for_models(tmp_path):
     assert client.get(f"/upload/{upload_id}/validazione").status_code == 200
     assert client.get(f"/upload/{upload_id}/anomalie.csv").status_code == 200
 
+    diag = client.get("/diagnostico.xlsx")
+    assert diag.status_code == 200
+    workbook = openpyxl.load_workbook(io.BytesIO(diag.data))
+    assert {"Leggimi", "Combinazioni", "Serie trimestrali", "Antibiogramma", "Breakpoint"} <= set(workbook.sheetnames)
+    # Aggregated only: no patient or sample codes anywhere in the file
+    cells = {str(c.value) for ws in workbook.worksheets for row in ws.iter_rows() for c in row if c.value is not None}
+    assert not {"80025028", "00006267", "0314324402"} & cells
+
     # Same file again is skipped, not imported twice
     client.post(
         "/upload",

@@ -1,17 +1,20 @@
 from __future__ import annotations
 
 import hashlib
+import io
 import shutil
 import uuid
+from datetime import datetime
 from pathlib import Path
 
 from flask import Blueprint, abort, current_app, flash, redirect, render_template, request, send_file, url_for
 from werkzeug.utils import secure_filename
 
-from app import db
+from app import APP_VERSION, db
 from app.models import AggregatedObservation, Observation, Prediction, TrainedModel, UploadedFile, ValidationMetric
 from app.services import dataset_store
 from app.services.database import aggregated_to_db, observation_month_totals_from_db, observations_to_db
+from app.services.diagnostics import build_diagnostic
 from app.services.preprocessing import aggregate_observations, load_tabular_file, normalize_uploaded_dataframe
 
 bp = Blueprint("upload", __name__)
@@ -116,6 +119,22 @@ def upload():
         db.session.commit()
         flash(f"Errore import: {exc}", "danger")
         return redirect(url_for("upload.upload"))
+
+
+@bp.get("/diagnostico.xlsx")
+def diagnostic():
+    uploads = [
+        {"id": u.id, "original_name": u.original_name, "status": u.status, "row_count": u.row_count,
+         "uploaded_at": u.uploaded_at.strftime("%d/%m/%Y") if u.uploaded_at else ""}
+        for u in UploadedFile.query.order_by(UploadedFile.uploaded_at.asc()).all()
+    ]
+    content = build_diagnostic(current_app.config["DATASET_FOLDER"], uploads, APP_VERSION)
+    return send_file(
+        io.BytesIO(content),
+        mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        as_attachment=True,
+        download_name=f"diagnostico_mic_res_{datetime.now():%Y%m%d_%H%M}.xlsx",
+    )
 
 
 @bp.get("/upload/<int:upload_id>/validazione")
