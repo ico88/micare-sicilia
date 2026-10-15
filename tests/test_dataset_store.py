@@ -225,3 +225,28 @@ def test_staph_clindamycin_keeps_reported_result():
     out = interpret_mic(pd.Series(["CLI", "ERY"]), pd.Series(["STAAUR", "STAAUR"]),
                         pd.Series(["<=", "<="]), pd.Series([0.12, 0.25]))
     assert pd.isna(out.iloc[0]) and out.iloc[1] == "S"
+
+
+def test_regional_long_flow_csv_is_converted(tmp_path):
+    header = ("REGIONE;LABORATORIO;OSPEDALE;CODICE_PAZIENTE;SESSO;ETA;NAZIONALITA;COMUNE_RESIDENZA;"
+              "PAZIENTE_RICOVERATO;DATA_RICOVERO;REPARTO_DI_RICOVERO;CODICE_CAMPIONE;DATA_PRELIEVO;MATERIALE;"
+              "MICROORGANISMO;ANTIBIOTICO;VALORE QUALITATIVO;VALORE QUANTITATIVO (MIC)")
+    base = "190;IT173;19092601;00012345;F;71;ITA;082053;1;10/01/2025;49;C0000001;14/01/2025;1;KLEPNE"
+    lines = [header,
+             base + ";MEM;R;>8",
+             base + ";COL;S;<=0,5",
+             base + ";MEM;R;>8",  # repeated row
+             "190;IT049;19090101;00099999;M;80;ITA;087015;3;;00;C0000002;20/01/2025;3;ESCCOL;CTX;S;<=1"]
+    path = tmp_path / "flusso.csv"
+    path.write_text("\n".join(lines), encoding="utf-8")
+
+    raw = dataset_store.read_raw_file(path)
+    assert {"MEM_QUALITATIVO", "COL_QUANTITATIVO", "CTX_QUALITATIVO"} <= set(raw.columns)
+    isolates, ast, report, _ = dataset_store.build_and_validate(raw)
+    assert len(isolates) == 2
+    assert set(isolates["comune_residenza"]) == {"082053", "087015"}  # leading zeros kept
+    col = ast[ast["antibiotic"] == "COL"].iloc[0]
+    assert (col["mic_operator"], col["mic_value"]) == ("<=", 0.5)
+    assert any("AMR-RETEMIC" in m for m in report["info"])
+    assert any("ripetute" in m for m in report["warnings"])
+    assert not any("PROVINCIA_RESIDENZA" in m for m in report["warnings"])

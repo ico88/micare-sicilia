@@ -34,9 +34,11 @@ RECOMMENDED_COLUMNS = [
     "REPARTO_DI_RICOVERO", "CODICE_CAMPIONE", "MATERIALE",
 ]
 # Codes kept as text so leading zeros survive (e.g. 00006267, 088009)
+# Alternatives accepted for a recommended column (old export vs regional flow 2026)
+COLUMN_ALTERNATIVES = {"PROVINCIA_RESIDENZA": "COMUNE_RESIDENZA"}
 CODE_COLUMNS = [
     "REGIONE", "LABORATORIO", "OSPEDALE", "CODICE_PAZIENTE", "SESSO", "NAZIONALITA",
-    "PROVINCIA_RESIDENZA", "PAZIENTE_RICOVERATO", "REPARTO_DI_RICOVERO",
+    "PROVINCIA_RESIDENZA", "COMUNE_RESIDENZA", "PAZIENTE_RICOVERATO", "REPARTO_DI_RICOVERO",
     "CODICE_CAMPIONE", "MATERIALE", "MICROORGANISMO",
 ]
 
@@ -85,13 +87,18 @@ def is_mic_export(columns) -> bool:
 def read_raw_file(path: str | Path) -> pd.DataFrame:
     """Read every cell as text (codes keep leading zeros, MIC keep operators).
 
-    Uses the Rust-based calamine engine when installed (much faster than
-    openpyxl on large workbooks), falling back to openpyxl.
+    Accepts the wide export (one row per isolate, <ABX>_QUALITATIVO columns) and the
+    regional AMR-RETEMIC flow (CSV with ';', one row per isolate x antibiotic), which
+    is converted to the wide layout. Uses the Rust-based calamine engine for Excel
+    when installed (much faster than openpyxl on large workbooks).
     """
     path = Path(path)
     suffix = path.suffix.lower()
     if suffix == ".csv":
-        df = pd.read_csv(path, dtype=str, keep_default_na=False, sep=None, engine="python")
+        with path.open(encoding="utf-8-sig", errors="replace") as fh:
+            header = fh.readline()
+        sep = ";" if header.count(";") >= header.count(",") else ","
+        df = pd.read_csv(path, dtype=str, keep_default_na=False, sep=sep, encoding="utf-8-sig")
     elif suffix in {".xlsx", ".xls"}:
         try:
             df = pd.read_excel(path, dtype=str, keep_default_na=False, engine="calamine")
@@ -100,7 +107,36 @@ def read_raw_file(path: str | Path) -> pd.DataFrame:
     else:
         raise ValueError("Formato non supportato. Usa CSV, XLS o XLSX.")
     df.columns = [str(col).strip().upper() for col in df.columns]
-    return df.apply(lambda col: col.astype(object).where(col.notna(), "").map(_clean_cell))
+    df = df.apply(lambda col: col.astype(object).where(col.notna(), "").map(_clean_cell))
+    return long_to_wide(df) if _long_format_columns(df.columns) else df
+
+
+def _long_format_columns(columns) -> tuple[str, str, str] | None:
+    """(antibiotic, qualitative, quantitative) columns of the long regional flow, if present."""
+    cols = list(columns)
+    abx = next((c for c in cols if c == "ANTIBIOTICO"), None)
+    qual = next((c for c in cols if "QUALITATIVO" in c and not c.endswith(QUAL_SUFFIX)), None)
+    quant = next((c for c in cols if "QUANTITATIVO" in c and not c.endswith(QUANT_SUFFIX)), None)
+    return (abx, qual, quant) if abx and qual else None
+
+
+def long_to_wide(df: pd.DataFrame) -> pd.DataFrame:
+    """One row per isolate x antibiotic -> one row per isolate with <ABX>_QUALITATIVO/_QUANTITATIVO."""
+    abx_col, qual_col, quant_col = _long_format_columns(df.columns)
+    id_cols = [c for c in df.columns if c not in (abx_col, qual_col, quant_col)]
+    data = df.assign(_abx=df[abx_col].str.strip().str.upper())
+    data = data[data["_abx"].ne("")]
+    duplicated = data.duplicated(id_cols + ["_abx"], keep="first")
+    data = data[~duplicated]
+    values = {"QUALITATIVO": qual_col}
+    if quant_col:
+        values["QUANTITATIVO"] = quant_col
+    wide = data.set_index(id_cols + ["_abx"])[list(values.values())].unstack("_abx", fill_value="")
+    wide.columns = [f"{abx}_{kind}" for col, abx in wide.columns for kind, src in values.items() if src == col]
+    wide = wide.reset_index()
+    wide.attrs["long_format"] = {"rows": int(len(df)), "isolates": int(len(wide)),
+                                 "duplicates": int(duplicated.sum())}
+    return wide
 
 
 def _clean_cell(value) -> str:
@@ -188,6 +224,16 @@ def build_and_validate(raw: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame, d
         col.removesuffix(QUAL_SUFFIX) for col in columns if col.endswith(QUAL_SUFFIX)
     )
     report: dict = {"errors": [], "warnings": [], "info": [], "stats": {}}
+    long_format = raw.attrs.get("long_format")
+    if long_format:
+        report["info"].append(
+            f"Tracciato regionale AMR-RETEMIC (una riga per antibiotico): {long_format['rows']} righe "
+            f"riunite in {long_format['isolates']} isolati. Nelle anomalie 'riga' indica l'isolato, non la riga del file."
+        )
+        if long_format["duplicates"]:
+            report["warnings"].append(
+                f"{long_format['duplicates']} righe ripetute per lo stesso isolato e antibiotico: tenuta la prima."
+            )
     missing_required = [col for col in REQUIRED_COLUMNS if col not in columns]
     if missing_required:
         report["errors"].append(f"Colonne obbligatorie mancanti: {', '.join(missing_required)}")
@@ -196,12 +242,13 @@ def build_and_validate(raw: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame, d
     if report["errors"]:
         raise DatasetValidationError(report)
 
-    missing_recommended = [col for col in RECOMMENDED_COLUMNS if col not in columns]
+    missing_recommended = [col for col in RECOMMENDED_COLUMNS
+                           if col not in columns and COLUMN_ALTERNATIVES.get(col) not in columns]
     if missing_recommended:
         report["warnings"].append(
             f"Colonne consigliate assenti (alcune analisi non saranno disponibili): {', '.join(missing_recommended)}"
         )
-    known = set(REQUIRED_COLUMNS + RECOMMENDED_COLUMNS)
+    known = set(REQUIRED_COLUMNS + RECOMMENDED_COLUMNS) | set(COLUMN_ALTERNATIVES.values())
     known |= {f"{a}{QUAL_SUFFIX}" for a in antibiotics} | {f"{a}{QUANT_SUFFIX}" for a in antibiotics}
     unexpected = [col for col in columns if col not in known]
     if unexpected:
