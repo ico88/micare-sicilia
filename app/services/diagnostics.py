@@ -32,7 +32,7 @@ SHEET_NOTES = {
     "Combinazioni": "Una riga per laboratorio x microrganismo x antibiotico: quanti dati ci sono e se bastano per una previsione trimestrale.",
     "Serie trimestrali": "Resistenza per trimestre, separata per popolazione: invasivi (sangue, liquor), urine (dal 2023), altri materiali. Primo isolato per paziente, reparti sommati, intrinseche escluse.",
     "Serie mensili": "Come le serie trimestrali, per mese. Utile solo dove i numeri sono alti.",
-    "Semaforo": "Per ogni combinazione e orizzonte: quale previsione verrà mostrata e con che affidabilità. Il modello è scelto sulle prove 2020-22 e giudicato solo sulle prove 2023-24.",
+    "Semaforo": "Per ogni combinazione e orizzonte: quale previsione verrà mostrata e con che affidabilità. Il modello è scelto sulle prove 2020-22 e giudicato solo sulle prove 2023-24. Un orizzonte non ha mai un semaforo migliore di quelli più vicini (colonna \"Semaforo del solo orizzonte\": il giudizio prima di questa regola).",
     "Banco di prova sintesi": "Quanto sbaglia la previsione più semplice (\"come gli ultimi 12 mesi\") sugli invasivi regionali, per orizzonte. È il riferimento che ogni modello deve battere.",
     "Banco di prova": "Dettaglio per combinazione e orizzonte. Errore medio e rumore in punti di % R; copertura = % di valori reali dentro l'intervallo dell'80% (accettabile 75-85%).",
     "Serie regionali invasivi": "Laboratori sommati, solo sangue e liquor: la serie su cui si costruisce la previsione regionale.",
@@ -152,12 +152,15 @@ def _bench_sheets(quarterly: pd.DataFrame, regional: pd.DataFrame) -> tuple[pd.D
     verdict = choose_and_verify(bench)
     verdict = verdict.assign(
         semaforo=verdict["semaforo"].map(lambda v: f"{v} - {TRAFFIC_LABELS[v]}"),
+        semaforo_orizzonte=verdict["semaforo_orizzonte"].map(lambda v: f"{v} - {TRAFFIC_LABELS[v]}"),
         scelto_su_2020_22=verdict["scelto_su_2020_22"].map(MODEL_NAMES),
         mostrato=verdict["mostrato"].map(MODEL_NAMES),
     ).sort_values(["orizzonte_mesi", "semaforo", "microorganismo", "antibiotic"])
     traffic = _round(verdict.rename(columns={
         "microorganismo": "Microrganismo", "antibiotic": "Antibiotico", "orizzonte_mesi": "Orizzonte (mesi)",
-        "semaforo": "Semaforo", "mostrato": "Previsione mostrata", "scelto_su_2020_22": "Modello scelto sulle prove 2020-22",
+        "semaforo": "Semaforo",
+        "semaforo_orizzonte": "Semaforo del solo orizzonte",
+        "mostrato": "Previsione mostrata", "scelto_su_2020_22": "Modello scelto sulle prove 2020-22",
         "prove_verifica": "Prove di verifica (2023-24)", "errore_verifica": "Errore in verifica (punti)",
         "errore_riferimento_verifica": "Errore di 'come gli ultimi 12 mesi' (punti)",
         "guadagno_pct": "Guadagno rispetto al riferimento (%)", "copertura_verifica": "Copertura 80% in verifica (%)",

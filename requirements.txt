@@ -11,6 +11,7 @@ prophet>=1.1
 pyarrow>=15.0
 python-calamine>=0.2
 scikit-learn>=1.4
+scipy>=1.11
 statsmodels>=0.14
 tqdm>=4.66
 

@@ -176,6 +176,7 @@ info "Installo scikit-learn, statsmodels, pandas, matplotlib, plotly..."
 "$PIP" install \
     "pandas>=2.1" \
     "scikit-learn>=1.4" \
+    "scipy>=1.11" \
     "statsmodels>=0.14" \
     "matplotlib>=3.8" \
     "plotly>=5.20" \

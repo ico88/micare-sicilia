@@ -115,6 +115,7 @@ FALLBACK = "persistenza_tarata"   # same point forecast as the reference, honest
 MIN_GAIN = 0.10                   # a model must cut the reference error by at least 10%
 MAX_ERROR_ON_NOISE = 1.5
 MIN_VERIFICATION_ORIGINS = 3
+SEMAFORO_ORDER = ("verde", "giallo", "grigio")
 
 
 def coverage_compatible(inside: int, total: int, target: float = 0.8, alpha: float = 0.05) -> bool:
@@ -130,63 +131,78 @@ def coverage_compatible(inside: int, total: int, target: float = 0.8, alpha: flo
     return binomtest(inside, total, target).pvalue >= alpha
 
 
-def choose_and_verify(bench: pd.DataFrame) -> pd.DataFrame:
-    """Per combination x horizon: model chosen on the selection period, judged on verification.
+def _pooled_error(bench: pd.DataFrame) -> pd.Series:
+    """Mean absolute error per combination x model across all horizons."""
+    return bench.assign(abs_err=bench["errore"].abs()).groupby(KEYS + ["modello"])["abs_err"].mean()
 
-    Semaforo:
-      verde   interval compatible with 80%, error <= 1.5 x noise, and either the chosen
-              model beats the reference by >= 10% on verification or the reference itself
-              is the forecast (stable resistance)
-      giallo  interval compatible with 80% but error larger than that, or the chosen model
-              did not confirm its gain (the reference with an honest interval is shown)
+
+def _pooled_coverage(bench: pd.DataFrame) -> pd.Series:
+    return 100 * bench.groupby(KEYS + ["modello"])["dentro_80"].mean()
+
+
+def choose_and_verify(bench: pd.DataFrame) -> pd.DataFrame:
+    """One model per combination (consistent across horizons), verdict per horizon.
+
+    The model is chosen on the selection period from its error averaged over all
+    horizons, and kept only if that gain is confirmed on the verification period;
+    otherwise the reference with a calibrated interval is shown.
+
+    Semaforo (per horizon, on verification tests of the model shown):
+      verde   interval compatible with 80%, error <= 1.5 x noise, and either the model
+              confirmed its gain or the reference itself is the forecast (stable resistance)
+      giallo  interval compatible with 80% but error larger than that
       grigio  interval not compatible with 80%, or too few verification tests
+    A horizon never gets a better light than the shorter ones (semaforo_orizzonte
+    keeps the judgement of the horizon alone).
     """
     selection, verification = split_periods(bench)
-    keys = KEYS + ["orizzonte_mesi"]
-    sel = summarize(selection).set_index(keys + ["modello"])
+    sel_err, sel_cov = _pooled_error(selection), _pooled_coverage(selection)
+    ver_err = _pooled_error(verification)
     ver_all = verification.assign(abs_err=verification["errore"].abs())
     rows = []
-    for key, group in ver_all.groupby(keys):
-        pathogen, antibiotic, horizon = key
-        ref_sel = sel.loc[(*key, REFERENCE), "errore_medio"] if (*key, REFERENCE) in sel.index else np.nan
+    for (pathogen, antibiotic), combo in ver_all.groupby(KEYS):
+        combo_key = (pathogen, antibiotic)
+        ref_sel = sel_err.get((*combo_key, REFERENCE), np.nan)
         chosen = FALLBACK
         if np.isfinite(ref_sel):
-            candidates = []
-            for name in group["modello"].unique():
-                if name in (REFERENCE, FALLBACK) or (*key, name) not in sel.index:
-                    continue
-                s = sel.loc[(*key, name)]
-                if s["errore_medio"] <= (1 - MIN_GAIN) * ref_sel and 60 <= s["copertura_80"] <= 95:
-                    candidates.append((s["errore_medio"], name))
+            candidates = [
+                (sel_err[(*combo_key, name)], name)
+                for name in combo["modello"].unique()
+                if name not in (REFERENCE, FALLBACK) and (*combo_key, name) in sel_err.index
+                and sel_err[(*combo_key, name)] <= (1 - MIN_GAIN) * ref_sel
+                and 60 <= sel_cov[(*combo_key, name)] <= 95
+            ]
             if candidates:
                 chosen = min(candidates)[1]
+        ref_ver = ver_err.get((*combo_key, REFERENCE), np.nan)
+        confirmed = chosen != FALLBACK and ver_err.get((*combo_key, chosen), np.inf) <= (1 - MIN_GAIN) * ref_ver
+        shown = chosen if confirmed else FALLBACK
 
-        def stats(name):
-            g = group[group["modello"] == name]
-            return g, (g["abs_err"].mean() if len(g) else np.nan)
-
-        ref_g, ref_err = stats(REFERENCE)
-        g, err = stats(chosen)
-        confirmed = chosen != FALLBACK and len(g) and err <= (1 - MIN_GAIN) * ref_err
-        shown = chosen if (chosen == FALLBACK or confirmed) else FALLBACK
-        g, err = stats(shown)
-        origins = g["origine"].nunique()
-        inside, total = int(g["dentro_80"].sum()), len(g)
-        noise = g["rumore"].mean() if total else np.nan
-        compatible = coverage_compatible(inside, total)
-        ratio = err / noise if total else np.nan
-        if origins < MIN_VERIFICATION_ORIGINS or not compatible:
-            semaforo = "grigio"
-        elif ratio <= MAX_ERROR_ON_NOISE and (shown == FALLBACK or confirmed):
-            semaforo = "verde"
-        else:
-            semaforo = "giallo"
-        rows.append({
-            "microorganismo": pathogen, "antibiotic": antibiotic, "orizzonte_mesi": horizon,
-            "scelto_su_2020_22": chosen, "mostrato": shown, "semaforo": semaforo,
-            "prove_verifica": total, "errore_verifica": err, "errore_riferimento_verifica": ref_err,
-            "guadagno_pct": 100 * (1 - err / ref_err) if ref_err else np.nan,
-            "copertura_verifica": 100 * inside / total if total else np.nan,
-            "rumore_verifica": noise, "errore_su_rumore": ratio,
-        })
+        worst = 0
+        for horizon, group in combo.groupby("orizzonte_mesi"):
+            g = group[group["modello"] == shown]
+            ref_g = group[group["modello"] == REFERENCE]
+            err = g["abs_err"].mean() if len(g) else np.nan
+            ref_err = ref_g["abs_err"].mean() if len(ref_g) else np.nan
+            inside, total = int(g["dentro_80"].sum()), len(g)
+            noise = g["rumore"].mean() if total else np.nan
+            ratio = err / noise if total else np.nan
+            if g["origine"].nunique() < MIN_VERIFICATION_ORIGINS or not coverage_compatible(inside, total):
+                semaforo = "grigio"
+            elif ratio <= MAX_ERROR_ON_NOISE:
+                semaforo = "verde"
+            else:
+                semaforo = "giallo"
+            # Reliability cannot improve further ahead: with few tests per horizon a
+            # farther horizon can look better by chance
+            worst = max(worst, SEMAFORO_ORDER.index(semaforo))
+            rows.append({
+                "microorganismo": pathogen, "antibiotic": antibiotic, "orizzonte_mesi": horizon,
+                "scelto_su_2020_22": chosen, "mostrato": shown, "semaforo": SEMAFORO_ORDER[worst],
+                "semaforo_orizzonte": semaforo,
+                "prove_verifica": total, "errore_verifica": err, "errore_riferimento_verifica": ref_err,
+                "guadagno_pct": 100 * (1 - err / ref_err) if ref_err else np.nan,
+                "copertura_verifica": 100 * inside / total if total else np.nan,
+                "rumore_verifica": noise, "errore_su_rumore": ratio,
+            })
     return pd.DataFrame(rows)

@@ -64,3 +64,13 @@ def test_laboratory_model_ignores_a_change_in_laboratory_mix():
     after = bench[(bench.origine >= "2023Q2") & (bench.orizzonte_mesi == 3)]
     err = after.assign(e=after.errore.abs()).groupby("modello")["e"].mean()
     assert err["trend_laboratori"] < err["trend"]
+
+
+def test_traffic_light_never_improves_further_ahead():
+    frames = [_regional([0.4] * 24, n=60, seed=s).assign(antibiotic=f"A{s}") for s in range(20)]
+    verdict = choose_and_verify(run_bench(pd.concat(frames)))
+    order = {"verde": 0, "giallo": 1, "grigio": 2}
+    for _, combo in verdict.sort_values("orizzonte_mesi").groupby("antibiotic"):
+        levels = combo["semaforo"].map(order).tolist()
+        assert levels == sorted(levels)
+        assert (combo["semaforo"].map(order) >= combo["semaforo_orizzonte"].map(order)).all()
