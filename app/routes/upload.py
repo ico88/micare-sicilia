@@ -15,6 +15,7 @@ from app.models import AggregatedObservation, Observation, Prediction, TrainedMo
 from app.services import dataset_store
 from app.services.database import aggregated_to_db, observation_month_totals_from_db, observations_to_db
 from app.services.diagnostics import build_diagnostic
+from app.services.forecast_run import RESULT_FILE
 from app.services.preprocessing import aggregate_observations, load_tabular_file, normalize_uploaded_dataframe
 
 bp = Blueprint("upload", __name__)
@@ -165,6 +166,7 @@ def reset_db():
 
     shutil.rmtree(current_app.config["DATASET_FOLDER"], ignore_errors=True)
     Path(current_app.config["DATASET_FOLDER"]).mkdir(parents=True, exist_ok=True)
+    (Path(current_app.config["FORECAST_FOLDER"]) / RESULT_FILE).unlink(missing_ok=True)
 
     # cancella file modello su disco
     model_folder = Path(current_app.config["MODEL_FOLDER"])

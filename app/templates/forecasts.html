@@ -1,0 +1,117 @@
+{% extends "base.html" %}
+{% block title %}Previsioni - MIC RES Sicilia{% endblock %}
+{% block content %}
+<div class="mb-3">
+  <h1 class="page-heading mb-1">Previsioni di resistenza</h1>
+  <div class="text-muted small">Isolati invasivi (sangue e liquor), tutti i laboratori della Rete MIC. Ogni previsione è stata messa alla prova sui dati passati.</div>
+</div>
+
+{% if not data %}
+  <section class="panel">
+    <p class="mb-3">Le previsioni non sono ancora state calcolate.</p>
+    <form method="post" action="{{ url_for('forecasts.compute') }}">
+      <button class="btn btn-primary" type="submit">Calcola previsioni</button>
+    </form>
+    <p class="text-muted small mt-2 mb-0">Serve l'export della Rete MIC già caricato in Gestione dati. Il calcolo richiede circa un minuto.</p>
+  </section>
+{% else %}
+  {% set meta = data.meta %}
+  {% if stale %}
+    <div class="alert alert-warning d-flex justify-content-between align-items-center gap-3">
+      <span>I dati in archivio sono cambiati dopo il calcolo di queste previsioni.</span>
+      <form method="post" action="{{ url_for('forecasts.compute') }}">
+        <button class="btn btn-warning btn-sm text-nowrap" type="submit">Ricalcola ora</button>
+      </form>
+    </div>
+  {% endif %}
+  <div class="alert alert-info small">
+    <strong>Dati fino al {{ meta.dati_fino_al }}</strong> (ultimo trimestre: {{ meta.ultimo_trimestre }}).
+    Le previsioni riguardano i quattro trimestri successivi: {{ meta.trimestri_previsti|join(", ") }}.
+    {% if meta.trimestri_previsti %}Per previsioni sul periodo attuale vanno caricati dati più recenti.{% endif %}
+  </div>
+
+  <section class="panel mb-3">
+    <form class="row g-2 align-items-end" method="get">
+      <div class="col-md-5">
+        <label class="form-label small mb-1" for="microrganismo">Microrganismo</label>
+        <select class="form-select" id="microrganismo" name="microrganismo" onchange="this.form.submit()">
+          {% for code, name in pathogens %}
+            <option value="{{ code }}" {% if code == selected %}selected{% endif %}>{{ name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-4">
+        <label class="form-label small mb-1" for="orizzonte">Previsione per il</label>
+        <select class="form-select" id="orizzonte" name="orizzonte" onchange="this.form.submit()">
+          {% for h in horizons %}
+            <option value="{{ h }}" {% if h == horizon %}selected{% endif %}>{{ meta.trimestri_previsti[loop.index0] }} ({{ h }} mesi)</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-3 text-md-end">
+        <span class="text-muted small d-block">Calcolate il {{ meta.calcolato_il }}</span>
+      </div>
+    </form>
+  </section>
+
+  <section class="panel">
+    <div class="table-responsive">
+      <table class="table align-middle">
+        <thead>
+          <tr>
+            <th>Antibiotico</th>
+            <th>Ultimi 12 mesi</th>
+            <th>Tendenza</th>
+            <th>Resistenza prevista</th>
+            <th>Affidabilità</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in rows %}
+            {% set c = row.combo %}{% set f = row.forecast %}
+            <tr>
+              <td class="fw-semibold">{{ c.antibiotico_nome }}</td>
+              <td>
+                {% if c.ultimi_12_mesi %}
+                  {{ "%.0f"|format(c.ultimi_12_mesi.pct) }}%
+                  <span class="text-muted small">su {{ c.ultimi_12_mesi.n }} isolati</span>
+                {% else %}<span class="text-muted">nessun dato</span>{% endif %}
+              </td>
+              <td class="small">{{ c.tendenza }}</td>
+              <td>
+                {% if f and f.semaforo != 'grigio' %}
+                  <strong>{{ "%.0f"|format(f.pct) }}%</strong>
+                  <span class="text-muted small">(fra {{ "%.0f"|format(f.low) }}% e {{ "%.0f"|format(f.high) }}%)</span>
+                {% elif f %}
+                  <span class="text-muted small">nessuna previsione</span>
+                {% else %}
+                  <span class="text-muted small">dati insufficienti</span>
+                {% endif %}
+              </td>
+              <td>
+                {% if f %}
+                  <span class="badge text-bg-{{ traffic[f.semaforo].badge }}">{{ traffic[f.semaforo].label }}</span>
+                {% else %}
+                  <span class="badge text-bg-light border">Dati insufficienti</span>
+                {% endif %}
+              </td>
+              <td class="text-end"><a class="small" href="{{ url_for('forecasts.detail', pathogen=c.microorganismo, antibiotic=c.antibiotico) }}">Dettaglio</a></td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <p class="text-muted small mb-0">
+      <span class="badge text-bg-success">Affidabile</span> previsioni passate vicine al valore reale ·
+      <span class="badge text-bg-warning">Indicativa</span> intervallo affidabile, errore oltre il minimo atteso ·
+      <span class="badge text-bg-secondary">Non affidabile</span> solo il dato degli ultimi 12 mesi.
+      Le previsioni si basano solo sull'andamento passato dei laboratori: non possono anticipare focolai o cambi di terapia.
+    </p>
+  </section>
+
+  <form class="mt-3" method="post" action="{{ url_for('forecasts.compute') }}">
+    <button class="btn btn-outline-secondary btn-sm" type="submit">Ricalcola con i dati attuali</button>
+  </form>
+{% endif %}
+{% endblock %}
