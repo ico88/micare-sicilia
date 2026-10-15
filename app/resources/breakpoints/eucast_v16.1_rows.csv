@@ -1,0 +1,645 @@
+sheet,excel_row,agent,agent_notes,s_text,r_text,s_le,r_gt,status,bracketed,notes
+Acinetobacter,10,Benzylpenicillin,,-,-,,,non_applicabile,False,
+Acinetobacter,11,Ampicillin,,-,-,,,non_applicabile,False,
+Acinetobacter,12,Ampicillin-sulbactam,,IE,IE,,,IE,False,
+Acinetobacter,13,Amoxicillin,,-,-,,,non_applicabile,False,
+Acinetobacter,14,Amoxicillin-clavulanic acid,,-,-,,,non_applicabile,False,
+Acinetobacter,15,Piperacillin,,IE,IE,,,IE,False,
+Acinetobacter,16,Piperacillin-tazobactam,,IE,IE,,,IE,False,
+Acinetobacter,17,Ticarcillin-clavulanic acid,,IE,IE,,,IE,False,
+Acinetobacter,18,Temocillin,,-,-,,,non_applicabile,False,
+Acinetobacter,19,Phenoxymethylpenicillin,,-,-,,,non_applicabile,False,
+Acinetobacter,20,Oxacillin,,-,-,,,non_applicabile,False,
+Acinetobacter,21,Cloxacillin,,-,-,,,non_applicabile,False,
+Acinetobacter,22,Dicloxacillin,,-,-,,,non_applicabile,False,
+Acinetobacter,23,Flucloxacillin,,-,-,,,non_applicabile,False,
+Acinetobacter,24,Mecillinam oral (pivmecillinam) (uncomplicated UTI only),,-,-,,,non_applicabile,False,
+Acinetobacter,27,Cephalosporins,,MIC breakpoints (mg/L),,,,non_interpretabile,False,
+Acinetobacter,29,Cefaclor,,-,-,,,non_applicabile,False,
+Acinetobacter,30,Cefadroxil,,-,-,,,non_applicabile,False,
+Acinetobacter,31,Cefalexin,,-,-,,,non_applicabile,False,
+Acinetobacter,32,Cefazolin,,-,-,,,non_applicabile,False,
+Acinetobacter,33,Cefepime,,-,-,,,non_applicabile,False,
+Acinetobacter,34,Cefepime-enmetazobactam,,-,-,,,non_applicabile,False,
+Acinetobacter,35,Cefiderocol,1,Note,Note,,,nota,False,"2,2"
+Acinetobacter,36,Cefixime,,-,-,,,non_applicabile,False,
+Acinetobacter,37,Cefotaxime,,-,-,,,non_applicabile,False,
+Acinetobacter,38,Cefoxitin,,-,-,,,non_applicabile,False,
+Acinetobacter,39,Cefpodoxime,,-,-,,,non_applicabile,False,
+Acinetobacter,40,Ceftaroline,,-,-,,,non_applicabile,False,
+Acinetobacter,41,Ceftazidime,,-,-,,,non_applicabile,False,
+Acinetobacter,42,Ceftazidime-avibactam,,-,-,,,non_applicabile,False,
+Acinetobacter,43,Ceftibuten,,-,-,,,non_applicabile,False,
+Acinetobacter,44,Ceftobiprole,,-,-,,,non_applicabile,False,
+Acinetobacter,45,Ceftolozane-tazobactam,,-,-,,,non_applicabile,False,
+Acinetobacter,46,Ceftriaxone,,-,-,,,non_applicabile,False,
+Acinetobacter,47,Cefuroxime iv,,-,-,,,non_applicabile,False,
+Acinetobacter,48,Cefuroxime oral,,-,-,,,non_applicabile,False,
+Acinetobacter,51,Carbapenems,,MIC breakpoints (mg/L),,,,non_interpretabile,False,
+Acinetobacter,53,Doripenem,,0.001,2,0.001,2.0,ok,False,
+Acinetobacter,54,Ertapenem,,-,-,,,non_applicabile,False,
+Acinetobacter,55,Imipenem,,2,4,2.0,4.0,ok,False,
+Acinetobacter,56,Imipenem-relebactam,1,Note,Note,,,nota,False,"1,1"
+Acinetobacter,57,Meropenem (indications other than meningitis),,2,8,2.0,8.0,ok,False,
+Acinetobacter,58,Meropenem (meningitis),,2,2,2.0,2.0,ok,False,
+Acinetobacter,59,Meropenem-vaborbactam,1,Note,Note,,,nota,False,"1,1"
+Acinetobacter,62,Monobactams,,MIC breakpoints (mg/L),,,,non_interpretabile,False,
+Acinetobacter,64,Aztreonam,,-,-,,,non_applicabile,False,
+Acinetobacter,65,Aztreonam-avibactam,,-,-,,,non_applicabile,False,
+Acinetobacter,68,Fluoroquinolones,,MIC breakpoints (mg/L),,,,non_interpretabile,False,
+Acinetobacter,70,Ciprofloxacin,,0.001,1,0.001,1.0,ok,False,
+Acinetobacter,71,Delafloxacin,,IE,IE,,,IE,False,
+Acinetobacter,72,Levofloxacin,,0.5,1,0.5,1.0,ok,False,
+Acinetobacter,73,Moxifloxacin,,-,-,,,non_applicabile,False,
+Acinetobacter,74,Nalidixic acid (screen only),,NA,NA,,,NA,False,
+Acinetobacter,75,Norfloxacin (uncomplicated UTI only),,-,-,,,non_applicabile,False,
+Acinetobacter,76,Ofloxacin,,-,-,,,non_applicabile,False,
+Acinetobacter,79,Aminoglycosides,1,MIC breakpoints (mg/L),,,,non_interpretabile,False,
+Acinetobacter,81,Amikacin (systemic infections),,(8),(8),8.0,8.0,ok,True,"1,1"
+Acinetobacter,82,Amikacin (infections originating from the urinary tract),,8,8,8.0,8.0,ok,False,
+Acinetobacter,83,Gentamicin (systemic infections),,(4),(4),4.0,4.0,ok,True,"1,1"
+Acinetobacter,84,Gentamicin (infections originating from the urinary tract),,4,4,4.0,4.0,ok,False,
+Acinetobacter,85,Netilmicin,,IE,IE,,,IE,False,
+Acinetobacter,86,Tobramycin (systemic infections),,(4),(4),4.0,4.0,ok,True,"1,1"
+Acinetobacter,87,Tobramycin (infections originating from the urinary tract),,4,4,4.0,4.0,ok,False,
+Acinetobacter,90,Glycopeptides and lipoglycopeptides,,MIC breakpoints (mg/L),,,,non_interpretabile,False,
+Acinetobacter,92,Dalbavancin,,-,-,,,non_applicabile,False,
+Acinetobacter,93,Oritavancin,,-,-,,,non_applicabile,False,
+Acinetobacter,94,Teicoplanin,,-,-,,,non_applicabile,False,
+Acinetobacter,95,Telavancin,,-,-,,,non_applicabile,False,
+Acinetobacter,96,Vancomycin,,-,-,,,non_applicabile,False,
+Acinetobacter,99,"Macrolides, lincosamides and streptogramins",,MIC breakpoints (mg/L),,,,non_interpretabile,False,
+Acinetobacter,101,Azithromycin,,-,-,,,non_applicabile,False,
+Acinetobacter,102,Clarithromycin,,-,-,,,non_applicabile,False,
+Acinetobacter,103,Erythromycin,,-,-,,,non_applicabile,False,
+Acinetobacter,104,Roxithromycin,,-,-,,,non_applicabile,False,
+Acinetobacter,105,Clindamycin,,-,-,,,non_applicabile,False,
+Acinetobacter,106,Quinupristin-dalfopristin,,-,-,,,non_applicabile,False,
+Acinetobacter,109,Tetracyclines,,MIC breakpoints (mg/L),,,,non_interpretabile,False,
+Acinetobacter,111,Doxycycline,,-,-,,,non_applicabile,False,
+Acinetobacter,112,Eravacycline,,IE,IE,,,IE,False,
+Acinetobacter,113,Minocycline,,IE,IE,,,IE,False,"1,1"
+Acinetobacter,114,Tetracycline,,-,-,,,non_applicabile,False,
+Acinetobacter,115,Tigecycline,,IE,IE,,,IE,False,
+Acinetobacter,118,Oxazolidinones,,MIC breakpoints (mg/L),,,,non_interpretabile,False,
+Acinetobacter,120,Linezolid,,-,-,,,non_applicabile,False,
+Acinetobacter,121,Tedizolid,,-,-,,,non_applicabile,False,
+Acinetobacter,124,Miscellaneous agents,,MIC breakpoints (mg/L),,,,non_interpretabile,False,
+Acinetobacter,126,Chloramphenicol,,-,-,,,non_applicabile,False,
+Acinetobacter,127,Colistin,1,(2),(2),2.0,2.0,ok,True,"2,2"
+Acinetobacter,128,Daptomycin,,-,-,,,non_applicabile,False,
+Acinetobacter,129,Fosfomycin iv,,Note,Note,,,nota,False,"3,3"
+Acinetobacter,130,Fosfomycin oral,,-,-,,,non_applicabile,False,
+Acinetobacter,131,Fusidic acid,,-,-,,,non_applicabile,False,
+Acinetobacter,132,Lefamulin,,-,-,,,non_applicabile,False,
+Acinetobacter,133,Metronidazole,,-,-,,,non_applicabile,False,
+Acinetobacter,134,Nitrofurantoin (uncomplicated UTI only),,-,-,,,non_applicabile,False,
+Acinetobacter,135,Nitroxoline (uncomplicated UTI only),,-,-,,,non_applicabile,False,
+Acinetobacter,136,Rifampicin,,-,-,,,non_applicabile,False,
+Acinetobacter,137,Spectinomycin,,-,-,,,non_applicabile,False,
+Acinetobacter,138,Trimethoprim (uncomplicated UTI only),,-,-,,,non_applicabile,False,
+Acinetobacter,139,Trimethoprim-sulfamethoxazole,4,0.5,0.5,0.5,0.5,ok,False,
+Enterobacterales,10,Benzylpenicillin,,-,-,,,non_applicabile,False,
+Enterobacterales,11,Ampicillin iv,1,8,8,8.0,8.0,ok,False,
+Enterobacterales,12,Ampicillin oral (uncomplicated UTI only),1,8,8,8.0,8.0,ok,False,
+Enterobacterales,13,Ampicillin-sulbactam iv,1,8,8,8.0,8.0,ok,False,"2,2"
+Enterobacterales,14,Ampicillin-sulbactam oral (uncomplicated UTI only),1,8,8,8.0,8.0,ok,False,"2,2"
+Enterobacterales,15,Amoxicillin iv,1,8,8,8.0,8.0,ok,False,
+Enterobacterales,16,Amoxicillin oral (infections originating from the urinary tract),1,0.001,8,0.001,8.0,ok,False,
+Enterobacterales,17,Amoxicillin oral (uncomplicated UTI only),1,8,8,8.0,8.0,ok,False,
+Enterobacterales,18,Amoxicillin oral (other indications),1,(0.001),(8),0.001,8.0,ok,True,"3,3"
+Enterobacterales,19,Amoxicillin-clavulanic acid iv,1,8,8,8.0,8.0,ok,False,"4,4"
+Enterobacterales,20,Amoxicillin-clavulanic acid oral (infections originating from the urinary tract),1,0.001,8,0.001,8.0,ok,False,"4,4"
+Enterobacterales,21,Amoxicillin-clavulanic acid oral (uncomplicated UTI only),1,32,32,32.0,32.0,ok,False,"4,4"
+Enterobacterales,22,Amoxicillin-clavulanic acid oral (other indications),1,(0.001),(8),0.001,8.0,ok,True,"3,4,3,4"
+Enterobacterales,23,Piperacillin,,8,8,8.0,8.0,ok,False,
+Enterobacterales,24,Piperacillin-tazobactam,,8,8,8.0,8.0,ok,False,"5,5"
+Enterobacterales,25,Ticarcillin-clavulanic acid,,8,16,8.0,16.0,ok,False,"4,4"
+Enterobacterales,26,"Temocillin (infections originating from the urinary tract), E. coli, Klebsiella spp. (except K. aerogenes) and P. mirabilis",,0.001,16,0.001,16.0,ok,False,
+Enterobacterales,27,Phenoxymethylpenicillin,,-,-,,,non_applicabile,False,
+Enterobacterales,28,Oxacillin,,-,-,,,non_applicabile,False,
+Enterobacterales,29,Cloxacillin,,-,-,,,non_applicabile,False,
+Enterobacterales,30,Dicloxacillin,,-,-,,,non_applicabile,False,
+Enterobacterales,31,Flucloxacillin,,-,-,,,non_applicabile,False,
+Enterobacterales,32,"Mecillinam oral (pivmecillinam) (uncomplicated UTI only), E. coli, Citrobacter spp., Klebsiella spp., Raoultella spp., Enterobacter spp. and P. mirabilis",,8,8,8.0,8.0,ok,False,"6,6"
+Enterobacterales,35,Cephalosporins,1,MIC breakpoints (mg/L),,,,non_interpretabile,False,
+Enterobacterales,37,Cefaclor (uncomplicated UTI only),,IE,IE,,,IE,False,
+Enterobacterales,38,Cefadroxil (uncomplicated UTI only),,16,16,16.0,16.0,ok,False,
+Enterobacterales,39,Cefalexin (uncomplicated UTI only),,16,16,16.0,16.0,ok,False,
+Enterobacterales,40,"Cefazolin (infections originating from the urinary tract), E. coli and Klebsiella spp. (except K. aerogenes)",,0.001,4,0.001,4.0,ok,False,"2,2"
+Enterobacterales,41,Cefepime,,1,4,1.0,4.0,ok,False,
+Enterobacterales,42,Cefepime-enmetazobactam,,4,4,4.0,4.0,ok,False,"3,3"
+Enterobacterales,43,Cefiderocol,,2,2,2.0,2.0,ok,False,"4,4"
+Enterobacterales,44,Cefixime (uncomplicated UTI only),,1,1,1.0,1.0,ok,False,
+Enterobacterales,45,Cefotaxime (indications other than meningitis),,1,2,1.0,2.0,ok,False,
+Enterobacterales,46,Cefotaxime (meningitis),,1,1,1.0,1.0,ok,False,
+Enterobacterales,47,Cefoxitin (screen only),5,Note,Note,,,nota,False,"5,5"
+Enterobacterales,48,Cefpodoxime (uncomplicated UTI only),,1,1,1.0,1.0,ok,False,
+Enterobacterales,49,Ceftaroline,,0.5,0.5,0.5,0.5,ok,False,
+Enterobacterales,50,Ceftazidime,,1,4,1.0,4.0,ok,False,
+Enterobacterales,51,Ceftazidime-avibactam,,8,8,8.0,8.0,ok,False,"6,6"
+Enterobacterales,52,Ceftibuten (infections originating from the urinary tract),,1,1,1.0,1.0,ok,False,
+Enterobacterales,53,Ceftobiprole,,0.25,0.25,0.25,0.25,ok,False,
+Enterobacterales,54,Ceftolozane-tazobactam,7,2,2,2.0,2.0,ok,False,"8,8"
+Enterobacterales,55,Ceftriaxone (indications other than meningitis),,1,2,1.0,2.0,ok,False,
+Enterobacterales,56,Ceftriaxone (meningitis),,1,1,1.0,1.0,ok,False,
+Enterobacterales,57,"Cefuroxime iv, E. coli, Klebsiella spp. (except K. aerogenes), Raoultella spp. and P. mirabilis",,0.001,8,0.001,8.0,ok,False,
+Enterobacterales,58,"Cefuroxime oral (uncomplicated UTI only), E. coli, Klebsiella spp. (except K. aerogenes), Raoultella spp. and P. mirabilis",,8,8,8.0,8.0,ok,False,
+Enterobacterales,61,Carbapenems,1,MIC breakpoints (mg/L),,,,non_interpretabile,False,
+Enterobacterales,63,Doripenem,,1,2,1.0,2.0,ok,False,
+Enterobacterales,64,Ertapenem,,0.5,0.5,0.5,0.5,ok,False,
+Enterobacterales,65,"Imipenem, Enterobacterales except Morganellaceae",,2,4,2.0,4.0,ok,False,
+Enterobacterales,66,"Imipenem, Morganellaceae",2,0.001,4,0.001,4.0,ok,False,
+Enterobacterales,67,"Imipenem-relebactam, Enterobacterales except Morganellaceae",,2,2,2.0,2.0,ok,False,"3,3"
+Enterobacterales,68,Meropenem (indications other than meningitis),,2,8,2.0,8.0,ok,False,
+Enterobacterales,69,Meropenem (meningitis),,2,2,2.0,2.0,ok,False,
+Enterobacterales,70,Meropenem-vaborbactam,,8,8,8.0,8.0,ok,False,"4,4"
+Enterobacterales,73,Monobactams,,MIC breakpoints (mg/L),,,,non_interpretabile,False,
+Enterobacterales,75,Aztreonam,1,1,4,1.0,4.0,ok,False,
+Enterobacterales,76,Aztreonam-avibactam,,4,4,4.0,4.0,ok,False,"2,2"
+Enterobacterales,79,Fluoroquinolones,,MIC breakpoints (mg/L),,,,non_interpretabile,False,
+Enterobacterales,81,"Ciprofloxacin, Salmonella spp.",1,0.06,0.06,0.06,0.06,ok,False,
+Enterobacterales,82,Ciprofloxacin (indications other than meningitis),,0.25,0.5,0.25,0.5,ok,False,
+Enterobacterales,83,Ciprofloxacin (meningitis),2,0.125,0.125,0.125,0.125,ok,False,
+Enterobacterales,84,Pefloxacin (screen only),,NA,NA,,,NA,False,
+Enterobacterales,85,"Delafloxacin, E. coli",,0.125,0.125,0.125,0.125,ok,False,
+Enterobacterales,86,Levofloxacin,,0.5,1,0.5,1.0,ok,False,
+Enterobacterales,87,"Moxifloxacin, Enterobacterales except Morganella morganii, Proteus spp. and Serratia spp.",3,0.25,0.25,0.25,0.25,ok,False,
+Enterobacterales,88,Nalidixic acid (screen only),,NA,NA,,,NA,False,
+Enterobacterales,89,Norfloxacin (uncomplicated UTI only),,0.5,0.5,0.5,0.5,ok,False,
+Enterobacterales,90,Ofloxacin,,0.25,0.5,0.25,0.5,ok,False,
+Enterobacterales,93,Aminoglycosides,1,MIC breakpoints (mg/L),,,,non_interpretabile,False,
+Enterobacterales,95,Amikacin (systemic infections),,(8),(8),8.0,8.0,ok,True,"1,1"
+Enterobacterales,96,Amikacin (infections originating from the urinary tract),,8,8,8.0,8.0,ok,False,
+Enterobacterales,97,Gentamicin (systemic infections),,(2),(2),2.0,2.0,ok,True,"1,1"
+Enterobacterales,98,Gentamicin (infections originating from the urinary tract),,2,2,2.0,2.0,ok,False,
+Enterobacterales,99,Netilmicin,,IE,IE,,,IE,False,
+Enterobacterales,100,Tobramycin (systemic infections),,(2),(2),2.0,2.0,ok,True,"1,1"
+Enterobacterales,101,Tobramycin (infections originating from the urinary tract),,2,2,2.0,2.0,ok,False,
+Enterobacterales,104,Glycopeptides and lipoglycopeptides,,MIC breakpoints (mg/L),,,,non_interpretabile,False,
+Enterobacterales,106,Dalbavancin,,-,-,,,non_applicabile,False,
+Enterobacterales,107,Oritavancin,,-,-,,,non_applicabile,False,
+Enterobacterales,108,Teicoplanin,,-,-,,,non_applicabile,False,
+Enterobacterales,109,Telavancin,,-,-,,,non_applicabile,False,
+Enterobacterales,110,Vancomycin,,-,-,,,non_applicabile,False,
+Enterobacterales,113,"Macrolides, lincosamides and streptogramins",,MIC breakpoints (mg/L),,,,non_interpretabile,False,
+Enterobacterales,115,Azithromycin,1,Note,Note,,,nota,False,"1,1"
+Enterobacterales,116,Clarithromycin,,-,-,,,non_applicabile,False,
+Enterobacterales,117,Erythromycin,,-,-,,,non_applicabile,False,
+Enterobacterales,118,Roxithromycin,,-,-,,,non_applicabile,False,
+Enterobacterales,119,Clindamycin,,-,-,,,non_applicabile,False,
+Enterobacterales,120,Quinupristin-dalfopristin,,-,-,,,non_applicabile,False,
+Enterobacterales,123,Tetracyclines,,MIC breakpoints (mg/L),,,,non_interpretabile,False,
+Enterobacterales,125,Doxycycline,,-,-,,,non_applicabile,False,
+Enterobacterales,126,"Eravacycline, E. coli",,0.5,0.5,0.5,0.5,ok,False,
+Enterobacterales,127,Minocycline,,-,-,,,non_applicabile,False,
+Enterobacterales,128,Tetracycline,1,-,-,,,non_applicabile,False,
+Enterobacterales,129,"Tigecycline, E. coli and C. koseri",,0.5,0.5,0.5,0.5,ok,False,"2,3,2,3"
+Enterobacterales,132,Oxazolidinones,,MIC breakpoints (mg/L),,,,non_interpretabile,False,
+Enterobacterales,134,Linezolid,,-,-,,,non_applicabile,False,
+Enterobacterales,135,Tedizolid,,-,-,,,non_applicabile,False,
+Enterobacterales,138,Miscellaneous agents,,MIC breakpoints (mg/L),,,,non_interpretabile,False,
+Enterobacterales,140,Chloramphenicol,,Note,Note,,,nota,False,"1,1"
+Enterobacterales,141,Colistin,2,(2),(2),2.0,2.0,ok,True,"3,3"
+Enterobacterales,142,Daptomycin,,-,-,,,non_applicabile,False,
+Enterobacterales,143,"Fosfomycin iv (infections originating from the urinary tract), E. coli",,8,8,8.0,8.0,ok,False,"4,4"
+Enterobacterales,144,"Fosfomycin iv (other indications), E. coli",,Note,Note,,,nota,False,"5,5"
+Enterobacterales,145,"Fosfomycin iv, other Enterobacterales",,Note,Note,,,nota,False,"6,6"
+Enterobacterales,146,"Fosfomycin oral (uncomplicated UTI only), E. coli",,8,8,8.0,8.0,ok,False,"4,4"
+Enterobacterales,147,Fusidic acid,,-,-,,,non_applicabile,False,
+Enterobacterales,148,"Gepotidacin (uncomplicated UTI only), E. coli",,8,8,8.0,8.0,ok,False,
+Enterobacterales,149,Lefamulin,,-,-,,,non_applicabile,False,
+Enterobacterales,150,Metronidazole,,-,-,,,non_applicabile,False,
+Enterobacterales,151,"Nitrofurantoin (uncomplicated UTI only), E. coli",,64,64,64.0,64.0,ok,False,
+Enterobacterales,152,"Nitroxoline (uncomplicated UTI only), E. coli",,16,16,16.0,16.0,ok,False,
+Enterobacterales,153,Rifampicin,,-,-,,,non_applicabile,False,
+Enterobacterales,154,Spectinomycin,,-,-,,,non_applicabile,False,
+Enterobacterales,155,"Trimethoprim (uncomplicated UTI only), E. coli and Klebsiella spp. (except K. aerogenes)",,2,2,2.0,2.0,ok,False,
+Enterobacterales,156,"Trimethoprim (uncomplicated UTI only), Proteus spp.",,Note,Note,,,nota,False,"7,7"
+Enterobacterales,157,"Trimethoprim-sulfamethoxazole, Enterobacterales except Serratia spp.",8,0.5,0.5,0.5,0.5,ok,False,
+Enterobacterales,158,"Trimethoprim-sulfamethoxazole, Serratia spp.",8,0.001,2,0.001,2.0,ok,False,
+Enterococcus,10,Benzylpenicillin,,-,-,,,non_applicabile,False,
+Enterococcus,11,Ampicillin iv,,4,4,4.0,4.0,ok,False,
+Enterococcus,12,Ampicillin-sulbactam iv,2,Note,Note,,,nota,False,"1,1"
+Enterococcus,13,Amoxicillin iv,,4,4,4.0,4.0,ok,False,"1,1"
+Enterococcus,14,Amoxicillin oral (uncomplicated UTI only),,4,4,4.0,4.0,ok,False,"1,1"
+Enterococcus,15,"Amoxicillin oral (other indications), E. faecalis",,(0.001),(4),0.001,4.0,ok,True,"3,4,3,4"
+Enterococcus,16,Amoxicillin-clavulanic acid iv,2,Note,Note,,,nota,False,"1,1"
+Enterococcus,17,Amoxicillin-clavulanic acid oral (uncomplicated UTI only),2,Note,Note,,,nota,False,"1,1"
+Enterococcus,18,"Amoxicillin-clavulanic acid oral (other indications), E. faecalis",2,Note,Note,,,nota,False,"3,4,3,4"
+Enterococcus,19,"Piperacillin, E. faecalis",,0.001,16,0.001,16.0,ok,False,
+Enterococcus,20,"Piperacillin-tazobactam, E. faecalis",2,0.001,16,0.001,16.0,ok,False,"5,5"
+Enterococcus,21,Ticarcillin-clavulanic acid,,-,-,,,non_applicabile,False,
+Enterococcus,22,Temocillin,,-,-,,,non_applicabile,False,
+Enterococcus,23,Phenoxymethylpenicillin,,-,-,,,non_applicabile,False,
+Enterococcus,24,Oxacillin,,-,-,,,non_applicabile,False,
+Enterococcus,25,Cloxacillin,,-,-,,,non_applicabile,False,
+Enterococcus,26,Dicloxacillin,,-,-,,,non_applicabile,False,
+Enterococcus,27,Flucloxacillin,,-,-,,,non_applicabile,False,
+Enterococcus,28,Mecillinam oral (pivmecillinam) (uncomplicated UTI only),,-,-,,,non_applicabile,False,
+Enterococcus,31,Cephalosporins,,MIC breakpoints (mg/L),,,,non_interpretabile,False,
+Enterococcus,33,Cefaclor,,-,-,,,non_applicabile,False,
+Enterococcus,34,Cefadroxil,,-,-,,,non_applicabile,False,
+Enterococcus,35,Cefalexin,,-,-,,,non_applicabile,False,
+Enterococcus,36,Cefazolin,,-,-,,,non_applicabile,False,
+Enterococcus,37,Cefepime,,-,-,,,non_applicabile,False,
+Enterococcus,38,Cefepime-enmetazobactam,,-,-,,,non_applicabile,False,
+Enterococcus,39,Cefiderocol,,-,-,,,non_applicabile,False,
+Enterococcus,40,Cefixime,,-,-,,,non_applicabile,False,
+Enterococcus,41,Cefotaxime,,-,-,,,non_applicabile,False,
+Enterococcus,42,Cefoxitin,,-,-,,,non_applicabile,False,
+Enterococcus,43,Cefpodoxime,,-,-,,,non_applicabile,False,
+Enterococcus,44,Ceftaroline,,-,-,,,non_applicabile,False,
+Enterococcus,45,Ceftazidime,,-,-,,,non_applicabile,False,
+Enterococcus,46,Ceftazidime-avibactam,,-,-,,,non_applicabile,False,
+Enterococcus,47,Ceftibuten,,-,-,,,non_applicabile,False,
+Enterococcus,48,Ceftobiprole,,-,-,,,non_applicabile,False,
+Enterococcus,49,Ceftolozane-tazobactam,,-,-,,,non_applicabile,False,
+Enterococcus,50,Ceftriaxone,,-,-,,,non_applicabile,False,
+Enterococcus,51,Cefuroxime iv,,-,-,,,non_applicabile,False,
+Enterococcus,52,Cefuroxime oral,,-,-,,,non_applicabile,False,
+Enterococcus,55,Carbapenems,,MIC breakpoints (mg/L),,,,non_interpretabile,False,
+Enterococcus,57,Doripenem,,-,-,,,non_applicabile,False,
+Enterococcus,58,Ertapenem,,-,-,,,non_applicabile,False,
+Enterococcus,59,"Imipenem, E. faecalis",,0.001,4,0.001,4.0,ok,False,
+Enterococcus,60,Imipenem-relebactam,,-,-,,,non_applicabile,False,
+Enterococcus,61,Meropenem,,-,-,,,non_applicabile,False,
+Enterococcus,62,Meropenem-vaborbactam,,-,-,,,non_applicabile,False,
+Enterococcus,65,Monobactams,,MIC breakpoints (mg/L),,,,non_interpretabile,False,
+Enterococcus,67,Aztreonam,,-,-,,,non_applicabile,False,
+Enterococcus,68,Aztreonam-avibactam,,-,-,,,non_applicabile,False,
+Enterococcus,71,Fluoroquinolones,,MIC breakpoints (mg/L),,,,non_interpretabile,False,
+Enterococcus,73,Ciprofloxacin (uncomplicated UTI only),,4,4,4.0,4.0,ok,False,
+Enterococcus,74,Delafloxacin,,IE,IE,,,IE,False,
+Enterococcus,75,Levofloxacin (uncomplicated UTI only),,4,4,4.0,4.0,ok,False,
+Enterococcus,76,Moxifloxacin,,Note,Note,,,nota,False,"1,1"
+Enterococcus,77,Nalidixic acid (screen only),,NA,NA,,,NA,False,
+Enterococcus,78,Norfloxacin (screen only),,NA,NA,,,NA,False,
+Enterococcus,79,Ofloxacin,,-,-,,,non_applicabile,False,
+Enterococcus,82,Aminoglycosides,1,MIC breakpoints (mg/L),,,,non_interpretabile,False,
+Enterococcus,84,Amikacin,,Note,Note,,,nota,False,"2,2"
+Enterococcus,85,Gentamicin (test for acquired aminoglycoside-modifying enzyme),,Note,Note,,,nota,False,"2,2"
+Enterococcus,86,Netilmicin,,Note,Note,,,nota,False,"2,2"
+Enterococcus,87,Streptomycin (test for acquired aminoglycoside-modifying enzyme),,Note,Note,,,nota,False,"3,3"
+Enterococcus,88,Tobramycin,,Note,Note,,,nota,False,"2,2"
+Enterococcus,91,Glycopeptides and lipoglycopeptides,,MIC breakpoints (mg/L),,,,non_interpretabile,False,
+Enterococcus,93,Dalbavancin,,IE,IE,,,IE,False,
+Enterococcus,94,Oritavancin,,IE,IE,,,IE,False,
+Enterococcus,95,Teicoplanin,,2,2,2.0,2.0,ok,False,
+Enterococcus,96,Telavancin,,IE,IE,,,IE,False,
+Enterococcus,97,"Vancomycin, E. faecalis and E. faecium",,4,4,4.0,4.0,ok,False,
+Enterococcus,98,"Vancomycin, E. casseliflavus and E. gallinarum",,-,-,,,non_applicabile,False,
+Enterococcus,99,"Vancomycin, other enterococci",,4,4,4.0,4.0,ok,False,
+Enterococcus,102,"Macrolides, lincosamides and streptogramins",,MIC breakpoints (mg/L),,,,non_interpretabile,False,
+Enterococcus,104,Azithromycin,,-,-,,,non_applicabile,False,
+Enterococcus,105,Clarithromycin,,-,-,,,non_applicabile,False,
+Enterococcus,106,Erythromycin,,-,-,,,non_applicabile,False,
+Enterococcus,107,Roxithromycin,,-,-,,,non_applicabile,False,
+Enterococcus,108,Clindamycin,,-,-,,,non_applicabile,False,
+Enterococcus,109,"Quinupristin-dalfopristin, E. faecium",,1,1,1.0,1.0,ok,False,
+Enterococcus,112,Tetracyclines,,MIC breakpoints (mg/L),,,,non_interpretabile,False,
+Enterococcus,114,Doxycycline,,-,-,,,non_applicabile,False,
+Enterococcus,115,Eravacycline,,0.25,0.25,0.25,0.25,ok,False,
+Enterococcus,116,Minocycline,,-,-,,,non_applicabile,False,
+Enterococcus,117,Tetracycline,,-,-,,,non_applicabile,False,
+Enterococcus,118,Tigecycline,1,0.5,0.5,0.5,0.5,ok,False,"2,2"
+Enterococcus,121,Oxazolidinones,,MIC breakpoints (mg/L),,,,non_interpretabile,False,
+Enterococcus,123,Linezolid,,4,4,4.0,4.0,ok,False,
+Enterococcus,124,Tedizolid,,IE,IE,,,IE,False,
+Enterococcus,127,Miscellaneous agents,,MIC breakpoints (mg/L),,,,non_interpretabile,False,
+Enterococcus,129,Chloramphenicol,,-,-,,,non_applicabile,False,
+Enterococcus,130,Colistin,,-,-,,,non_applicabile,False,
+Enterococcus,131,Daptomycin,1,IE,IE,,,IE,False,
+Enterococcus,132,Fosfomycin iv,,Note,Note,,,nota,False,"2,2"
+Enterococcus,133,Fosfomycin oral,,-,-,,,non_applicabile,False,
+Enterococcus,134,Fusidic acid,,-,-,,,non_applicabile,False,
+Enterococcus,135,"Gepotidacin (uncomplicated UTI only), E. faecalis",,8,8,8.0,8.0,ok,False,
+Enterococcus,136,Lefamulin,,Note,Note,,,nota,False,"3,3"
+Enterococcus,137,Metronidazole,,-,-,,,non_applicabile,False,
+Enterococcus,138,"Nitrofurantoin (uncomplicated UTI only), E. faecalis",,64,64,64.0,64.0,ok,False,
+Enterococcus,139,Nitroxoline (uncomplicated UTI only),,IE,IE,,,IE,False,
+Enterococcus,140,Rifampicin,,-,-,,,non_applicabile,False,
+Enterococcus,141,Spectinomycin,,-,-,,,non_applicabile,False,
+Enterococcus,142,Trimethoprim (uncomplicated UTI only),,Note,Note,,,nota,False,"4,4"
+Enterococcus,143,Trimethoprim-sulfamethoxazole,5,Note,Note,,,nota,False,"4,4"
+Pseudomonas,10,Benzylpenicillin,,-,-,,,non_applicabile,False,
+Pseudomonas,11,Ampicillin,,-,-,,,non_applicabile,False,
+Pseudomonas,12,Ampicillin-sulbactam,,-,-,,,non_applicabile,False,
+Pseudomonas,13,Amoxicillin,,-,-,,,non_applicabile,False,
+Pseudomonas,14,Amoxicillin-clavulanic acid,,-,-,,,non_applicabile,False,
+Pseudomonas,15,Piperacillin,,0.001,16,0.001,16.0,ok,False,
+Pseudomonas,16,Piperacillin-tazobactam,,0.001,16,0.001,16.0,ok,False,"1,1"
+Pseudomonas,17,Ticarcillin-clavulanic acid,,0.001,16,0.001,16.0,ok,False,"2,2"
+Pseudomonas,18,Temocillin,,-,-,,,non_applicabile,False,
+Pseudomonas,19,Phenoxymethylpenicillin,,-,-,,,non_applicabile,False,
+Pseudomonas,20,Oxacillin,,-,-,,,non_applicabile,False,
+Pseudomonas,21,Cloxacillin,,-,-,,,non_applicabile,False,
+Pseudomonas,22,Dicloxacillin,,-,-,,,non_applicabile,False,
+Pseudomonas,23,Flucloxacillin,,-,-,,,non_applicabile,False,
+Pseudomonas,24,Mecillinam oral (pivmecillinam) (uncomplicated UTI only),,-,-,,,non_applicabile,False,
+Pseudomonas,27,Cephalosporins,,MIC breakpoints (mg/L),,,,non_interpretabile,False,
+Pseudomonas,29,Cefaclor,,-,-,,,non_applicabile,False,
+Pseudomonas,30,Cefadroxil,,-,-,,,non_applicabile,False,
+Pseudomonas,31,Cefalexin,,-,-,,,non_applicabile,False,
+Pseudomonas,32,Cefazolin,,-,-,,,non_applicabile,False,
+Pseudomonas,33,Cefepime,,0.001,8,0.001,8.0,ok,False,
+Pseudomonas,34,Cefepime-enmetazobactam,,Note,Note,,,nota,False,"1,1"
+Pseudomonas,35,"Cefiderocol, P. aeruginosa",,2,2,2.0,2.0,ok,False,"2,2"
+Pseudomonas,36,Cefixime,,-,-,,,non_applicabile,False,
+Pseudomonas,37,Cefotaxime,,-,-,,,non_applicabile,False,
+Pseudomonas,38,Cefoxitin,,-,-,,,non_applicabile,False,
+Pseudomonas,39,Cefpodoxime,,-,-,,,non_applicabile,False,
+Pseudomonas,40,Ceftaroline,,-,-,,,non_applicabile,False,
+Pseudomonas,41,Ceftazidime,,0.001,8,0.001,8.0,ok,False,
+Pseudomonas,42,"Ceftazidime-avibactam, P. aeruginosa",,8,8,8.0,8.0,ok,False,"3,3"
+Pseudomonas,43,Ceftibuten,,-,-,,,non_applicabile,False,
+Pseudomonas,44,Ceftobiprole,,IE,IE,,,IE,False,
+Pseudomonas,45,"Ceftolozane-tazobactam, P. aeruginosa",4,4,4,4.0,4.0,ok,False,"5,5"
+Pseudomonas,46,Ceftriaxone,,-,-,,,non_applicabile,False,
+Pseudomonas,47,Cefuroxime iv,,-,-,,,non_applicabile,False,
+Pseudomonas,48,Cefuroxime oral,,-,-,,,non_applicabile,False,
+Pseudomonas,51,Carbapenems,,MIC breakpoints (mg/L),,,,non_interpretabile,False,
+Pseudomonas,53,Doripenem,,0.001,2,0.001,2.0,ok,False,
+Pseudomonas,54,Ertapenem,,-,-,,,non_applicabile,False,
+Pseudomonas,55,Imipenem,,0.001,4,0.001,4.0,ok,False,
+Pseudomonas,56,"Imipenem-relebactam, P. aeruginosa",,2,2,2.0,2.0,ok,False,"1,1"
+Pseudomonas,57,"Meropenem (indications other than meningitis), P. aeruginosa",,2,8,2.0,8.0,ok,False,
+Pseudomonas,58,"Meropenem (indications other than meningitis), Pseudomonas other than P. aeruginosa",,2,8,2.0,8.0,ok,False,
+Pseudomonas,59,"Meropenem (meningitis), P. aeruginosa",,2,2,2.0,2.0,ok,False,
+Pseudomonas,60,"Meropenem-vaborbactam, P. aeruginosa",,8,8,8.0,8.0,ok,False,"2,2"
+Pseudomonas,63,Monobactams,,MIC breakpoints (mg/L),,,,non_interpretabile,False,
+Pseudomonas,65,Aztreonam,,0.001,16,0.001,16.0,ok,False,
+Pseudomonas,66,Aztreonam-avibactam,,IE,IE,,,IE,False,
+Pseudomonas,69,Fluoroquinolones,,MIC breakpoints (mg/L),,,,non_interpretabile,False,
+Pseudomonas,71,Ciprofloxacin,,0.001,0.5,0.001,0.5,ok,False,
+Pseudomonas,72,Delafloxacin,,IE,IE,,,IE,False,
+Pseudomonas,73,Levofloxacin,,0.001,2,0.001,2.0,ok,False,
+Pseudomonas,74,Moxifloxacin,,-,-,,,non_applicabile,False,
+Pseudomonas,75,Nalidixic acid (screen only),,NA,NA,,,NA,False,
+Pseudomonas,76,Norfloxacin (uncomplicated UTI only),,-,-,,,non_applicabile,False,
+Pseudomonas,77,Ofloxacin,,-,-,,,non_applicabile,False,
+Pseudomonas,80,Aminoglycosides,1,MIC breakpoints (mg/L),,,,non_interpretabile,False,
+Pseudomonas,82,Amikacin (systemic infections),,(16),(16),16.0,16.0,ok,True,"1,1"
+Pseudomonas,83,Amikacin (infections originating from the urinary tract),,16,16,16.0,16.0,ok,False,
+Pseudomonas,84,Gentamicin (systemic infections),,IE,IE,,,IE,False,
+Pseudomonas,85,Gentamicin (infections originating from the urinary tract),,IE,IE,,,IE,False,
+Pseudomonas,86,Netilmicin,,IE,IE,,,IE,False,
+Pseudomonas,87,Tobramycin (systemic infections),,(2),(2),2.0,2.0,ok,True,"1,1"
+Pseudomonas,88,Tobramycin (infections originating from the urinary tract),,2,2,2.0,2.0,ok,False,
+Pseudomonas,91,Glycopeptides and lipoglycopeptides,,MIC breakpoints (mg/L),,,,non_interpretabile,False,
+Pseudomonas,93,Dalbavancin,,-,-,,,non_applicabile,False,
+Pseudomonas,94,Oritavancin,,-,-,,,non_applicabile,False,
+Pseudomonas,95,Teicoplanin,,-,-,,,non_applicabile,False,
+Pseudomonas,96,Telavancin,,-,-,,,non_applicabile,False,
+Pseudomonas,97,Vancomycin,,-,-,,,non_applicabile,False,
+Pseudomonas,100,"Macrolides, lincosamides and streptogramins",,MIC breakpoints (mg/L),,,,non_interpretabile,False,
+Pseudomonas,102,Azithromycin,,-,-,,,non_applicabile,False,
+Pseudomonas,103,Clarithromycin,,-,-,,,non_applicabile,False,
+Pseudomonas,104,Erythromycin,,-,-,,,non_applicabile,False,
+Pseudomonas,105,Roxithromycin,,-,-,,,non_applicabile,False,
+Pseudomonas,106,Clindamycin,,-,-,,,non_applicabile,False,
+Pseudomonas,107,Quinupristin-dalfopristin,,-,-,,,non_applicabile,False,
+Pseudomonas,110,Tetracyclines,,MIC breakpoints (mg/L),,,,non_interpretabile,False,
+Pseudomonas,112,Doxycycline,,-,-,,,non_applicabile,False,
+Pseudomonas,113,Eravacycline,,-,-,,,non_applicabile,False,
+Pseudomonas,114,Minocycline,,-,-,,,non_applicabile,False,
+Pseudomonas,115,Tetracycline,,-,-,,,non_applicabile,False,
+Pseudomonas,116,Tigecycline,,-,-,,,non_applicabile,False,
+Pseudomonas,119,Oxazolidinones,,MIC breakpoints (mg/L),,,,non_interpretabile,False,
+Pseudomonas,121,Linezolid,,-,-,,,non_applicabile,False,
+Pseudomonas,122,Tedizolid,,-,-,,,non_applicabile,False,
+Pseudomonas,125,Miscellaneous agents,,MIC breakpoints (mg/L),,,,non_interpretabile,False,
+Pseudomonas,127,Chloramphenicol,,-,-,,,non_applicabile,False,
+Pseudomonas,128,Colistin,1,(4),(4),4.0,4.0,ok,True,"2,2"
+Pseudomonas,129,Daptomycin,,-,-,,,non_applicabile,False,
+Pseudomonas,130,Fosfomycin iv,,Note,Note,,,nota,False,"3,3"
+Pseudomonas,131,Fosfomycin oral,,-,-,,,non_applicabile,False,
+Pseudomonas,132,Fusidic acid,,-,-,,,non_applicabile,False,
+Pseudomonas,133,Lefamulin,,-,-,,,non_applicabile,False,
+Pseudomonas,134,Metronidazole,,-,-,,,non_applicabile,False,
+Pseudomonas,135,Nitrofurantoin (uncomplicated UTI only),,-,-,,,non_applicabile,False,
+Pseudomonas,136,Nitroxoline (uncomplicated UTI only),,-,-,,,non_applicabile,False,
+Pseudomonas,137,Rifampicin,,-,-,,,non_applicabile,False,
+Pseudomonas,138,Spectinomycin,,-,-,,,non_applicabile,False,
+Pseudomonas,139,Trimethoprim (uncomplicated UTI only),,-,-,,,non_applicabile,False,
+Pseudomonas,140,Trimethoprim-sulfamethoxazole,,-,-,,,non_applicabile,False,
+S.pneumoniae,8,Benzylpenicillin (indications other than endocarditis and meningitis),,0.06,1,0.06,1.0,ok,False,
+S.pneumoniae,9,Benzylpenicillin (endocarditis and meningitis),,0.06,0.06,0.06,0.06,ok,False,
+S.pneumoniae,10,Ampicillin iv (indications other than endocarditis and meningitis),,0.5,1,0.5,1.0,ok,False,
+S.pneumoniae,11,Ampicillin iv (endocarditis and meningitis),,0.06,0.06,0.06,0.06,ok,False,
+S.pneumoniae,12,Ampicillin-sulbactam,2,Note,Note,,,nota,False,"1,3,1,3"
+S.pneumoniae,13,Amoxicillin iv (indications other than endocarditis and meningitis),,Note,Note,,,nota,False,"1,3,1,3"
+S.pneumoniae,14,Amoxicillin iv (endocarditis and meningitis),,0.06,0.06,0.06,0.06,ok,False,
+S.pneumoniae,15,Amoxicillin oral,,0.5,1,0.5,1.0,ok,False,
+S.pneumoniae,16,Amoxicillin-clavulanic acid iv,2,Note,Note,,,nota,False,"1,3,1,3"
+S.pneumoniae,17,Amoxicillin-clavulanic acid oral,2,0.5,1,0.5,1.0,ok,False,"4,4"
+S.pneumoniae,18,Piperacillin,,Note,Note,,,nota,False,"1,3,1,3"
+S.pneumoniae,19,Piperacillin-tazobactam,2,Note,Note,,,nota,False,"1,3,1,3"
+S.pneumoniae,20,Ticarcillin-clavulanic acid,,-,-,,,non_applicabile,False,
+S.pneumoniae,21,Temocillin,,-,-,,,non_applicabile,False,
+S.pneumoniae,22,Phenoxymethylpenicillin,,Note,Note,,,nota,False,"1,1"
+S.pneumoniae,23,Oxacillin (screen only),1,NA,NA,,,NA,False,
+S.pneumoniae,24,Oxacillin,,IE,IE,,,IE,False,
+S.pneumoniae,25,Cloxacillin,,IE,IE,,,IE,False,
+S.pneumoniae,26,Dicloxacillin,,IE,IE,,,IE,False,
+S.pneumoniae,27,Flucloxacillin,,IE,IE,,,IE,False,
+S.pneumoniae,28,Mecillinam oral (pivmecillinam) (uncomplicated UTI only),,-,-,,,non_applicabile,False,
+S.pneumoniae,31,Cephalosporins,1,MIC breakpoints (mg/L),,,,non_interpretabile,False,
+S.pneumoniae,33,Cefaclor,,0.001,0.5,0.001,0.5,ok,False,
+S.pneumoniae,34,Cefadroxil,,IE,IE,,,IE,False,
+S.pneumoniae,35,Cefalexin,,IE,IE,,,IE,False,
+S.pneumoniae,36,Cefazolin,,IE,IE,,,IE,False,
+S.pneumoniae,37,Cefepime,,1,2,1.0,2.0,ok,False,
+S.pneumoniae,38,Cefepime-enmetazobactam,2,Note,Note,,,nota,False,"2,2"
+S.pneumoniae,39,Cefiderocol,,-,-,,,non_applicabile,False,
+S.pneumoniae,40,Cefixime,,-,-,,,non_applicabile,False,
+S.pneumoniae,41,Cefotaxime (indications other than endocarditis and meningitis),,0.5,2,0.5,2.0,ok,False,
+S.pneumoniae,42,Cefotaxime (endocarditis and meningitis),,0.5,0.5,0.5,0.5,ok,False,
+S.pneumoniae,43,Cefoxitin,,IE,IE,,,IE,False,
+S.pneumoniae,44,Cefpodoxime,,0.25,0.25,0.25,0.25,ok,False,
+S.pneumoniae,45,Ceftaroline,,0.25,0.25,0.25,0.25,ok,False,
+S.pneumoniae,46,Ceftazidime,,-,-,,,non_applicabile,False,
+S.pneumoniae,47,Ceftazidime-avibactam,,-,-,,,non_applicabile,False,
+S.pneumoniae,48,Ceftibuten,,-,-,,,non_applicabile,False,
+S.pneumoniae,49,Ceftobiprole,,0.5,0.5,0.5,0.5,ok,False,
+S.pneumoniae,50,Ceftolozane-tazobactam,,-,-,,,non_applicabile,False,
+S.pneumoniae,51,Ceftriaxone (indications other than endocarditis and meningitis),,0.5,2,0.5,2.0,ok,False,
+S.pneumoniae,52,Ceftriaxone (endocarditis and meningitis),,0.5,0.5,0.5,0.5,ok,False,
+S.pneumoniae,53,Cefuroxime iv,,0.5,1,0.5,1.0,ok,False,
+S.pneumoniae,54,Cefuroxime oral,,0.25,0.25,0.25,0.25,ok,False,
+S.pneumoniae,57,Carbapenems,"1,2",MIC breakpoints (mg/L),,,,non_interpretabile,False,
+S.pneumoniae,59,Doripenem,,1,1,1.0,1.0,ok,False,
+S.pneumoniae,60,Ertapenem,,0.5,0.5,0.5,0.5,ok,False,
+S.pneumoniae,61,Imipenem,,2,2,2.0,2.0,ok,False,
+S.pneumoniae,62,Imipenem-relebactam,3,Note,Note,,,nota,False,"3,3"
+S.pneumoniae,63,Meropenem (indications other than meningitis),,2,2,2.0,2.0,ok,False,
+S.pneumoniae,64,Meropenem (meningitis),,0.25,0.25,0.25,0.25,ok,False,
+S.pneumoniae,65,Meropenem-vaborbactam,3,Note,Note,,,nota,False,"3,3"
+S.pneumoniae,68,Monobactams,,MIC breakpoints (mg/L),,,,non_interpretabile,False,
+S.pneumoniae,70,Aztreonam,,-,-,,,non_applicabile,False,
+S.pneumoniae,71,Aztreonam-avibactam,,-,-,,,non_applicabile,False,
+S.pneumoniae,74,Fluoroquinolones,,MIC breakpoints (mg/L),,,,non_interpretabile,False,
+S.pneumoniae,76,Ciprofloxacin,,-,-,,,non_applicabile,False,
+S.pneumoniae,77,Delafloxacin,,IE,IE,,,IE,False,
+S.pneumoniae,78,Levofloxacin,,0.001,2,0.001,2.0,ok,False,
+S.pneumoniae,79,Moxifloxacin,,0.5,0.5,0.5,0.5,ok,False,
+S.pneumoniae,80,Nalidixic acid (screen only),,NA,NA,,,NA,False,
+S.pneumoniae,81,Norfloxacin (screen only),,NA,NA,,,NA,False,
+S.pneumoniae,82,Ofloxacin,,-,-,,,non_applicabile,False,
+S.pneumoniae,85,Aminoglycosides,,MIC breakpoints (mg/L),,,,non_interpretabile,False,
+S.pneumoniae,87,Amikacin,,-,-,,,non_applicabile,False,
+S.pneumoniae,88,Gentamicin,,-,-,,,non_applicabile,False,
+S.pneumoniae,89,Netilmicin,,-,-,,,non_applicabile,False,
+S.pneumoniae,90,Tobramycin,,-,-,,,non_applicabile,False,
+S.pneumoniae,93,Glycopeptides and lipoglycopeptides,,MIC breakpoints (mg/L),,,,non_interpretabile,False,
+S.pneumoniae,95,Dalbavancin,,IE,IE,,,IE,False,
+S.pneumoniae,96,Oritavancin,,IE,IE,,,IE,False,
+S.pneumoniae,97,Teicoplanin,1,2,2,2.0,2.0,ok,False,
+S.pneumoniae,98,Telavancin,,IE,IE,,,IE,False,
+S.pneumoniae,99,Vancomycin,1,2,2,2.0,2.0,ok,False,
+S.pneumoniae,102,"Macrolides, lincosamides and streptogramins",,MIC breakpoints (mg/L),,,,non_interpretabile,False,
+S.pneumoniae,104,Azithromycin,,0.25,0.25,0.25,0.25,ok,False,"1,1"
+S.pneumoniae,105,Clarithromycin,,0.25,0.25,0.25,0.25,ok,False,"1,1"
+S.pneumoniae,106,Erythromycin,,0.25,0.25,0.25,0.25,ok,False,"1,1"
+S.pneumoniae,107,Roxithromycin,,0.5,0.5,0.5,0.5,ok,False,"1,1"
+S.pneumoniae,108,Clindamycin,2,0.5,0.5,0.5,0.5,ok,False,
+S.pneumoniae,109,Quinupristin-dalfopristin,,-,-,,,non_applicabile,False,
+S.pneumoniae,112,Tetracyclines,,MIC breakpoints (mg/L),,,,non_interpretabile,False,
+S.pneumoniae,114,Doxycycline,,1,1,1.0,1.0,ok,False,"1,1"
+S.pneumoniae,115,Eravacycline,,IE,IE,,,IE,False,
+S.pneumoniae,116,Minocycline,,0.5,0.5,0.5,0.5,ok,False,"1,1"
+S.pneumoniae,117,Tetracycline,,1,1,1.0,1.0,ok,False,"1,1"
+S.pneumoniae,118,Tigecycline,,IE,IE,,,IE,False,
+S.pneumoniae,121,Oxazolidinones,,MIC breakpoints (mg/L),,,,non_interpretabile,False,
+S.pneumoniae,123,Linezolid,,2,2,2.0,2.0,ok,False,
+S.pneumoniae,124,Tedizolid,,IE,IE,,,IE,False,
+S.pneumoniae,127,Miscellaneous agents,,MIC breakpoints (mg/L),,,,non_interpretabile,False,
+S.pneumoniae,129,Chloramphenicol,1,Note,Note,,,nota,False,"1,1"
+S.pneumoniae,130,Colistin,,-,-,,,non_applicabile,False,
+S.pneumoniae,131,Daptomycin,,IE,IE,,,IE,False,
+S.pneumoniae,132,Fosfomycin iv,,IE,IE,,,IE,False,
+S.pneumoniae,133,Fosfomycin oral,,-,-,,,non_applicabile,False,
+S.pneumoniae,134,Fusidic acid,,-,-,,,non_applicabile,False,
+S.pneumoniae,135,Lefamulin,,0.5,0.5,0.5,0.5,ok,False,
+S.pneumoniae,136,Metronidazole,,-,-,,,non_applicabile,False,
+S.pneumoniae,137,Nitrofurantoin (uncomplicated UTI only),,-,-,,,non_applicabile,False,
+S.pneumoniae,138,Nitroxoline (uncomplicated UTI only),,-,-,,,non_applicabile,False,
+S.pneumoniae,139,Rifampicin,,0.125,0.125,0.125,0.125,ok,False,
+S.pneumoniae,140,Spectinomycin,,-,-,,,non_applicabile,False,
+S.pneumoniae,141,Trimethoprim (uncomplicated UTI only),,-,-,,,non_applicabile,False,
+S.pneumoniae,142,Trimethoprim-sulfamethoxazole,2,1,1,1.0,1.0,ok,False,
+Staphylococcus,10,"Benzylpenicillin, S. aureus",,0.125,0.125,0.125,0.125,ok,False,"1,1"
+Staphylococcus,11,"Benzylpenicillin, S. lugdunensis",,0.125,0.125,0.125,0.125,ok,False,
+Staphylococcus,12,"Benzylpenicillin, other staphylococci",,Note,Note,,,nota,False,"2,2"
+Staphylococcus,13,"Ampicillin, S. saprophyticus",,Note,Note,,,nota,False,"2,3,2,3"
+Staphylococcus,14,Ampicillin-sulbactam,,Note,Note,,,nota,False,"1,2,3,1,2,3"
+Staphylococcus,15,Amoxicillin,,Note,Note,,,nota,False,"1,2,3,1,2,3"
+Staphylococcus,16,Amoxicillin-clavulanic acid,,Note,Note,,,nota,False,"1,2,3,1,2,3"
+Staphylococcus,17,Piperacillin,,Note,Note,,,nota,False,"1,2,3,1,2,3"
+Staphylococcus,18,Piperacillin-tazobactam,,Note,Note,,,nota,False,"1,2,3,1,2,3"
+Staphylococcus,19,Ticarcillin-clavulanic acid,,Note,Note,,,nota,False,"1,2,1,2"
+Staphylococcus,20,Temocillin,,-,-,,,non_applicabile,False,
+Staphylococcus,21,"Phenoxymethylpenicillin, S. aureus",,Note,Note,,,nota,False,"1,1"
+Staphylococcus,22,"Phenoxymethylpenicillin, Coagulase-negative staphylococci",,-,-,,,non_applicabile,False,"2,2"
+Staphylococcus,23,"Oxacillin (screen only), S. pseudintermedius, S. intermedius, S. schleiferi and S. coagulans",,NA,NA,,,NA,False,
+Staphylococcus,24,"Oxacillin,other staphylococci",4,Note,Note,,,nota,False,"1,4,1,4"
+Staphylococcus,25,Cloxacillin,,Note,Note,,,nota,False,"1,2,1,2"
+Staphylococcus,26,Dicloxacillin,,Note,Note,,,nota,False,"1,2,1,2"
+Staphylococcus,27,Flucloxacillin,,Note,Note,,,nota,False,"1,2,1,2"
+Staphylococcus,28,Mecillinam oral (pivmecillinam) (uncomplicated UTI only),,-,-,,,non_applicabile,False,
+Staphylococcus,31,Cephalosporins,1,MIC breakpoints (mg/L),,,,non_interpretabile,False,
+Staphylococcus,33,Cefaclor,2,Note,Note,,,nota,False,"1,1"
+Staphylococcus,34,Cefadroxil,,Note,Note,,,nota,False,"1,1"
+Staphylococcus,35,Cefalexin,,Note,Note,,,nota,False,"1,1"
+Staphylococcus,36,Cefazolin,2,Note,Note,,,nota,False,"1,1"
+Staphylococcus,37,Cefepime,2,Note,Note,,,nota,False,"1,1"
+Staphylococcus,38,Cefepime-enmetazobactam,3,Note,Note,,,nota,False,"1,1"
+Staphylococcus,39,Cefiderocol,,-,-,,,non_applicabile,False,
+Staphylococcus,40,Cefixime,,-,-,,,non_applicabile,False,
+Staphylococcus,41,Cefotaxime,2,Note,Note,,,nota,False,"1,1"
+Staphylococcus,42,"Cefoxitin (screen only), S. aureus and coagulase-negative staphylococci except S. epidermidis and S. lugdunensis",,Note,Note,,,nota,False,"4,5,4,5"
+Staphylococcus,43,"Cefoxitin (screen only), S. epidermidis and S. lugdunensis",,Note,Note,,,nota,False,"4,5,4,5"
+Staphylococcus,44,"Cefoxitin (screen only), S. pseudintermedius, S. intermedius, S. schleiferi and S. coagulans",,Note,Note,,,nota,False,"6,6"
+Staphylococcus,45,Cefpodoxime,,Note,Note,,,nota,False,"1,1"
+Staphylococcus,46,"Ceftaroline (indications other than pneumonia), S. aureus",,1,2,1.0,2.0,ok,False,"7,7,8"
+Staphylococcus,47,"Ceftaroline (pneumonia), S. aureus",,1,1,1.0,1.0,ok,False,"7,7"
+Staphylococcus,48,Ceftazidime,,-,-,,,non_applicabile,False,
+Staphylococcus,49,Ceftazidime-avibactam,,-,-,,,non_applicabile,False,
+Staphylococcus,50,Ceftibuten,,-,-,,,non_applicabile,False,
+Staphylococcus,51,"Ceftobiprole, S. aureus",,2,2,2.0,2.0,ok,False,"9,9"
+Staphylococcus,52,Ceftolozane-tazobactam,,-,-,,,non_applicabile,False,
+Staphylococcus,53,Ceftriaxone,2,Note,Note,,,nota,False,"1,1"
+Staphylococcus,54,Cefuroxime iv,2,Note,Note,,,nota,False,"1,1"
+Staphylococcus,55,Cefuroxime oral,,Note,Note,,,nota,False,"1,1"
+Staphylococcus,58,Carbapenems,1,MIC breakpoints (mg/L),,,,non_interpretabile,False,
+Staphylococcus,60,Doripenem,,Note,Note,,,nota,False,"1,1"
+Staphylococcus,61,Ertapenem,,Note,Note,,,nota,False,"1,1"
+Staphylococcus,62,Imipenem,,Note,Note,,,nota,False,"1,1"
+Staphylococcus,63,Imipenem-relebactam,2,Note,Note,,,nota,False,"1,1"
+Staphylococcus,64,Meropenem,,Note,Note,,,nota,False,"1,1"
+Staphylococcus,65,Meropenem-vaborbactam,2,Note,Note,,,nota,False,"1,1"
+Staphylococcus,68,Monobactams,,MIC breakpoints (mg/L),,,,non_interpretabile,False,
+Staphylococcus,70,Aztreonam,,-,-,,,non_applicabile,False,
+Staphylococcus,71,Aztreonam-avibactam,,-,-,,,non_applicabile,False,
+Staphylococcus,74,Fluoroquinolones,1,MIC breakpoints (mg/L),,,,non_interpretabile,False,
+Staphylococcus,76,"Ciprofloxacin, S. aureus",,(0.001),(2),0.001,2.0,ok,True,"2,2"
+Staphylococcus,77,"Ciprofloxacin, Coagulase-negative staphylococci",,(0.001),(2),0.001,2.0,ok,True,"2,2"
+Staphylococcus,78,"Delafloxacin (community-acquired pneumonia), S. aureus",,0.016,0.016,0.016,0.016,ok,False,
+Staphylococcus,79,"Delafloxacin (skin and skin structure infections), S. aureus",,0.25,0.25,0.25,0.25,ok,False,
+Staphylococcus,80,"Levofloxacin, S. aureus",,0.001,1,0.001,1.0,ok,False,
+Staphylococcus,81,"Levofloxacin, Coagulase-negative staphylococci",,0.001,1,0.001,1.0,ok,False,
+Staphylococcus,82,"Moxifloxacin, S. aureus",3,0.25,0.25,0.25,0.25,ok,False,
+Staphylococcus,83,"Moxifloxacin, Coagulase-negative staphylococci",3,0.25,0.25,0.25,0.25,ok,False,
+Staphylococcus,84,Nalidixic acid (screen only),,NA,NA,,,NA,False,
+Staphylococcus,85,Norfloxacin (screen only),,NA,NA,,,NA,False,
+Staphylococcus,86,Ofloxacin,,Note,Note,,,nota,False,"3,3"
+Staphylococcus,89,Aminoglycosides,1,MIC breakpoints (mg/L),,,,non_interpretabile,False,
+Staphylococcus,91,"Amikacin, S. aureus",,(16),(16),16.0,16.0,ok,True,"1,1"
+Staphylococcus,92,"Amikacin, Coagulase-negative staphylococci",,(16),(16),16.0,16.0,ok,True,"1,1"
+Staphylococcus,93,"Gentamicin, S. aureus",,(2),(2),2.0,2.0,ok,True,"1,1"
+Staphylococcus,94,"Gentamicin, Coagulase-negative staphylococci",,(2),(2),2.0,2.0,ok,True,"1,1"
+Staphylococcus,95,Netilmicin,,IE,IE,,,IE,False,
+Staphylococcus,96,"Tobramycin, S. aureus",,(2),(2),2.0,2.0,ok,True,"1,1"
+Staphylococcus,97,"Tobramycin, Coagulase-negative staphylococci",,(2),(2),2.0,2.0,ok,True,"1,1"
+Staphylococcus,100,Glycopeptides and lipoglycopeptides,1,MIC breakpoints (mg/L),,,,non_interpretabile,False,
+Staphylococcus,102,Dalbavancin,2,0.25,0.25,0.25,0.25,ok,False,"3,3"
+Staphylococcus,103,"Oritavancin, S. aureus",2,0.125,0.125,0.125,0.125,ok,False,"3,3"
+Staphylococcus,104,"Teicoplanin, S. aureus",2,2,2,2.0,2.0,ok,False,
+Staphylococcus,105,"Teicoplanin, Coagulase-negative staphylococci",,4,4,4.0,4.0,ok,False,
+Staphylococcus,106,"Telavancin, MRSA",2,0.125,0.125,0.125,0.125,ok,False,"3,3"
+Staphylococcus,107,"Vancomycin, S. aureus",2,2,2,2.0,2.0,ok,False,
+Staphylococcus,108,"Vancomycin, Coagulase-negative staphylococci",2,4,4,4.0,4.0,ok,False,
+Staphylococcus,111,"Macrolides, lincosamides and streptogramins",,MIC breakpoints (mg/L),,,,non_interpretabile,False,
+Staphylococcus,113,Azithromycin,,2,2,2.0,2.0,ok,False,"1,1"
+Staphylococcus,114,Clarithromycin,,1,1,1.0,1.0,ok,False,"1,1"
+Staphylococcus,115,Erythromycin,,1,1,1.0,1.0,ok,False,"1,1"
+Staphylococcus,116,Roxithromycin,,1,1,1.0,1.0,ok,False,"1,1"
+Staphylococcus,117,Clindamycin,2,0.25,0.25,0.25,0.25,ok,False,
+Staphylococcus,118,Quinupristin-dalfopristin,,1,1,1.0,1.0,ok,False,
+Staphylococcus,121,Tetracyclines,,MIC breakpoints (mg/L),,,,non_interpretabile,False,
+Staphylococcus,123,Doxycycline,,1,1,1.0,1.0,ok,False,"1,1"
+Staphylococcus,124,"Eravacycline, S. aureus",,0.25,0.25,0.25,0.25,ok,False,
+Staphylococcus,125,Minocycline,,0.5,0.5,0.5,0.5,ok,False,"1,1"
+Staphylococcus,126,Tetracycline,,1,1,1.0,1.0,ok,False,"1,1"
+Staphylococcus,127,Tigecycline,2,0.5,0.5,0.5,0.5,ok,False,"3,3"
+Staphylococcus,130,Oxazolidinones,,MIC breakpoints (mg/L),,,,non_interpretabile,False,
+Staphylococcus,132,Linezolid,,4,4,4.0,4.0,ok,False,
+Staphylococcus,133,Tedizolid,,0.5,0.5,0.5,0.5,ok,False,1
+Staphylococcus,136,Miscellaneous agents,,MIC breakpoints (mg/L),,,,non_interpretabile,False,
+Staphylococcus,138,Chloramphenicol,,IE,IE,,,IE,False,
+Staphylococcus,139,Colistin,,-,-,,,non_applicabile,False,
+Staphylococcus,140,"Daptomycin, S. aureus",1,1,1,1.0,1.0,ok,False,"2,2"
+Staphylococcus,141,"Daptomycin, other staphylococci",,Note,Note,,,nota,False,"3,3"
+Staphylococcus,142,Fosfomycin iv,,Note,Note,,,nota,False,"4,4"
+Staphylococcus,143,Fosfomycin oral,,-,-,,,non_applicabile,False,
+Staphylococcus,144,Fusidic acid,,1,1,1.0,1.0,ok,False,
+Staphylococcus,145,"Gepotidacin (uncomplicated UTI only), S. saprophyticus",,0.25,0.25,0.25,0.25,ok,False,
+Staphylococcus,146,"Lefamulin, S. aureus",,0.25,0.25,0.25,0.25,ok,False,
+Staphylococcus,147,Metronidazole,,-,-,,,non_applicabile,False,
+Staphylococcus,148,"Nitrofurantoin (uncomplicated UTI only), S. saprophyticus",,64,64,64.0,64.0,ok,False,
+Staphylococcus,149,"Nitroxoline (uncomplicated UTI only), S. saprophyticus",,IE,IE,,,IE,False,
+Staphylococcus,150,"Rifampicin, S. aureus",,0.06,0.06,0.06,0.06,ok,False,
+Staphylococcus,151,"Rifampicin, Coagulase-negative staphylococci",,0.06,0.06,0.06,0.06,ok,False,
+Staphylococcus,152,Spectinomycin,,-,-,,,non_applicabile,False,
+Staphylococcus,153,Trimethoprim (uncomplicated UTI only),,2,2,2.0,2.0,ok,False,
+Staphylococcus,154,Trimethoprim-sulfamethoxazole,5,0.5,0.5,0.5,0.5,ok,False,

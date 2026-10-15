@@ -360,9 +360,9 @@ def build_and_validate(raw: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame, d
         else pd.DataFrame(columns=["isolate_id", "antibiotic", "result", "result_raw", "result_source",
                                    "mic_raw", "mic_operator", "mic_value"])
     )
-    _interpret_missing_categories(ast, isolates, report)
+    _harmonize(ast, isolates, report)
 
-    if isolates.empty or ast["result"].notna().sum() == 0:
+    if isolates.empty or ast["result_harmonized"].notna().sum() == 0:
         report["errors"].append("Nessun isolato valido con risultati S/I/R dopo la validazione.")
         report["stats"] = {"rows_read": int(n_rows)}
         raise DatasetValidationError(report | {"issue_summary": issues.summary()})
@@ -383,7 +383,7 @@ def build_and_validate(raw: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame, d
             + ", ".join(f"{p}/{a} ({n})" for (p, a), n in combos.items())
         )
 
-    report["stats"] = _stats(n_rows, isolates, ast, antibiotics)
+    report["stats"] = _stats(n_rows, isolates, ast, antibiotics) | {"harmonization": report["stats"]["harmonization"]}
     pts = report["stats"]
     if pts.get("repeat_isolates", 0):
         report["info"].append(
@@ -397,29 +397,45 @@ def build_and_validate(raw: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame, d
     return isolates, ast, report, issues.frame()
 
 
-def _interpret_missing_categories(ast: pd.DataFrame, isolates: pd.DataFrame, report: dict) -> None:
-    """Fill S/I/R from EUCAST breakpoints where only the MIC was reported (in place)."""
-    pending = ast["result"].isna() & ast["mic_value"].notna() & ~ast["result_raw"].str.upper().isin(INSUFFICIENT_EVIDENCE_CODES)
-    if not pending.any():
-        return
-    pathogen = ast.loc[pending, "isolate_id"].map(isolates.set_index("isolate_id")["microorganismo"])
-    derived = interpret_mic(ast.loc[pending, "antibiotic"], pathogen,
-                            ast.loc[pending, "mic_operator"], ast.loc[pending, "mic_value"])
-    filled = derived.dropna()
-    ast.loc[filled.index, "result"] = filled
-    ast.loc[filled.index, "result_source"] = "eucast_calcolato"
-    if not filled.empty:
-        per_abx = ast.loc[filled.index].groupby("antibiotic").size()
+def _harmonize(ast: pd.DataFrame, isolates: pd.DataFrame, report: dict) -> None:
+    """Add the harmonised reading (one EUCAST version) next to the reported one, in place.
+
+    result              S/I/R as reported by the laboratory (breakpoints of that year)
+    result_harmonized   S/I/R/NR from the MIC with EUCAST v<BREAKPOINTS_VERSION>; the
+                        reported result where the MIC is missing or not interpretable
+    harmonized_source   "mic" or "refertato"
+    intrinsic           pathogen x antibiotic with intrinsic resistance (excluded from models)
+    """
+    pathogen = ast["isolate_id"].map(isolates.set_index("isolate_id")["microorganismo"])
+    from_mic = interpret_mic(ast["antibiotic"], pathogen, ast["mic_operator"], ast["mic_value"])
+    fallback = from_mic.isna() & ast["result"].notna()
+    ast["result_harmonized"] = from_mic.where(~fallback, ast["result"])
+    ast["harmonized_source"] = pd.Series(np.where(from_mic.notna(), "mic", np.where(fallback, "refertato", None)),
+                                         index=ast.index)
+    intrinsic_pairs = {
+        f"{p}|{code}"
+        for p, classes in INTRINSIC_RESISTANCE_EXCLUSIONS.items()
+        for cls in classes
+        for code in ANTIBIOTIC_CLASS_CODES.get(cls, [])
+    }
+    ast["intrinsic"] = (pathogen + "|" + ast["antibiotic"]).isin(intrinsic_pairs)
+
+    both = from_mic.notna() & ast["result"].notna()
+    discordant = both & (from_mic.eq("R") != ast["result"].eq("R"))
+    report["stats"]["harmonization"] = {
+        "breakpoints": f"EUCAST v{BREAKPOINTS_VERSION}",
+        "from_mic": int(from_mic.notna().sum()),
+        "fallback_reported": int(fallback.sum()),
+        "undetermined": int(ast["result_harmonized"].isna().sum()),
+        "compared": int(both.sum()),
+        "discordant_r": int(discordant.sum()),
+    }
+    if both.any():
         report["info"].append(
-            f"Categoria S/I/R calcolata con breakpoint {BREAKPOINTS_VERSION} per {len(filled)} MIC refertate senza "
-            "interpretazione: " + ", ".join(f"{a} ({n})" for a, n in per_abx.items())
-        )
-    left = int(pending.sum() - len(filled))
-    if left:
-        per_abx = ast.loc[pending & ast["result"].isna()].groupby("antibiotic").size().sort_values(ascending=False)
-        report["info"].append(
-            f"{left} MIC restano senza categoria (breakpoint assente/IE per quel microrganismo o MIC censurata ambigua): "
-            + ", ".join(f"{a} ({n})" for a, n in per_abx.head(15).items())
+            f"Lettura armonizzata EUCAST v{BREAKPOINTS_VERSION}: {int(from_mic.notna().sum())} risultati dalla MIC, "
+            f"{int(fallback.sum())} dal refertato (MIC assente o non interpretabile). "
+            f"R/non-R diverso dal refertato in {int(discordant.sum())} casi su {int(both.sum())} "
+            "(effetto dei cambi di breakpoint negli anni)."
         )
 
 

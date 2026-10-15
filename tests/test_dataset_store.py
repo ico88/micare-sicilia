@@ -93,13 +93,18 @@ def test_read_and_validate_keeps_codes_and_parses_mic(xlsx_path):
     assert quirky_issues == {"info"}
 
     derived = ast[ast["isolate_id"].isin([8, 9])].set_index(["isolate_id", "antibiotic"])
-    assert derived.loc[(8, "COL"), ["result", "result_source"]].tolist() == ["S", "eucast_calcolato"]
-    assert derived.loc[(9, "COL"), ["result", "result_source"]].tolist() == ["R", "eucast_calcolato"]
-    assert pd.isna(derived.loc[(8, "MEM"), "result"])  # no breakpoint in the table: left uninterpreted
+    # Reported result stays as the laboratory gave it; the harmonised one comes from the MIC (EUCAST v16.1)
+    assert pd.isna(derived.loc[(8, "COL"), "result"])
+    assert derived.loc[(8, "COL"), ["result_harmonized", "harmonized_source"]].tolist() == ["S", "mic"]
+    assert derived.loc[(9, "COL"), ["result_harmonized", "harmonized_source"]].tolist() == ["R", "mic"]
+    assert derived.loc[(8, "MEM"), "result_harmonized"] == "R"  # >8 with Acinetobacter R > 8
     assert derived.loc[(8, "FOX"), ["result", "result_source"]].tolist() == ["R", "screening_fox"]
     assert derived.loc[(9, "FOX"), "result"] == "S"
     assert pd.isna(derived.loc[(9, "FOX"), "mic_value"])
     assert ast.loc[ast["isolate_id"] == 0, "result_source"].eq("laboratorio").all()
+    # FOX screen has no MIC breakpoint: the harmonised reading falls back to the reported one
+    assert derived.loc[(8, "FOX"), ["result_harmonized", "harmonized_source"]].tolist() == ["R", "refertato"]
+    assert report["stats"]["harmonization"]["breakpoints"] == "EUCAST v16.1"
 
 
 def test_missing_required_columns_blocks_import(tmp_path):
@@ -175,3 +180,23 @@ def test_censored_mic_interpretation_is_conservative():
     assert out.tolist()[:4] == ["S", "R", "S", "R"]
     assert pd.isna(out.iloc[4]) and pd.isna(out.iloc[5])
     assert out.iloc[6] == "R"
+
+
+def test_censored_mic_below_r_breakpoint_is_not_resistant():
+    from app.services.breakpoints import interpret_mic
+
+    # P. aeruginosa ciprofloxacin: S <= 0.001 (no S category), R > 0.5
+    out = interpret_mic(pd.Series(["CIP", "CIP"]), pd.Series(["PSEAER", "PSEAER"]),
+                        pd.Series(["<=", "="]), pd.Series([0.25, 0.5]))
+    assert out.tolist() == ["NR", "I"]
+
+
+def test_breakpoint_table_reads_footnotes_apart():
+    from app.services.breakpoints import load_breakpoints
+
+    table = load_breakpoints()
+    # In the workbook these cells are "8" + superscript footnote; read naively they become 84 / 85
+    assert table[("AMC", "ESCCOL")] == (8.0, 8.0)
+    assert table[("TZP", "KLEPNE")] == (8.0, 8.0)
+    assert table[("TGC", "ENTFCM")] == (0.5, 0.5)
+    assert table[("COL", "PSEAER")] == (4.0, 4.0)

@@ -42,3 +42,6 @@ update.log
 
 # Build artifacts
 *.egg-info/
+
+# Reference data shipped with the app (EUCAST breakpoints)
+!app/resources/**/*.csv
