@@ -16,7 +16,7 @@ import numpy as np
 import pandas as pd
 
 from .breakpoints import BREAKPOINTS_VERSION, breakpoint_table
-from .dataset_store import load_ast_results, load_isolates
+from .dataset_store import first_isolate_mask, load_ast_results, load_isolates
 from .series import MIN_ISOLATES_PER_PERIOD, build_series, cumulative_antibiogram
 
 DIAGNOSTIC_VERSION = 1
@@ -28,6 +28,7 @@ SHEET_NOTES = {
     "Combinazioni": "Una riga per laboratorio x microrganismo x antibiotico: quanti dati ci sono e se bastano per una previsione trimestrale.",
     "Serie trimestrali": "Resistenza per trimestre (primo isolato per paziente, reparti sommati, intrinseche escluse). n = isolati testati.",
     "Serie mensili": "Come le serie trimestrali, per mese. Utile solo dove i numeri sono alti.",
+    "Composizione": "Primi isolati per anno, per materiale e per tipo di paziente: un cambio di composizione cambia la % R senza che i batteri cambino.",
     "Antibiogramma": "Antibiogramma cumulativo annuale (CLSI M39): da confrontare con i report dei laboratori.",
     "Breakpoint": f"Riga EUCAST v{BREAKPOINTS_VERSION} usata per ogni coppia e quanto la lettura armonizzata differisce dal refertato.",
     "Breakpoint per anno": "Quota di risultati in cui R/non-R cambia rileggendo la MIC con la versione attuale: i salti indicano cambi di breakpoint.",
@@ -59,6 +60,7 @@ def build_diagnostic(dataset_folder: str | Path, uploads: list[dict], app_versio
     monthly = build_series(folder, "M")
     sheets["Leggimi"] = _readme(app_version, uploads, isolates, quarterly)
     sheets["Combinazioni"] = _combinations(quarterly)
+    sheets["Composizione"] = _composition(isolates)
     sheets["Serie trimestrali"] = _series_sheet(quarterly)
     sheets["Serie mensili"] = _series_sheet(monthly)
     sheets["Antibiogramma"] = _antibiogram_sheet(cumulative_antibiogram(folder))
@@ -121,6 +123,20 @@ def _combinations(quarterly: pd.DataFrame) -> pd.DataFrame:
         "pct_r_armonizzato_ultimi_12_mesi": "% R armonizzato ultimi 12 mesi",
         "modellabile_trimestrale": "Dati sufficienti per previsione trimestrale",
     }))
+
+
+def _composition(isolates: pd.DataFrame) -> pd.DataFrame:
+    first = isolates[first_isolate_mask(isolates, "Y")].assign(anno=lambda d: d["data_prelievo"].dt.year)
+    parts = []
+    for column, label in [("materiale", "Materiale"), ("paziente_ricoverato", "Paziente ricoverato")]:
+        table = first.pivot_table(index=["microorganismo", column], columns="anno", values="isolate_id",
+                                  aggfunc="size", fill_value=0)
+        table = table.reset_index().rename(columns={"microorganismo": "Microrganismo", column: "Codice"})
+        table.insert(1, "Variabile", label)
+        parts.append(table)
+    out = pd.concat(parts, ignore_index=True)
+    out.columns = [str(c) for c in out.columns]
+    return out
 
 
 def _series_sheet(series: pd.DataFrame) -> pd.DataFrame:

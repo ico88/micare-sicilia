@@ -51,6 +51,22 @@ ANTIBIOTIC_NAMES: dict[str, str] = {
 }
 
 
+# Pairs where the laboratory category rests on more than the MIC (expert rules), so a
+# MIC re-read would be wrong; their harmonised reading is the reported one.
+#   S. aureus clindamycin: inducible MLSB resistance (D-test) is reported R with a low MIC
+NOT_HARMONIZABLE: set[tuple[str, str]] = {("CLI", "STAAUR")}
+
+# Trimethoprim-sulfamethoxazole MICs are sometimes written as the sum of both
+# components (1/19 -> "20", 8/152 -> "160"); EUCAST breakpoints refer to trimethoprim.
+_SXT_SUMS = {10.0: 0.5, 20.0: 1.0, 40.0: 2.0, 80.0: 4.0, 160.0: 8.0, 320.0: 16.0}
+
+
+def normalize_sxt_mic(value: pd.Series, raw: pd.Series) -> pd.Series:
+    """Trimethoprim component of an SXT MIC written as a combined sum (no '/')."""
+    combined = ~raw.astype(str).str.contains("/") & value.isin(list(_SXT_SUMS))
+    return value.where(~combined, value.map(_SXT_SUMS))
+
+
 @lru_cache(maxsize=4)
 def load_breakpoints(version: str = BREAKPOINTS_VERSION) -> dict[tuple[str, str], tuple[float, float]]:
     """(antibiotic, pathogen) -> (S <=, R >) for pairs with numeric breakpoints."""
@@ -92,4 +108,5 @@ def interpret_mic(antibiotic: pd.Series, pathogen: pd.Series,
     out[at_most & (value <= s_le)] = "S"
     out[exact & (value > s_le) & (value <= r_gt)] = "I"
     out[(op.eq(">") & (value >= r_gt)) | (op.isin(["=", ">="]) & (value > r_gt))] = "R"
-    return out.where(s_le.notna() & value.notna())
+    blocked = pd.Series([k in NOT_HARMONIZABLE for k in keys], index=value.index)
+    return out.where(s_le.notna() & value.notna() & ~blocked)

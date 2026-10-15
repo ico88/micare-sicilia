@@ -20,7 +20,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from app.services.breakpoints import BREAKPOINTS_VERSION, interpret_mic
+from app.services.breakpoints import BREAKPOINTS_VERSION, interpret_mic, normalize_sxt_mic
 from micare_sicilia.config import ANTIBIOTIC_CLASS_CODES, INTRINSIC_RESISTANCE_EXCLUSIONS
 
 QUAL_SUFFIX = "_QUALITATIVO"
@@ -407,6 +407,8 @@ def _harmonize(ast: pd.DataFrame, isolates: pd.DataFrame, report: dict) -> None:
     intrinsic           pathogen x antibiotic with intrinsic resistance (excluded from models)
     """
     pathogen = ast["isolate_id"].map(isolates.set_index("isolate_id")["microorganismo"])
+    sxt = ast["antibiotic"].eq("SXT")
+    ast.loc[sxt, "mic_value"] = normalize_sxt_mic(ast.loc[sxt, "mic_value"], ast.loc[sxt, "mic_raw"])
     from_mic = interpret_mic(ast["antibiotic"], pathogen, ast["mic_operator"], ast["mic_value"])
     fallback = from_mic.isna() & ast["result"].notna()
     ast["result_harmonized"] = from_mic.where(~fallback, ast["result"])

@@ -208,3 +208,20 @@ def test_breakpoint_table_reads_footnotes_apart():
     assert table[("TZP", "KLEPNE")] == (8.0, 8.0)
     assert table[("TGC", "ENTFCM")] == (0.5, 0.5)
     assert table[("COL", "PSEAER")] == (4.0, 4.0)
+
+
+def test_sxt_combined_sum_is_read_as_trimethoprim():
+    from app.services.breakpoints import normalize_sxt_mic
+
+    values = pd.Series([20.0, 160.0, 1.0, 0.5, 16.0])
+    raw = pd.Series(["<=20", ">160", "<=1/19", "0.5", ">16"])
+    assert normalize_sxt_mic(values, raw).tolist() == [1.0, 8.0, 1.0, 0.5, 16.0]
+
+
+def test_staph_clindamycin_keeps_reported_result():
+    from app.services.breakpoints import interpret_mic
+
+    # Inducible resistance (D-test) is reported R with a low MIC: no MIC re-read
+    out = interpret_mic(pd.Series(["CLI", "ERY"]), pd.Series(["STAAUR", "STAAUR"]),
+                        pd.Series(["<=", "<="]), pd.Series([0.12, 0.25]))
+    assert pd.isna(out.iloc[0]) and out.iloc[1] == "S"
