@@ -92,7 +92,7 @@ def test_pages_before_and_after_computing(client, tmp_path):
     http, app = client
     page = http.get("/previsioni")
     assert page.status_code == 200
-    assert "non sono ancora state calcolate" in page.get_data(as_text=True)
+    assert "Non ci sono ancora dati" in page.get_data(as_text=True)
 
     _store(app.config["DATASET_FOLDER"])
     response = http.post("/previsioni/calcola")
@@ -130,4 +130,61 @@ def test_reset_removes_stored_forecasts(client):
     assert load_forecasts(app.config["FORECAST_FOLDER"]) is not None
     http.post("/reset-db")
     assert load_forecasts(app.config["FORECAST_FOLDER"]) is None
-    assert "non sono ancora state calcolate" in http.get("/previsioni").get_data(as_text=True)
+    assert "Non ci sono ancora dati" in http.get("/previsioni").get_data(as_text=True)
+
+
+def _mark_imported(app, folder, upload_id=1, date_to="2024-12-30"):
+    """An imported upload with its validation report, as the upload route leaves it."""
+    from app.models import UploadedFile
+
+    with app.app_context():
+        db.session.add(UploadedFile(id=upload_id, filename="x.xlsx", original_name="rete_mic.xlsx", status="imported"))
+        db.session.commit()
+    report = {"errors": [], "warnings": [], "info": [],
+              "stats": {"rows_read": 1203, "isolates_valid": 1200, "rows_excluded": 3, "ast_results": 1200,
+                        "mic_values": 0, "antibiotics": ["CTX"], "date_from": "2019-01-02", "date_to": date_to,
+                        "laboratories": 2, "hospitals": 2, "isolates_per_year": {2019: 200}}}
+    dataset_store.save_report(folder, upload_id, report, pd.DataFrame())
+
+
+def test_guide_shows_one_step_to_do_now(client):
+    http, app = client
+    html = http.get("/").get_data(as_text=True)
+    assert "Percorso guidato" in html and "Carica il file Excel esportato" in html
+    assert html.count("Fai questo ora") == 1
+
+    folder = app.config["DATASET_FOLDER"]
+    _store(folder)
+    _mark_imported(app, folder)
+    html = http.get("/").get_data(as_text=True)
+    assert "Calcola le previsioni (passo 3)" in html and html.count("Fai questo ora") == 1
+    assert "1.200 isolati" in html and "30/12/2024" in html
+
+    http.post("/previsioni/calcola")
+    html = http.get("/").get_data(as_text=True)
+    # Data end long before today: ready, but the operator is told to load newer data
+    assert "carica l'export aggiornato" in html
+    assert "Apri le previsioni" in html
+    assert 'class="steps-bar' in http.get("/previsioni").get_data(as_text=True)
+
+
+def test_workflow_state_order():
+    from datetime import date
+    from types import SimpleNamespace
+
+    from app.services.workflow import workflow_state
+
+    empty = workflow_state("/nonexistent", "/nonexistent", [], today=date(2025, 1, 1))
+    assert empty["current"] == "carica"
+    assert empty["status"] == {"carica": "ora", "controlla": "dopo", "calcola": "dopo", "leggi": "dopo"}
+    assert empty["data"] is None
+
+
+def test_validation_page_points_to_next_step(client):
+    http, app = client
+    folder = app.config["DATASET_FOLDER"]
+    _store(folder)
+    _mark_imported(app, folder)
+    html = http.get("/upload/1/validazione").get_data(as_text=True)
+    assert "Prossimo passo: calcola le previsioni" in html
+    assert 'action="/previsioni/calcola"' in html

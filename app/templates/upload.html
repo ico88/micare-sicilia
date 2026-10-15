@@ -2,8 +2,8 @@
 {% block title %}Gestione dati - MIC RES Sicilia{% endblock %}
 {% block content %}
 <div class="mb-3">
-  <h1 class="h4 mb-1">Gestione dati</h1>
-  <div class="text-muted">Carica i file Excel della Rete MIC e avvia l'addestramento dei modelli.</div>
+  <h1 class="page-heading mb-1">Gestione dati</h1>
+  <div class="text-muted">Elenco dei file caricati e operazioni sull'archivio. Per il lavoro di tutti i giorni usa il <a href="{{ url_for('guide.home') }}">percorso guidato</a>.</div>
 </div>
 
 <div class="row g-4">
@@ -12,7 +12,7 @@
     <section class="panel">
       <h2 class="h6 mb-1">1 · Carica file Excel</h2>
       <p class="text-muted small mb-3">Seleziona l'export della Rete MIC (.xlsx, anche più anni in un unico file). Il file viene validato e archiviato integralmente (paziente, reparto, materiale, MIC) per tutti i modelli. Un file da ~40 MB può richiedere qualche minuto.</p>
-      <form method="post" enctype="multipart/form-data">
+      <form method="post" enctype="multipart/form-data" data-busy="Caricamento e controllo del file in corso. Può richiedere qualche minuto: non chiudere la pagina.">
         <input class="form-control" id="dataset" name="dataset" type="file" accept=".csv,.xls,.xlsx" required>
         <button class="btn btn-primary mt-3 w-100" type="submit">Carica e importa</button>
       </form>
@@ -20,10 +20,13 @@
 
     {% if has_imports %}
     <section class="panel mt-3">
-      <h2 class="h6 mb-1">2 · Addestra i modelli predittivi</h2>
-      <p class="text-muted small mb-3">Una volta caricati tutti gli anni, avvia l'addestramento. L'operazione richiede alcuni minuti.</p>
-      <form method="post" action="{{ url_for('dashboard.train') }}">
-        <button class="btn btn-success w-100" type="submit">Avvia addestramento</button>
+      <h2 class="h6 mb-1">2 · Calcola le previsioni</h2>
+      <p class="text-muted small mb-3">Dopo ogni caricamento ricalcola le previsioni. Richiede circa un minuto.</p>
+      <form method="post" action="{{ url_for('forecasts.compute') }}" data-busy="Calcolo delle previsioni in corso, circa un minuto. Non chiudere la pagina.">
+        <button class="btn btn-primary w-100" type="submit">Calcola le previsioni</button>
+      </form>
+      <form class="mt-2" method="post" action="{{ url_for('dashboard.train') }}">
+        <button class="btn btn-link btn-sm text-muted p-0" type="submit">Addestra i modelli precedenti (non validati)</button>
       </form>
     </section>
     {% endif %}

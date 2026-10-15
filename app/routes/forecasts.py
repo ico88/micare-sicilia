@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from flask import Blueprint, abort, current_app, flash, redirect, render_template, request, url_for
 
+from app.routes.guide import current_workflow
 from app.services.forecast_run import archive_signature, compute_forecasts, load_forecasts, save_forecasts
 
 bp = Blueprint("forecasts", __name__)
@@ -46,7 +47,7 @@ def past_test_sentence(f: dict) -> str:
 def overview():
     data = load_forecasts(_folder())
     if not data or not data["meta"].get("available"):
-        return render_template("forecasts.html", data=None)
+        return render_template("forecasts.html", data=None, wf=current_workflow())
     combos = data["combinations"]
     pathogens = sorted({(c["microorganismo"], c["microorganismo_nome"]) for c in combos}, key=lambda p: p[1])
     selected = request.args.get("microrganismo") or (pathogens[0][0] if pathogens else "")
@@ -63,7 +64,7 @@ def overview():
                              r["combo"]["antibiotico_nome"]))
     stale = data["meta"].get("archivio") != archive_signature(current_app.config["DATASET_FOLDER"])
     return render_template("forecasts.html", data=data, rows=rows, pathogens=pathogens, selected=selected,
-                           horizon=horizon, horizons=HORIZONS, traffic=TRAFFIC, stale=stale)
+                           horizon=horizon, horizons=HORIZONS, traffic=TRAFFIC, stale=stale, wf=current_workflow())
 
 
 @bp.get("/previsioni/<pathogen>/<antibiotic>")
@@ -85,10 +86,10 @@ def detail(pathogen: str, antibiotic: str):
 def compute():
     result = compute_forecasts(current_app.config["DATASET_FOLDER"])
     if not result["meta"].get("available"):
-        flash("Nessun dato in archivio: caricare prima l'export della Rete MIC.", "warning")
-        return redirect(url_for("upload.upload"))
+        flash("Nessun dato in archivio: carica prima l'export della Rete MIC (passo 1).", "warning")
+        return redirect(url_for("guide.home"))
     save_forecasts(result, _folder())
     meta = result["meta"]
-    flash(f"Previsioni calcolate: {meta['con_previsione']} combinazioni su {meta['combinazioni']}, "
-          f"dati fino al {meta['dati_fino_al']}.", "success")
+    flash(f"Passo 3 completato: previsioni calcolate per {meta['con_previsione']} combinazioni, "
+          f"dati fino al {meta['dati_fino_al']}. Ora scegli un microrganismo e leggi la tabella.", "success")
     return redirect(url_for("forecasts.overview"))

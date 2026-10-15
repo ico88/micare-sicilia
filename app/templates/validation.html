@@ -1,12 +1,28 @@
 {% extends "base.html" %}
-{% block title %}Validazione dati - MIC RES Sicilia{% endblock %}
+{% block title %}Controllo dati - MIC RES Sicilia{% endblock %}
 {% block content %}
-<div class="d-flex justify-content-between align-items-center mb-3">
-  <div>
-    <h1 class="h4 mb-1">Validazione dati</h1>
-    <div class="text-muted">{{ uploaded.original_name }} · {{ uploaded.message }}</div>
-  </div>
-  <a class="btn btn-outline-secondary" href="{{ url_for('upload.upload') }}">Gestione dati</a>
+{% set here = 'controlla' %}{% include "_steps_bar.html" %}
+<div class="mb-3">
+  <h1 class="page-heading mb-1">Controllo dei dati</h1>
+  <div class="text-muted">{{ uploaded.original_name }} · {{ uploaded.message }}</div>
 </div>
+
+{% if uploaded.status == 'imported' %}
+  <div class="next-step mb-3">
+    <div>
+      <div class="fw-semibold">Il file è stato caricato. Prossimo passo: calcola le previsioni.</div>
+      <div class="small text-muted">Leggi qui sotto l'esito del controllo{% if report.warnings %}: gli avvisi in giallo di solito non bloccano il calcolo{% endif %}. Il calcolo richiede circa un minuto.</div>
+    </div>
+    <form method="post" action="{{ url_for('forecasts.compute') }}" data-busy="Calcolo delle previsioni in corso, circa un minuto. Non chiudere la pagina.">
+      <button class="btn btn-primary btn-lg" type="submit">Calcola le previsioni</button>
+    </form>
+  </div>
+{% else %}
+  <div class="alert alert-danger d-flex justify-content-between align-items-center gap-3 flex-wrap">
+    <span><strong>Il file non è stato caricato.</strong> Leggi gli errori qui sotto, correggi il file e caricalo di nuovo.</span>
+    <a class="btn btn-outline-danger btn-sm" href="{{ url_for('guide.home') }}#passo-carica">Torna al passo 1</a>
+  </div>
+{% endif %}
+
 {% include "_validation_report.html" %}
 {% endblock %}

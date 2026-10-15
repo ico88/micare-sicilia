@@ -16,14 +16,10 @@ from app.services import dataset_store
 from app.services.database import aggregated_to_db, observation_month_totals_from_db, observations_to_db
 from app.services.diagnostics import build_diagnostic
 from app.services.forecast_run import RESULT_FILE
+from app.routes.guide import current_workflow
 from app.services.preprocessing import aggregate_observations, load_tabular_file, normalize_uploaded_dataframe
 
 bp = Blueprint("upload", __name__)
-
-
-@bp.get("/")
-def index():
-    return redirect(url_for("pipeline.wizard"))
 
 
 @bp.route("/upload", methods=["GET", "POST"])
@@ -38,7 +34,7 @@ def upload():
     incoming = request.files.get("dataset")
     if not incoming or incoming.filename == "":
         flash("Seleziona un file CSV/XLSX.", "danger")
-        return redirect(url_for("upload.upload"))
+        return redirect(url_for("guide.home"))
 
     filename = secure_filename(incoming.filename)
     upload_dir = Path(current_app.config["UPLOAD_FOLDER"])
@@ -55,7 +51,7 @@ def upload():
         db.session.add(uploaded)
         db.session.commit()
         flash(uploaded.message, "warning")
-        return redirect(url_for("upload.upload"))
+        return redirect(url_for("guide.home"))
 
     saved_path = upload_dir / f"{uuid.uuid4().hex}_{filename}"
     incoming.save(saved_path)
@@ -94,6 +90,9 @@ def upload():
         aggregated_to_db(aggregated)
         db.session.commit()
         flash(uploaded.message, "success")
+        if report:
+            # Guided path: the next thing to do is read the outcome of the check
+            return redirect(url_for("upload.validation_report", upload_id=uploaded_id))
         return render_template(
             "preview.html",
             uploaded=uploaded,
@@ -119,7 +118,7 @@ def upload():
         uploaded.message = str(exc)
         db.session.commit()
         flash(f"Errore import: {exc}", "danger")
-        return redirect(url_for("upload.upload"))
+        return redirect(url_for("guide.home"))
 
 
 @bp.get("/diagnostico.xlsx")
@@ -143,7 +142,8 @@ def validation_report(upload_id: int):
     uploaded = db.session.get(UploadedFile, upload_id) or abort(404)
     report = dataset_store.load_report(current_app.config["DATASET_FOLDER"], upload_id) or abort(404)
     has_issues = dataset_store.issues_path(current_app.config["DATASET_FOLDER"], upload_id).exists()
-    return render_template("validation.html", uploaded=uploaded, report=report, has_issues=has_issues)
+    return render_template("validation.html", uploaded=uploaded, report=report, has_issues=has_issues,
+                           wf=current_workflow())
 
 
 @bp.get("/upload/<int:upload_id>/anomalie.csv")
@@ -177,7 +177,7 @@ def reset_db():
             shutil.rmtree(item, ignore_errors=True)
 
     flash("Database e modelli azzerati. Puoi ricaricare i file Excel.", "success")
-    return redirect(url_for("upload.upload"))
+    return redirect(url_for("guide.home"))
 
 
 def _uploaded_file_hash(incoming) -> str:

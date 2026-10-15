@@ -1,0 +1,136 @@
+{% extends "base.html" %}
+{% block title %}Percorso guidato - MIC RES Sicilia{% endblock %}
+{% block content %}
+{% set d = wf.data %}{% set fc = wf.forecasts %}{% set s = wf.status %}
+<div class="mb-3">
+  <h1 class="page-heading mb-1">Percorso guidato</h1>
+  <div class="text-muted">Quattro passi, sempre nello stesso ordine. Il passo da fare è evidenziato.</div>
+</div>
+
+<div class="now-box mb-4">
+  <div class="now-label">Cosa fare adesso</div>
+  <div class="now-text">
+    {% if wf.current == 'carica' %}Carica il file Excel esportato dalla Rete MIC (passo 1).
+    {% elif wf.current == 'calcola' %}{% if wf.stale %}I dati sono cambiati: ricalcola le previsioni (passo 3).{% else %}Calcola le previsioni (passo 3).{% endif %}
+    {% elif d and d.old %}Le previsioni sono pronte, ma i dati finiscono il {{ d.date_to }}: carica l'export aggiornato (passo 1) e poi ricalcola.
+    {% else %}Le previsioni sono pronte: aprile (passo 4).{% endif %}
+  </div>
+</div>
+
+<div class="row g-4">
+  <div class="col-xl-8">
+
+    {# ---------------- 1 Carica ---------------- #}
+    <section class="guide-step {{ s.carica }}" id="passo-carica">
+      <div class="step-num {{ s.carica }}">{% if s.carica == 'fatto' %}&#10003;{% else %}1{% endif %}</div>
+      <div class="step-body">
+        <div class="d-flex justify-content-between align-items-start gap-2">
+          <div class="step-title">1. Carica i dati</div>
+          {% if s.carica == 'ora' %}<span class="badge text-bg-primary">Fai questo ora</span>{% else %}<span class="badge text-bg-success">Fatto</span>{% endif %}
+        </div>
+        {% if s.carica == 'ora' %}
+          <p class="step-desc">Scegli il file Excel (o CSV) esportato dalla Rete MIC. Può contenere più anni. Un file di circa 40 MB richiede qualche minuto: non chiudere la pagina.</p>
+          <form method="post" action="{{ url_for('upload.upload') }}" enctype="multipart/form-data" data-busy="Caricamento e controllo del file in corso. Può richiedere qualche minuto: non chiudere la pagina.">
+            <input class="form-control" name="dataset" type="file" accept=".csv,.xls,.xlsx" required>
+            <button class="btn btn-primary btn-lg mt-3" type="submit">Carica il file</button>
+          </form>
+        {% else %}
+          <p class="step-desc mb-1">In archivio: <strong>{{ "{:,}".format(d.isolates).replace(",", ".") }} isolati</strong> dal {{ d.date_from }} al <strong>{{ d.date_to }}</strong>, {{ d.laboratories }} laboratori ({{ d.files }} file {{ "caricato" if d.files == 1 else "caricati" }}).</p>
+          {% if d.old %}
+            <div class="alert alert-warning small py-2 mb-2">I dati finiscono il {{ d.date_to }}. Per previsioni sul periodo attuale carica l'export più recente.</div>
+          {% endif %}
+          <details {% if d.old %}open{% endif %}>
+            <summary class="small">Aggiungi un file più recente</summary>
+            <form class="mt-2" method="post" action="{{ url_for('upload.upload') }}" enctype="multipart/form-data" data-busy="Caricamento e controllo del file in corso. Può richiedere qualche minuto: non chiudere la pagina.">
+              <input class="form-control form-control-sm" name="dataset" type="file" accept=".csv,.xls,.xlsx" required>
+              <button class="btn btn-outline-primary btn-sm mt-2" type="submit">Carica il file</button>
+              <div class="form-text">Lo stesso file caricato due volte viene riconosciuto e ignorato.</div>
+            </form>
+          </details>
+        {% endif %}
+      </div>
+    </section>
+
+    {# ---------------- 2 Controlla ---------------- #}
+    <section class="guide-step {{ s.controlla }}" id="passo-controlla">
+      <div class="step-num {{ s.controlla }}">{% if s.controlla == 'fatto' %}&#10003;{% elif s.controlla == 'attenzione' %}!{% else %}2{% endif %}</div>
+      <div class="step-body">
+        <div class="d-flex justify-content-between align-items-start gap-2">
+          <div class="step-title">2. Controlla i dati</div>
+          {% if s.controlla == 'fatto' %}<span class="badge text-bg-success">Nessun problema</span>
+          {% elif s.controlla == 'attenzione' %}<span class="badge text-bg-warning">Da leggere</span>{% endif %}
+        </div>
+        {% if not d %}
+          <p class="step-desc mb-0">Dopo il caricamento il sistema controlla da solo date, codici e risultati, e scarta le righe non utilizzabili.</p>
+        {% else %}
+          <p class="step-desc mb-2">Ultimo file: {{ d.last_upload_name }}.
+            {% if d.last_excluded %}{{ "{:,}".format(d.last_excluded).replace(",", ".") }} righe escluse.{% else %}Nessuna riga esclusa.{% endif %}
+            {% if d.warnings %}{{ d.warnings }} {{ "avviso" if d.warnings == 1 else "avvisi" }} da leggere: di solito non bloccano il calcolo.{% endif %}</p>
+          <a class="btn btn-outline-secondary btn-sm" href="{{ url_for('upload.validation_report', upload_id=d.last_upload_id) }}">Apri l'esito del controllo</a>
+        {% endif %}
+      </div>
+    </section>
+
+    {# ---------------- 3 Calcola ---------------- #}
+    <section class="guide-step {{ s.calcola }}" id="passo-calcola">
+      <div class="step-num {{ s.calcola }}">{% if s.calcola == 'fatto' %}&#10003;{% else %}3{% endif %}</div>
+      <div class="step-body">
+        <div class="d-flex justify-content-between align-items-start gap-2">
+          <div class="step-title">3. Calcola le previsioni</div>
+          {% if s.calcola == 'ora' %}<span class="badge text-bg-primary">Fai questo ora</span>
+          {% elif s.calcola == 'fatto' %}<span class="badge text-bg-success">Fatto</span>{% endif %}
+        </div>
+        {% if s.calcola == 'dopo' %}
+          <p class="step-desc mb-0">Disponibile dopo il caricamento dei dati.</p>
+        {% elif s.calcola == 'ora' %}
+          <p class="step-desc">{% if wf.stale %}<strong>I dati sono cambiati dopo l'ultimo calcolo.</strong> {% endif %}Il sistema mette alla prova i modelli sui dati passati e calcola la resistenza dei quattro trimestri successivi ai dati. Richiede circa un minuto.</p>
+          <form method="post" action="{{ url_for('forecasts.compute') }}" data-busy="Calcolo delle previsioni in corso, circa un minuto. Non chiudere la pagina.">
+            <button class="btn btn-primary btn-lg" type="submit">Calcola le previsioni</button>
+          </form>
+        {% else %}
+          <p class="step-desc mb-2">Calcolate il {{ fc.calcolato_il }} sui dati fino al {{ fc.dati_fino_al }}.</p>
+          <form method="post" action="{{ url_for('forecasts.compute') }}" data-busy="Calcolo delle previsioni in corso, circa un minuto. Non chiudere la pagina.">
+            <button class="btn btn-outline-secondary btn-sm" type="submit">Ricalcola</button>
+          </form>
+        {% endif %}
+      </div>
+    </section>
+
+    {# ---------------- 4 Leggi ---------------- #}
+    <section class="guide-step {{ s.leggi }}" id="passo-leggi">
+      <div class="step-num {{ s.leggi }}">4</div>
+      <div class="step-body">
+        <div class="d-flex justify-content-between align-items-start gap-2">
+          <div class="step-title">4. Leggi le previsioni</div>
+          {% if s.leggi == 'ora' %}<span class="badge text-bg-primary">Fai questo ora</span>{% endif %}
+        </div>
+        {% if s.leggi == 'ora' %}
+          <p class="step-desc">Previsioni per {{ fc.trimestri_previsti|join(", ") }}: {{ fc.con_previsione }} combinazioni microrganismo-antibiotico, di cui {{ fc.affidabili_3_mesi }} affidabili a 3 mesi.
+            {% if d and d.old %}Riguardano un periodo già trascorso perché i dati finiscono il {{ d.date_to }}.{% endif %}</p>
+          <a class="btn btn-primary btn-lg" href="{{ url_for('forecasts.overview') }}">Apri le previsioni</a>
+        {% else %}
+          <p class="step-desc mb-0">Per ogni microrganismo e antibiotico: la resistenza attesa nei prossimi trimestri, con un semaforo che dice quanto fidarsi.</p>
+        {% endif %}
+      </div>
+    </section>
+  </div>
+
+  <div class="col-xl-4">
+    <section class="panel mb-3">
+      <h2 class="h6">Come leggere il semaforo</h2>
+      <ul class="list-unstyled small mb-0">
+        <li class="mb-2"><span class="badge text-bg-success">Affidabile</span> nelle prove sul passato la previsione è stata vicina al valore reale.</li>
+        <li class="mb-2"><span class="badge text-bg-warning">Indicativa</span> l'intervallo ha funzionato, ma l'errore è stato più ampio: usarla come indicazione di massima.</li>
+        <li><span class="badge text-bg-secondary">Non affidabile</span> nessuna previsione: vale il dato degli ultimi 12 mesi.</li>
+      </ul>
+    </section>
+    {% if d %}
+    <section class="panel">
+      <h2 class="h6">Dopo ogni caricamento</h2>
+      <p class="small text-muted">Scarica il file diagnostico e invialo per un controllo. Contiene solo dati aggregati, nessun codice paziente.</p>
+      <a class="btn btn-outline-primary btn-sm" href="{{ url_for('upload.diagnostic') }}">Scarica il file diagnostico</a>
+    </section>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

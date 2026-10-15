@@ -71,9 +71,11 @@ def create_app(test_config: dict | None = None) -> Flask:
     from . import models  # noqa: F401
     from .routes.dashboard import bp as dashboard_bp
     from .routes.forecasts import bp as forecasts_bp
+    from .routes.guide import bp as guide_bp
     from .routes.pipeline import bp as pipeline_bp
     from .routes.upload import bp as upload_bp
 
+    app.register_blueprint(guide_bp)
     app.register_blueprint(forecasts_bp)
     app.register_blueprint(upload_bp)
     app.register_blueprint(dashboard_bp)

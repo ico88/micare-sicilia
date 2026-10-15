@@ -141,9 +141,12 @@ def test_upload_stores_dataset_for_models(tmp_path):
         "/upload",
         data={"dataset": (io.BytesIO(content), "rete_mic.xlsx")},
         content_type="multipart/form-data",
+        follow_redirects=True,
     )
     assert response.status_code == 200
-    assert "Validazione dati" in response.get_data(as_text=True)
+    html = response.get_data(as_text=True)
+    assert "Validazione dati" in html
+    assert "Prossimo passo: calcola le previsioni" in html
 
     with app.app_context():
         uploaded = UploadedFile.query.one()

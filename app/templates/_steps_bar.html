@@ -1,0 +1,11 @@
+{# Compact step bar. Needs: wf (workflow_state), here (step key of this page). #}
+<nav class="steps-bar mb-3" aria-label="Percorso guidato">
+  {% for key, title in wf.steps %}
+    {% set st = wf.status[key] %}
+    <a class="steps-bar-item {{ st }} {% if key == here %}here{% endif %}" href="{{ url_for('guide.home') }}#passo-{{ key }}">
+      <span class="steps-bar-num">{% if st == 'fatto' %}&#10003;{% elif st == 'attenzione' %}!{% else %}{{ loop.index }}{% endif %}</span>
+      <span>{{ title }}</span>
+    </a>
+    {% if not loop.last %}<span class="steps-bar-sep" aria-hidden="true"></span>{% endif %}
+  {% endfor %}
+</nav>

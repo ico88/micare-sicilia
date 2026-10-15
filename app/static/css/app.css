@@ -557,3 +557,95 @@ html, body {
   .annual-summary-grid,
   .training-time-grid { grid-template-columns: 1fr; }
 }
+
+/* ============================================================
+   Guided path
+   ============================================================ */
+.now-box {
+  background: var(--accent-bg);
+  border: 1px solid #bfdbfe;
+  border-left: 4px solid var(--accent);
+  border-radius: var(--radius);
+  padding: 0.9rem 1.1rem;
+}
+.now-label { font-size: 0.72rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--accent-dark); }
+.now-text  { font-size: 1.05rem; font-weight: 600; margin-top: 0.15rem; }
+
+.guide-step {
+  display: flex;
+  align-items: flex-start;
+  gap: 1rem;
+  padding: 1.1rem 1.2rem;
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  margin-bottom: 0.75rem;
+}
+.guide-step.ora   { border: 2px solid var(--accent); box-shadow: 0 0 0 4px rgba(59,130,246,.12); }
+.guide-step.dopo  { opacity: .6; }
+.guide-step .step-desc { font-size: 0.88rem; }
+.step-num.ora        { background: var(--accent); color: #fff; }
+.step-num.fatto      { background: #dcfce7; color: var(--green); }
+.step-num.attenzione { background: #fef9c3; color: var(--yellow); }
+.step-num.dopo       { background: var(--border); color: var(--text-muted); }
+
+.steps-bar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0.5rem 0.75rem;
+}
+.steps-bar-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.25rem 0.55rem;
+  border-radius: 999px;
+  font-size: 0.82rem;
+  color: var(--text-secondary);
+  text-decoration: none;
+}
+.steps-bar-item:hover { background: var(--bg-app); }
+.steps-bar-item.here { background: var(--accent-bg); color: var(--accent-dark); font-weight: 600; }
+.steps-bar-num {
+  width: 22px; height: 22px; border-radius: 50%;
+  display: inline-flex; align-items: center; justify-content: center;
+  font-size: 0.75rem; font-weight: 700;
+  background: var(--border); color: var(--text-secondary);
+}
+.steps-bar-item.fatto .steps-bar-num      { background: #dcfce7; color: var(--green); }
+.steps-bar-item.attenzione .steps-bar-num { background: #fef9c3; color: var(--yellow); }
+.steps-bar-item.ora .steps-bar-num        { background: var(--accent); color: #fff; }
+.steps-bar-sep { flex: 0 0 18px; height: 1px; background: var(--border-med); }
+
+.next-step {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+  background: var(--accent-bg);
+  border: 1px solid #bfdbfe;
+  border-radius: var(--radius);
+  padding: 0.9rem 1.1rem;
+}
+
+.busy-overlay {
+  position: fixed; inset: 0; z-index: 2000;
+  display: none; align-items: center; justify-content: center;
+  background: rgba(15,23,42,.45);
+}
+.busy-overlay.visible { display: flex; }
+.busy-card {
+  background: var(--bg-surface);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-md);
+  padding: 1.5rem 1.75rem;
+  max-width: 420px;
+  text-align: center;
+}
