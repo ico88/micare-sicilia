@@ -18,7 +18,7 @@ import pandas as pd
 from .breakpoints import BREAKPOINTS_VERSION, breakpoint_table
 from .dataset_store import first_isolate_mask, load_ast_results, load_isolates
 from .reference import ADMISSION_LABELS, MATERIAL_LABELS, label, laboratory_names
-from .benchmark import overview, run_bench, summarize
+from .benchmark import choose_and_verify, overview, run_bench, summarize
 from .series import MIN_ISOLATES_PER_PERIOD, build_series, cumulative_antibiogram, regional_series
 
 DIAGNOSTIC_VERSION = 2
@@ -32,6 +32,7 @@ SHEET_NOTES = {
     "Combinazioni": "Una riga per laboratorio x microrganismo x antibiotico: quanti dati ci sono e se bastano per una previsione trimestrale.",
     "Serie trimestrali": "Resistenza per trimestre, separata per popolazione: invasivi (sangue, liquor), urine (dal 2023), altri materiali. Primo isolato per paziente, reparti sommati, intrinseche escluse.",
     "Serie mensili": "Come le serie trimestrali, per mese. Utile solo dove i numeri sono alti.",
+    "Semaforo": "Per ogni combinazione e orizzonte: quale previsione verrà mostrata e con che affidabilità. Il modello è scelto sulle prove 2020-22 e giudicato solo sulle prove 2023-24.",
     "Banco di prova sintesi": "Quanto sbaglia la previsione più semplice (\"come gli ultimi 12 mesi\") sugli invasivi regionali, per orizzonte. È il riferimento che ogni modello deve battere.",
     "Banco di prova": "Dettaglio per combinazione e orizzonte. Errore medio e rumore in punti di % R; copertura = % di valori reali dentro l'intervallo dell'80% (accettabile 75-85%).",
     "Serie regionali invasivi": "Laboratori sommati, solo sangue e liquor: la serie su cui si costruisce la previsione regionale.",
@@ -67,7 +68,8 @@ def build_diagnostic(dataset_folder: str | Path, uploads: list[dict], app_versio
     monthly = build_series(folder, "M")
     sheets["Leggimi"] = _readme(app_version, uploads, isolates, quarterly)
     regional = regional_series(quarterly, "invasivi")
-    bench_overview, bench_detail = _bench_sheets(regional)
+    bench_overview, bench_detail, traffic = _bench_sheets(quarterly, regional)
+    sheets["Semaforo"] = traffic
     sheets["Banco di prova sintesi"] = bench_overview
     sheets["Banco di prova"] = bench_detail
     sheets["Serie regionali invasivi"] = _regional_sheet(regional)
@@ -109,22 +111,36 @@ def _readme(app_version: str, uploads: list[dict], isolates: pd.DataFrame | None
     return pd.DataFrame(rows, columns=["Voce", "Valore"])
 
 
-def _bench_sheets(regional: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
+MODEL_NAMES = {
+    "persistenza_12m": "Come gli ultimi 12 mesi",
+    "persistenza_tarata": "Come gli ultimi 12 mesi, intervallo tarato",
+    "trend": "Trend smorzato",
+    "trend_laboratori": "Trend con effetto laboratorio",
+}
+TRAFFIC_LABELS = {
+    "verde": "Affidabile",
+    "giallo": "Indicativa",
+    "grigio": "Non affidabile",
+}
+
+
+def _bench_sheets(quarterly: pd.DataFrame, regional: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     reportable = regional.groupby(["microorganismo", "antibiotic"])["reportable"].sum()
-    eligible = reportable[reportable >= MIN_REPORTABLE_REGIONAL_QUARTERS].index
-    data = regional.set_index(["microorganismo", "antibiotic"]).loc[eligible].reset_index()
-    summary = summarize(run_bench(data))
-    if summary.empty:
-        return pd.DataFrame(), pd.DataFrame()
-    names = {"persistenza_12m": "Come gli ultimi 12 mesi", "ultimo_trimestre": "Come l'ultimo trimestre"}
-    over = overview(summary).assign(modello=lambda d: d["modello"].map(names))
+    eligible = set(reportable[reportable >= MIN_REPORTABLE_REGIONAL_QUARTERS].index)
+    labs = quarterly[quarterly["popolazione"] == "invasivi"]
+    labs = labs[[k in eligible for k in zip(labs["microorganismo"], labs["antibiotic"])]]
+    bench = run_bench(labs)
+    if bench.empty:
+        return pd.DataFrame(), pd.DataFrame(), pd.DataFrame()
+    summary = summarize(bench)
+    over = overview(summary).assign(modello=lambda d: d["modello"].map(MODEL_NAMES))
     over = _round(over.rename(columns={
         "modello": "Previsione", "orizzonte_mesi": "Orizzonte (mesi)", "combinazioni": "Combinazioni",
         "errore_medio": "Errore tipico (punti % R, mediana)", "errore_peggiore_10pct": "Errore nel 10% peggiore",
         "copertura_80": "Copertura intervallo 80% (mediana)", "rumore_atteso": "Rumore inevitabile (punti)",
         "errore_su_rumore": "Errore / rumore (mediana)",
     }))
-    detail = summary.assign(modello=lambda d: d["modello"].map(names)).sort_values(
+    detail = summary.assign(modello=lambda d: d["modello"].map(MODEL_NAMES)).sort_values(
         ["modello", "orizzonte_mesi", "errore_medio"], ascending=[True, True, False])
     detail = _round(detail.rename(columns={
         "microorganismo": "Microrganismo", "antibiotic": "Antibiotico", "modello": "Previsione",
@@ -133,7 +149,21 @@ def _bench_sheets(regional: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
         "rumore_atteso": "Rumore inevitabile (punti)", "testati_medi": "Testati medi per trimestre",
         "errore_su_rumore": "Errore / rumore",
     }))
-    return over, detail
+    verdict = choose_and_verify(bench)
+    verdict = verdict.assign(
+        semaforo=verdict["semaforo"].map(lambda v: f"{v} - {TRAFFIC_LABELS[v]}"),
+        scelto_su_2020_22=verdict["scelto_su_2020_22"].map(MODEL_NAMES),
+        mostrato=verdict["mostrato"].map(MODEL_NAMES),
+    ).sort_values(["orizzonte_mesi", "semaforo", "microorganismo", "antibiotic"])
+    traffic = _round(verdict.rename(columns={
+        "microorganismo": "Microrganismo", "antibiotic": "Antibiotico", "orizzonte_mesi": "Orizzonte (mesi)",
+        "semaforo": "Semaforo", "mostrato": "Previsione mostrata", "scelto_su_2020_22": "Modello scelto sulle prove 2020-22",
+        "prove_verifica": "Prove di verifica (2023-24)", "errore_verifica": "Errore in verifica (punti)",
+        "errore_riferimento_verifica": "Errore di 'come gli ultimi 12 mesi' (punti)",
+        "guadagno_pct": "Guadagno rispetto al riferimento (%)", "copertura_verifica": "Copertura 80% in verifica (%)",
+        "rumore_verifica": "Rumore inevitabile (punti)", "errore_su_rumore": "Errore / rumore",
+    }))
+    return over, detail, traffic
 
 
 def _regional_sheet(regional: pd.DataFrame) -> pd.DataFrame:
