@@ -18,9 +18,12 @@ import pandas as pd
 from .breakpoints import BREAKPOINTS_VERSION, breakpoint_table
 from .dataset_store import first_isolate_mask, load_ast_results, load_isolates
 from .reference import ADMISSION_LABELS, MATERIAL_LABELS, label, laboratory_names
-from .series import MIN_ISOLATES_PER_PERIOD, build_series, cumulative_antibiogram
+from .benchmark import overview, run_bench, summarize
+from .series import MIN_ISOLATES_PER_PERIOD, build_series, cumulative_antibiogram, regional_series
 
-DIAGNOSTIC_VERSION = 1
+DIAGNOSTIC_VERSION = 2
+# Regional combinations entering the test bench: almost complete quarterly history
+MIN_REPORTABLE_REGIONAL_QUARTERS = 20
 # A combination is worth modelling per quarter when most recent quarters are reportable
 MIN_REPORTABLE_QUARTERS = 12
 
@@ -29,6 +32,9 @@ SHEET_NOTES = {
     "Combinazioni": "Una riga per laboratorio x microrganismo x antibiotico: quanti dati ci sono e se bastano per una previsione trimestrale.",
     "Serie trimestrali": "Resistenza per trimestre, separata per popolazione: invasivi (sangue, liquor), urine (dal 2023), altri materiali. Primo isolato per paziente, reparti sommati, intrinseche escluse.",
     "Serie mensili": "Come le serie trimestrali, per mese. Utile solo dove i numeri sono alti.",
+    "Banco di prova sintesi": "Quanto sbaglia la previsione più semplice (\"come gli ultimi 12 mesi\") sugli invasivi regionali, per orizzonte. È il riferimento che ogni modello deve battere.",
+    "Banco di prova": "Dettaglio per combinazione e orizzonte. Errore medio e rumore in punti di % R; copertura = % di valori reali dentro l'intervallo dell'80% (accettabile 75-85%).",
+    "Serie regionali invasivi": "Laboratori sommati, solo sangue e liquor: la serie su cui si costruisce la previsione regionale.",
     "Composizione": "Primi isolati per anno, per materiale e per tipo di paziente: un cambio di composizione cambia la % R senza che i batteri cambino.",
     "Antibiogramma": "Antibiogramma cumulativo annuale (CLSI M39): da confrontare con i report dei laboratori.",
     "Breakpoint": f"Riga EUCAST v{BREAKPOINTS_VERSION} usata per ogni coppia e quanto la lettura armonizzata differisce dal refertato.",
@@ -60,6 +66,11 @@ def build_diagnostic(dataset_folder: str | Path, uploads: list[dict], app_versio
     quarterly = build_series(folder, "Q")
     monthly = build_series(folder, "M")
     sheets["Leggimi"] = _readme(app_version, uploads, isolates, quarterly)
+    regional = regional_series(quarterly, "invasivi")
+    bench_overview, bench_detail = _bench_sheets(regional)
+    sheets["Banco di prova sintesi"] = bench_overview
+    sheets["Banco di prova"] = bench_detail
+    sheets["Serie regionali invasivi"] = _regional_sheet(regional)
     sheets["Combinazioni"] = _combinations(quarterly)
     sheets["Composizione"] = _composition(isolates)
     sheets["Serie trimestrali"] = _series_sheet(quarterly)
@@ -96,6 +107,41 @@ def _readme(app_version: str, uploads: list[dict], isolates: pd.DataFrame | None
         rows.append((f"File caricato #{u['id']}", f"{u['original_name']} ({u['uploaded_at']}, {u['status']}, {u.get('row_count') or 0} osservazioni)"))
     rows += [(f"Foglio: {name}", note) for name, note in SHEET_NOTES.items() if name != "Leggimi"]
     return pd.DataFrame(rows, columns=["Voce", "Valore"])
+
+
+def _bench_sheets(regional: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
+    reportable = regional.groupby(["microorganismo", "antibiotic"])["reportable"].sum()
+    eligible = reportable[reportable >= MIN_REPORTABLE_REGIONAL_QUARTERS].index
+    data = regional.set_index(["microorganismo", "antibiotic"]).loc[eligible].reset_index()
+    summary = summarize(run_bench(data))
+    if summary.empty:
+        return pd.DataFrame(), pd.DataFrame()
+    names = {"persistenza_12m": "Come gli ultimi 12 mesi", "ultimo_trimestre": "Come l'ultimo trimestre"}
+    over = overview(summary).assign(modello=lambda d: d["modello"].map(names))
+    over = _round(over.rename(columns={
+        "modello": "Previsione", "orizzonte_mesi": "Orizzonte (mesi)", "combinazioni": "Combinazioni",
+        "errore_medio": "Errore tipico (punti % R, mediana)", "errore_peggiore_10pct": "Errore nel 10% peggiore",
+        "copertura_80": "Copertura intervallo 80% (mediana)", "rumore_atteso": "Rumore inevitabile (punti)",
+        "errore_su_rumore": "Errore / rumore (mediana)",
+    }))
+    detail = summary.assign(modello=lambda d: d["modello"].map(names)).sort_values(
+        ["modello", "orizzonte_mesi", "errore_medio"], ascending=[True, True, False])
+    detail = _round(detail.rename(columns={
+        "microorganismo": "Microrganismo", "antibiotic": "Antibiotico", "modello": "Previsione",
+        "orizzonte_mesi": "Orizzonte (mesi)", "prove": "Prove", "errore_medio": "Errore medio (punti)",
+        "distorsione": "Distorsione (+ = sovrastima)", "copertura_80": "Copertura intervallo 80% (%)",
+        "rumore_atteso": "Rumore inevitabile (punti)", "testati_medi": "Testati medi per trimestre",
+        "errore_su_rumore": "Errore / rumore",
+    }))
+    return over, detail
+
+
+def _regional_sheet(regional: pd.DataFrame) -> pd.DataFrame:
+    cols = ["microorganismo", "antibiotic", "period", "laboratori", "n_reported", "r_reported", "pct_r_reported",
+            "n_harmonized", "r_harmonized", "pct_r_harmonized", "low_harmonized", "high_harmonized", "reportable"]
+    out = regional[cols].copy()
+    out["reportable"] = np.where(out["reportable"], "sì", "no")
+    return _round(out.rename(columns=COLUMN_LABELS | {"laboratori": "Laboratori con dati"}))
 
 
 def _combinations(quarterly: pd.DataFrame) -> pd.DataFrame:

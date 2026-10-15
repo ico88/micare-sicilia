@@ -20,6 +20,8 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
+from micare_sicilia.config import START_DATE
+
 from .dataset_store import first_isolate_mask, load_ast_results, load_isolates
 
 MIN_ISOLATES_PER_PERIOD = 30  # CLSI M39 minimum for a reportable percentage
@@ -29,6 +31,17 @@ KEYS = ["popolazione", "laboratorio", "microorganismo", "antibiotic"]
 # 4 urethral, 5 cervical, 6 rectal, 7 pharyngeal, 8 other
 POPULATIONS = {"1": "invasivi", "2": "invasivi", "3": "urine"}
 OTHER_POPULATION = "altri materiali"
+
+
+def _series_isolates(folder: str | Path) -> pd.DataFrame:
+    """Archive isolates from the network start (START_DATE) on, with their population.
+
+    Earlier isolates stay in the archive but are not part of any series.
+    """
+    isolates = load_isolates(folder)
+    if isolates.empty:
+        return isolates
+    return add_population(isolates[isolates["data_prelievo"] >= START_DATE])
 
 
 def add_population(isolates: pd.DataFrame) -> pd.DataFrame:
@@ -56,10 +69,9 @@ def build_series(folder: str | Path, freq: str = "Q") -> pd.DataFrame:
     plus isolates (first isolates of the pathogen in the laboratory), tested_share
     (n_harmonized / isolates) and reportable (n_harmonized >= 30).
     """
-    isolates = load_isolates(folder)
+    isolates = _series_isolates(folder)
     if isolates.empty:
         return pd.DataFrame()
-    isolates = add_population(isolates)
     isolates = isolates[first_isolate_mask(isolates, freq, by=["popolazione"])]
     ast = load_ast_results(folder, with_isolate_columns=False)
     ast = ast.merge(isolates[["upload_id", "isolate_id", "popolazione", "laboratorio", "microorganismo", "data_prelievo"]],
@@ -111,10 +123,9 @@ def cumulative_antibiogram(folder: str | Path) -> pd.DataFrame:
     First isolate per patient x pathogen x year; %S and %R with 95% interval;
     reportable only with at least 30 isolates tested.
     """
-    isolates = load_isolates(folder)
+    isolates = _series_isolates(folder)
     if isolates.empty:
         return pd.DataFrame()
-    isolates = add_population(isolates)
     isolates = isolates[first_isolate_mask(isolates, "Y", by=["popolazione"])]
     ast = load_ast_results(folder, with_isolate_columns=False)
     ast = ast.merge(isolates[["upload_id", "isolate_id", "popolazione", "laboratorio", "microorganismo", "data_prelievo"]],
@@ -131,3 +142,24 @@ def cumulative_antibiogram(folder: str | Path) -> pd.DataFrame:
     table["pct_r_low"], table["pct_r_high"] = wilson_interval(table["r"], table["testati"])
     table["riportabile"] = table["testati"] >= MIN_ISOLATES_PER_PERIOD
     return table.sort_values(KEYS + ["anno"]).reset_index(drop=True)
+
+
+def regional_series(series: pd.DataFrame, population: str = "invasivi") -> pd.DataFrame:
+    """Laboratories pooled: one row per pathogen x antibiotic x period of one population."""
+    keys = ["microorganismo", "antibiotic", "period", "period_start"]
+    counts = ["n_reported", "r_reported", "n_harmonized", "r_harmonized", "isolates"]
+    data = series[series["popolazione"] == population]
+    # isolates is per laboratory x pathogen: count it once per laboratory before pooling
+    pooled = data.groupby(keys)[counts[:-1]].sum()
+    isolates = (data.drop_duplicates(["laboratorio", "microorganismo", "period"])
+                .groupby(["microorganismo", "period"])["isolates"].sum())
+    out = pooled.reset_index().merge(isolates.reset_index(), on=["microorganismo", "period"], how="left")
+    out["laboratori"] = data[data["n_harmonized"] > 0].groupby(keys)["laboratorio"].nunique().reindex(
+        pd.MultiIndex.from_frame(out[keys])).fillna(0).astype(int).to_numpy()
+    for reading in READINGS:
+        n, r = out[f"n_{reading}"], out[f"r_{reading}"]
+        out[f"pct_r_{reading}"] = 100 * r / n.where(n > 0)
+        out[f"low_{reading}"], out[f"high_{reading}"] = wilson_interval(r, n)
+    out["reportable"] = out["n_harmonized"] >= MIN_ISOLATES_PER_PERIOD
+    out.insert(0, "popolazione", population)
+    return out.sort_values(["microorganismo", "antibiotic", "period_start"]).reset_index(drop=True)
