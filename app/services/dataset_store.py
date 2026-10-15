@@ -21,6 +21,7 @@ import numpy as np
 import pandas as pd
 
 from app.services.breakpoints import BREAKPOINTS_VERSION, interpret_mic, normalize_sxt_mic
+from app.services.reference import laboratory_names
 from micare_sicilia.config import ANTIBIOTIC_CLASS_CODES, INTRINSIC_RESISTANCE_EXCLUSIONS
 
 QUAL_SUFFIX = "_QUALITATIVO"
@@ -383,6 +384,12 @@ def build_and_validate(raw: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame, d
             + ", ".join(f"{p}/{a} ({n})" for (p, a), n in combos.items())
         )
 
+    known_labs = laboratory_names()
+    unknown_labs = sorted(set(isolates["laboratorio"]) - set(known_labs)) if known_labs else []
+    if unknown_labs:
+        report["warnings"].append(
+            "Codici laboratorio non presenti nell'elenco della Rete MIC (Allegato 2): " + ", ".join(unknown_labs)
+        )
     report["stats"] = _stats(n_rows, isolates, ast, antibiotics) | {"harmonization": report["stats"]["harmonization"]}
     pts = report["stats"]
     if pts.get("repeat_isolates", 0):
@@ -467,16 +474,18 @@ def _stats(n_rows: int, isolates: pd.DataFrame, ast: pd.DataFrame, antibiotics: 
     return stats
 
 
-def first_isolate_mask(isolates: pd.DataFrame, period: str = "Y") -> pd.Series:
+def first_isolate_mask(isolates: pd.DataFrame, period: str = "Y", by: list[str] | None = None) -> pd.Series:
     """True for the first isolate per laboratory x patient x pathogen x period (CLSI M39).
 
     period: "Y" (calendar year, cumulative antibiogram), "Q" (quarter) or "M" (month),
     matching the granularity of the series. Patient codes are only unique within a
-    laboratory, hence the laboratory in the key. Rows without a patient code are kept.
+    laboratory, hence the laboratory in the key. `by` adds columns to the key (e.g. the
+    specimen population, so blood and urine are deduplicated separately).
+    Rows without a patient code are kept.
     """
     order = isolates.sort_values(["data_prelievo", "codice_campione"])
     key = [order["laboratorio"], order["codice_paziente"], order["microorganismo"],
-           order["data_prelievo"].dt.to_period(period)]
+           order["data_prelievo"].dt.to_period(period)] + [order[c] for c in (by or [])]
     first = ~order.groupby(key, sort=False).cumcount().astype(bool)
     first |= order["codice_paziente"].eq("")
     return first.reindex(isolates.index)

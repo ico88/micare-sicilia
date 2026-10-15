@@ -44,3 +44,25 @@ def test_antibiogram_uses_first_isolate_per_year(tmp_path):
     row = a.loc[("IT1", "MEM", 2022)]
     assert (row["testati"], row["r"]) == (2, 1)  # P1 counted once in the year
     assert not row["riportabile"]
+
+
+def test_blood_and_urine_are_separate_series(tmp_path):
+    iso = pd.DataFrame([
+        (0, "IT1", "P1", "ESCCOL", "2022-02-01", "1"),   # blood
+        (1, "IT1", "P2", "ESCCOL", "2023-02-01", "1"),   # blood
+        (2, "IT1", "P2", "ESCCOL", "2023-02-03", "3"),   # same patient, urine: first in its own population
+        (3, "IT1", "P3", "ESCCOL", "2023-03-01", "3"),
+    ], columns=["isolate_id", "laboratorio", "codice_paziente", "microorganismo", "data_prelievo", "materiale"])
+    iso["data_prelievo"] = pd.to_datetime(iso["data_prelievo"])
+    iso["codice_campione"] = iso["isolate_id"].astype(str)
+    ast = pd.DataFrame([(i, "CTX", r, r) for i, r in [(0, "R"), (1, "R"), (2, "S"), (3, "S")]],
+                       columns=["isolate_id", "antibiotic", "result", "result_harmonized"])
+    ast["intrinsic"] = False
+    dataset_store.save_dataset(tmp_path, 1, iso, ast, {}, pd.DataFrame())
+
+    s = build_series(tmp_path, "Q").set_index(["popolazione", "period"])
+    assert s.loc[("invasivi", "2023Q1"), "pct_r_reported"] == 100.0
+    assert (s.loc[("urine", "2023Q1"), "n_reported"], s.loc[("urine", "2023Q1"), "r_reported"]) == (2, 0)
+    # Urine exist only from 2023: no empty urine quarters in 2022
+    assert "2022Q1" not in s.loc["urine"].index
+    assert s.loc[("invasivi", "2022Q2"), "n_reported"] == 0

@@ -12,8 +12,8 @@ TARGETS = ("resistenti", "intermedi", "sensibili")
 # Soglia minima di campioni/mese per una stima percentuale affidabile
 MIN_SAMPLES_PER_MONTH = 10
 
-# Codice reparto UTI/Rianimazione secondo Tabella A2 Min. Salute
-REPARTO_UTI_CODE = 26
+# Terapia intensiva nella tabella discipline del flusso AMR-RETEMIC (Allegato 1); 26 = Medicina generale
+REPARTO_UTI_CODE = 49
 
 # Codice paziente ricoverato in regime ordinario
 PAZIENTE_RICOVERATO_CODE = 1

@@ -17,6 +17,7 @@ import pandas as pd
 
 from .breakpoints import BREAKPOINTS_VERSION, breakpoint_table
 from .dataset_store import first_isolate_mask, load_ast_results, load_isolates
+from .reference import ADMISSION_LABELS, MATERIAL_LABELS, label, laboratory_names
 from .series import MIN_ISOLATES_PER_PERIOD, build_series, cumulative_antibiogram
 
 DIAGNOSTIC_VERSION = 1
@@ -26,7 +27,7 @@ MIN_REPORTABLE_QUARTERS = 12
 SHEET_NOTES = {
     "Leggimi": "Cosa ha prodotto questo file: versioni, soglie e dati inclusi.",
     "Combinazioni": "Una riga per laboratorio x microrganismo x antibiotico: quanti dati ci sono e se bastano per una previsione trimestrale.",
-    "Serie trimestrali": "Resistenza per trimestre (primo isolato per paziente, reparti sommati, intrinseche escluse). n = isolati testati.",
+    "Serie trimestrali": "Resistenza per trimestre, separata per popolazione: invasivi (sangue, liquor), urine (dal 2023), altri materiali. Primo isolato per paziente, reparti sommati, intrinseche escluse.",
     "Serie mensili": "Come le serie trimestrali, per mese. Utile solo dove i numeri sono alti.",
     "Composizione": "Primi isolati per anno, per materiale e per tipo di paziente: un cambio di composizione cambia la % R senza che i batteri cambino.",
     "Antibiogramma": "Antibiogramma cumulativo annuale (CLSI M39): da confrontare con i report dei laboratori.",
@@ -36,7 +37,7 @@ SHEET_NOTES = {
 }
 
 COLUMN_LABELS = {
-    "laboratorio": "Laboratorio", "microorganismo": "Microrganismo", "antibiotic": "Antibiotico",
+    "popolazione": "Popolazione", "laboratorio": "Laboratorio", "ente": "Ente", "microorganismo": "Microrganismo", "antibiotic": "Antibiotico",
     "period": "Periodo", "isolates": "Primi isolati del microrganismo",
     "n_reported": "Testati (refertato)", "r_reported": "Resistenti (refertato)",
     "pct_r_reported": "% R refertato", "low_reported": "% R refertato min (IC95)", "high_reported": "% R refertato max (IC95)",
@@ -98,7 +99,7 @@ def _readme(app_version: str, uploads: list[dict], isolates: pd.DataFrame | None
 
 
 def _combinations(quarterly: pd.DataFrame) -> pd.DataFrame:
-    keys = ["laboratorio", "microorganismo", "antibiotic"]
+    keys = ["popolazione", "laboratorio", "microorganismo", "antibiotic"]
     last_year = quarterly["period_start"] >= quarterly["period_start"].max() - pd.DateOffset(months=9)
     grouped = quarterly.groupby(keys)
     table = grouped.agg(
@@ -114,8 +115,9 @@ def _combinations(quarterly: pd.DataFrame) -> pd.DataFrame:
     table = table.merge(recent[["pct_r_refertato_ultimi_12_mesi", "pct_r_armonizzato_ultimi_12_mesi"]].reset_index(), on=keys, how="left")
     table["modellabile_trimestrale"] = np.where(table["trimestri_riportabili"] >= MIN_REPORTABLE_QUARTERS, "sì", "no")
     table = table.sort_values(["modellabile_trimestrale", "testati_medi"], ascending=[False, False])
+    table.insert(2, "ente", table["laboratorio"].map(laboratory_names()))
     return _round(table.rename(columns={
-        "laboratorio": "Laboratorio", "microorganismo": "Microrganismo", "antibiotic": "Antibiotico",
+        "popolazione": "Popolazione", "laboratorio": "Laboratorio", "ente": "Ente", "microorganismo": "Microrganismo", "antibiotic": "Antibiotico",
         "trimestri": "Trimestri nel periodo", "trimestri_con_dati": "Trimestri con dati",
         "trimestri_riportabili": f"Trimestri con almeno {MIN_ISOLATES_PER_PERIOD} testati",
         "testati_medi": "Testati medi per trimestre", "quota_testata_media": "Quota testata media",
@@ -128,11 +130,13 @@ def _combinations(quarterly: pd.DataFrame) -> pd.DataFrame:
 def _composition(isolates: pd.DataFrame) -> pd.DataFrame:
     first = isolates[first_isolate_mask(isolates, "Y")].assign(anno=lambda d: d["data_prelievo"].dt.year)
     parts = []
-    for column, label in [("materiale", "Materiale"), ("paziente_ricoverato", "Paziente ricoverato")]:
+    for column, name, labels in [("materiale", "Materiale", MATERIAL_LABELS),
+                                 ("paziente_ricoverato", "Paziente ricoverato", ADMISSION_LABELS)]:
         table = first.pivot_table(index=["microorganismo", column], columns="anno", values="isolate_id",
                                   aggfunc="size", fill_value=0)
         table = table.reset_index().rename(columns={"microorganismo": "Microrganismo", column: "Codice"})
-        table.insert(1, "Variabile", label)
+        table.insert(1, "Variabile", name)
+        table.insert(3, "Descrizione", table["Codice"].map(lambda c: label(c, labels)))
         parts.append(table)
     out = pd.concat(parts, ignore_index=True)
     out.columns = [str(c) for c in out.columns]
@@ -140,6 +144,7 @@ def _composition(isolates: pd.DataFrame) -> pd.DataFrame:
 
 
 def _series_sheet(series: pd.DataFrame) -> pd.DataFrame:
+    series = series.assign(ente=series["laboratorio"].map(laboratory_names()))
     cols = [c for c in COLUMN_LABELS if c in series.columns]
     out = series[cols].copy()
     out["reportable"] = np.where(out["reportable"], "sì", "no")
@@ -150,8 +155,8 @@ def _antibiogram_sheet(table: pd.DataFrame) -> pd.DataFrame:
     out = table.copy()
     out["riportabile"] = np.where(out["riportabile"], "sì", "no")
     return _round(out.rename(columns={
-        "laboratorio": "Laboratorio", "microorganismo": "Microrganismo", "antibiotic": "Antibiotico",
-        "anno": "Anno", "testati": "Testati (primo isolato)", "s": "S", "i": "I", "r": "R",
+        "popolazione": "Popolazione", "laboratorio": "Laboratorio", "microorganismo": "Microrganismo",
+        "antibiotic": "Antibiotico", "anno": "Anno", "testati": "Testati (primo isolato)", "s": "S", "i": "I", "r": "R",
         "pct_s": "% S", "pct_r": "% R", "pct_r_low": "% R min (IC95)", "pct_r_high": "% R max (IC95)",
         "riportabile": f"Riportabile (almeno {MIN_ISOLATES_PER_PERIOD})",
     }))

@@ -1,7 +1,10 @@
 """Resistance series per laboratory x pathogen x antibiotic, built from the
 validated isolate archive (dataset_store), the way AMR surveillance requires:
 
-- first isolate per patient x pathogen in each period (CLSI M39)
+- separate populations by specimen (MATERIALE, flusso AMR-RETEMIC): invasive
+  (blood, CSF), urine (in the network from 2023) and other; mixing them shifts
+  %R whenever the specimen mix changes
+- first isolate per patient x pathogen in each period and population (CLSI M39)
 - intrinsic resistances and EUCAST "IE" results left out
 - wards pooled: one value per laboratory and period, weighted by isolates
 - two readings: "reported" (laboratory S/I/R, breakpoints of that year) and
@@ -20,7 +23,17 @@ import pandas as pd
 from .dataset_store import first_isolate_mask, load_ast_results, load_isolates
 
 MIN_ISOLATES_PER_PERIOD = 30  # CLSI M39 minimum for a reportable percentage
-KEYS = ["laboratorio", "microorganismo", "antibiotic"]
+KEYS = ["popolazione", "laboratorio", "microorganismo", "antibiotic"]
+
+# MATERIALE codes of the regional flow (Allegato 1): 1 blood, 2 CSF, 3 urine,
+# 4 urethral, 5 cervical, 6 rectal, 7 pharyngeal, 8 other
+POPULATIONS = {"1": "invasivi", "2": "invasivi", "3": "urine"}
+OTHER_POPULATION = "altri materiali"
+
+
+def add_population(isolates: pd.DataFrame) -> pd.DataFrame:
+    material = isolates["materiale"].astype(str).str.strip() if "materiale" in isolates else ""
+    return isolates.assign(popolazione=pd.Series(material, index=isolates.index).map(POPULATIONS).fillna(OTHER_POPULATION))
 READINGS = {"reported": "result", "harmonized": "result_harmonized"}
 
 
@@ -46,9 +59,10 @@ def build_series(folder: str | Path, freq: str = "Q") -> pd.DataFrame:
     isolates = load_isolates(folder)
     if isolates.empty:
         return pd.DataFrame()
-    isolates = isolates[first_isolate_mask(isolates, freq)]
+    isolates = add_population(isolates)
+    isolates = isolates[first_isolate_mask(isolates, freq, by=["popolazione"])]
     ast = load_ast_results(folder, with_isolate_columns=False)
-    ast = ast.merge(isolates[["upload_id", "isolate_id", "laboratorio", "microorganismo", "data_prelievo"]],
+    ast = ast.merge(isolates[["upload_id", "isolate_id", "popolazione", "laboratorio", "microorganismo", "data_prelievo"]],
                     on=["upload_id", "isolate_id"], how="inner")
     ast = ast[~ast["intrinsic"].astype(bool)]
     ast["period"] = ast["data_prelievo"].dt.to_period(freq)
@@ -60,20 +74,23 @@ def build_series(folder: str | Path, freq: str = "Q") -> pd.DataFrame:
         parts.append(grouped.add_suffix(f"_{reading}"))
     series = pd.concat(parts, axis=1).fillna(0).astype(int).reset_index()
 
-    # Explicit zero rows for periods without results, inside each laboratory's own data window
-    windows = isolates.groupby("laboratorio")["data_prelievo"].agg(["min", "max"])
+    # Explicit zero rows for periods without results, inside the data window of each
+    # laboratory and population (urine only exists from 2023: no empty quarters before)
+    windows = isolates.groupby(["laboratorio", "popolazione"])["data_prelievo"].agg(["min", "max"])
     lab_periods = pd.concat([
-        pd.DataFrame({"laboratorio": lab, "period": pd.period_range(w["min"], w["max"], freq=freq)})
-        for lab, w in windows.iterrows()
+        pd.DataFrame({"laboratorio": lab, "popolazione": pop,
+                      "period": pd.period_range(w["min"], w["max"], freq=freq)})
+        for (lab, pop), w in windows.iterrows()
     ])
-    grid = series[KEYS].drop_duplicates().merge(lab_periods, on="laboratorio")
+    grid = series[KEYS].drop_duplicates().merge(lab_periods, on=["laboratorio", "popolazione"])
     series = grid.merge(series, on=KEYS + ["period"], how="left").fillna(0)
 
+    den_keys = ["popolazione", "laboratorio", "microorganismo", "period"]
     denominators = (
         isolates.assign(period=isolates["data_prelievo"].dt.to_period(freq))
-        .groupby(["laboratorio", "microorganismo", "period"]).size().rename("isolates").reset_index()
+        .groupby(den_keys).size().rename("isolates").reset_index()
     )
-    series = series.merge(denominators, on=["laboratorio", "microorganismo", "period"], how="left")
+    series = series.merge(denominators, on=den_keys, how="left")
     series["isolates"] = series["isolates"].fillna(0).astype(int)
 
     for reading in READINGS:
@@ -89,7 +106,7 @@ def build_series(folder: str | Path, freq: str = "Q") -> pd.DataFrame:
 
 
 def cumulative_antibiogram(folder: str | Path) -> pd.DataFrame:
-    """Annual cumulative antibiogram per laboratory (CLSI M39), reported reading.
+    """Annual cumulative antibiogram per population and laboratory (CLSI M39), reported reading.
 
     First isolate per patient x pathogen x year; %S and %R with 95% interval;
     reportable only with at least 30 isolates tested.
@@ -97,9 +114,10 @@ def cumulative_antibiogram(folder: str | Path) -> pd.DataFrame:
     isolates = load_isolates(folder)
     if isolates.empty:
         return pd.DataFrame()
-    isolates = isolates[first_isolate_mask(isolates, "Y")]
+    isolates = add_population(isolates)
+    isolates = isolates[first_isolate_mask(isolates, "Y", by=["popolazione"])]
     ast = load_ast_results(folder, with_isolate_columns=False)
-    ast = ast.merge(isolates[["upload_id", "isolate_id", "laboratorio", "microorganismo", "data_prelievo"]],
+    ast = ast.merge(isolates[["upload_id", "isolate_id", "popolazione", "laboratorio", "microorganismo", "data_prelievo"]],
                     on=["upload_id", "isolate_id"], how="inner")
     ast = ast[~ast["intrinsic"].astype(bool) & ast["result"].notna()]
     ast["anno"] = ast["data_prelievo"].dt.year
