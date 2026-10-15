@@ -18,6 +18,7 @@ from .config import (
     FORECAST_PERIODS_MONTHS,
     MAX_TRAINING_DATE,
     MIN_MONTHS_PER_COMBINATION,
+    START_DATE,
     TARGETS,
 )
 
@@ -199,7 +200,7 @@ def _dynamic_cv_dates(first_date: pd.Timestamp, last_date: pd.Timestamp) -> pd.D
 def process_combination(
     combination: str,
     data: pd.DataFrame,
-    max_training_date: pd.Timestamp = MAX_TRAINING_DATE,
+    max_training_date: pd.Timestamp | None = MAX_TRAINING_DATE,
 ) -> tuple[str, dict[str, pd.DataFrame], dict[str, dict[str, float]]]:
     local_forecasts: dict[str, pd.DataFrame] = {}
     local_metrics: dict[str, dict[str, float]] = {
@@ -207,7 +208,9 @@ def process_combination(
         "rmse_arima": {}, "rmse_glm": {},
     }
 
-    data = data[data["data"] <= max_training_date].copy()
+    if max_training_date is not None:
+        data = data[data["data"] <= max_training_date]
+    data = data.copy()
     if data.empty:
         return combination, {}, {}
 
@@ -342,7 +345,7 @@ def train_forecasts(
     output_path = Path(output_dir)
     output_path.mkdir(parents=True, exist_ok=True)
 
-    filtered = aggregated[aggregated["data"].dt.year >= 2019].copy()
+    filtered = aggregated[aggregated["data"] >= START_DATE].copy()
     counts = filtered.groupby("combinazione_unica").size()
     valid_combinations = counts[counts >= MIN_MONTHS_PER_COMBINATION].index
     valid_data = filtered[filtered["combinazione_unica"].isin(valid_combinations)].copy()

@@ -465,13 +465,16 @@ def _stats(n_rows: int, isolates: pd.DataFrame, ast: pd.DataFrame, antibiotics: 
     return stats
 
 
-def first_isolate_mask(isolates: pd.DataFrame) -> pd.Series:
-    """True for the first isolate per patient x pathogen x calendar year (CLSI M39).
+def first_isolate_mask(isolates: pd.DataFrame, period: str = "Y") -> pd.Series:
+    """True for the first isolate per laboratory x patient x pathogen x period (CLSI M39).
 
-    Rows without a patient code are always kept.
+    period: "Y" (calendar year, cumulative antibiogram), "Q" (quarter) or "M" (month),
+    matching the granularity of the series. Patient codes are only unique within a
+    laboratory, hence the laboratory in the key. Rows without a patient code are kept.
     """
     order = isolates.sort_values(["data_prelievo", "codice_campione"])
-    key = [order["codice_paziente"], order["microorganismo"], order["data_prelievo"].dt.year]
+    key = [order["laboratorio"], order["codice_paziente"], order["microorganismo"],
+           order["data_prelievo"].dt.to_period(period)]
     first = ~order.groupby(key, sort=False).cumcount().astype(bool)
     first |= order["codice_paziente"].eq("")
     return first.reindex(isolates.index)

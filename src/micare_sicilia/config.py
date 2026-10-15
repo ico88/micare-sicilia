@@ -3,7 +3,8 @@ from __future__ import annotations
 import pandas as pd
 
 START_DATE = pd.Timestamp("2019-01-01")
-MAX_TRAINING_DATE = pd.Timestamp("2024-12-31")
+# None = train on all available data (no fixed cut-off date)
+MAX_TRAINING_DATE: pd.Timestamp | None = None
 MIN_MONTHS_PER_COMBINATION = 24
 FORECAST_PERIODS_MONTHS = 60
 TARGETS = ("resistenti", "intermedi", "sensibili")
