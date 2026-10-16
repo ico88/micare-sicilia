@@ -3,12 +3,15 @@ from __future__ import annotations
 
 import io
 from datetime import datetime
+from pathlib import Path
+
+import pandas as pd
 
 from flask import Blueprint, abort, current_app, flash, redirect, render_template, request, send_file, url_for
 
 from app import APP_VERSION
 from app.routes.guide import current_workflow
-from app.services import jobs
+from app.services import jobs, model_search
 from app.services.diagnostics import CAUSE_LABELS, MODEL_NAMES, build_validation_workbook
 from app.services.out_of_sample import (
     COMPARED, compute_validation, cutoff_label, load_validation, save_validation, validation_possible,
@@ -170,3 +173,40 @@ def _compute_validation(app, progress) -> dict:
     save_validation(result, app.config["FORECAST_FOLDER"])
     return {"message": "Verifica completata: confronto fra le previsioni e i valori osservati, con l'analisi "
                        "degli scostamenti.", "link_endpoint": "forecasts.validation"}
+
+
+@bp.get("/modelli")
+def model_search_page():
+    summary = model_search.load_summary(_folder())
+    board = pd.DataFrame((summary or {}).get("classifica", []))
+    tops = {target: g.sort_values("errore_verifica").head(8).to_dict("records")
+            for target, g in board.groupby("obiettivo")} if not board.empty else {}
+    has_workbook = (Path(_folder()) / model_search.WORKBOOK_FILE).exists()
+    return render_template("models_search.html", summary=summary, tops=tops, has_workbook=has_workbook,
+                           references=model_search.TARGET_REFERENCE, wf=current_workflow())
+
+
+@bp.post("/modelli/ricerca")
+def model_search_run():
+    app = current_app._get_current_object()
+    busy = jobs.start("ricerca", app, lambda progress: _run_model_search(app, progress))
+    _flash_started("ricerca", busy)
+    return redirect(url_for("forecasts.model_search_page"))
+
+
+@bp.get("/modelli/ricerca.xlsx")
+def model_search_workbook():
+    path = Path(_folder()) / model_search.WORKBOOK_FILE
+    if not path.exists():
+        abort(404)
+    return send_file(path, as_attachment=True, download_name=f"ricerca_modelli_{datetime.now():%Y%m%d_%H%M}.xlsx")
+
+
+def _run_model_search(app, progress) -> dict:
+    result = model_search.run_search(app.config["DATASET_FOLDER"], progress=lambda message: progress(message))
+    folder = app.config["FORECAST_FOLDER"]
+    model_search.write_workbook(result, Path(folder) / model_search.WORKBOOK_FILE)
+    model_search.save_summary(result, folder)
+    return {"message": f"Provate {result['configurazioni']} configurazioni su {result['combinazioni']} combinazioni "
+                       f"({len(result['prove']):,} prove).".replace(",", "."),
+            "link_endpoint": "forecasts.model_search_page"}

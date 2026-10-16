@@ -18,6 +18,7 @@ LABELS = {
     "cruscotto": "Scaricamento dal cruscotto regionale",
     "previsioni": "Calcolo delle previsioni",
     "verifica": "Verifica sui dati nuovi",
+    "ricerca": "Ricerca dei modelli",
 }
 SHOW_FINISHED_FOR = timedelta(minutes=30)
 

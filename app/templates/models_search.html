@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+{% block title %}Ricerca dei modelli - MIC RES Sicilia{% endblock %}
+{% block content %}
+{% macro pts(v) -%}{%- if v is none -%}–{%- else -%}{{ "%.2f"|format(v)|replace(".", ",") }}{%- endif -%}{%- endmacro %}
+<div class="mb-3">
+  <h1 class="page-heading mb-1">Ricerca dei modelli</h1>
+  <div class="text-muted">Il sistema prova molte configurazioni (livelli recenti, condivisione fra laboratori e regione, trend, medie fra modelli, gradient boosting) su tre obiettivi e le giudica senza guardare il 2025: si sceglie sulle prove fino al 2022, si conferma su quelle del 2023-2024, e il 2025 serve solo da controllo finale.</div>
+</div>
+
+<div class="d-flex gap-2 flex-wrap mb-3">
+  <form method="post" action="{{ url_for('forecasts.model_search_run') }}"><button class="btn btn-primary" type="submit">{{ "Rifai la ricerca" if summary else "Avvia la ricerca" }}</button></form>
+  {% if has_workbook %}<a class="btn btn-outline-primary" href="{{ url_for('forecasts.model_search_workbook') }}">Scarica i risultati (Excel)</a>{% endif %}
+</div>
+
+{% if not summary %}
+  <section class="panel"><p class="mb-0">Nessuna ricerca ancora fatta. Richiede alcuni minuti e gira sul server: si può chiudere la pagina.</p></section>
+{% else %}
+  <p class="small text-muted">Calcolata il {{ summary.calcolato_il }}: {{ summary.configurazioni }} configurazioni, {{ summary.combinazioni }} combinazioni, {{ "{:,}".format(summary.prove).replace(",", ".") }} prove. Errori in punti di % R, media per combinazione.</p>
+  <section class="panel mb-3">
+    <h2 class="h6">Cosa è stato scelto</h2>
+    <div class="table-responsive">
+      <table class="table table-sm align-middle mb-0">
+        <thead><tr><th>Obiettivo</th><th>Modello scelto</th><th class="text-end">Scelta (fino al 2022)</th><th class="text-end">Verifica (2023-24)</th><th class="text-end">Controllo 2025</th><th>Perché</th></tr></thead>
+        <tbody>
+          {% for s in summary.scelti %}
+          <tr>
+            <td>{{ s.obiettivo }}</td><td>{{ s.modello }}<div class="small text-muted">riferimento: {{ s.riferimento }}</div></td>
+            <td class="text-end">{{ pts(s.errore_scelta) }} <span class="small text-muted">({{ pts(s.errore_rif_scelta) }})</span></td>
+            <td class="text-end">{{ pts(s.errore_verifica) }} <span class="small text-muted">({{ pts(s.errore_rif_verifica) }})</span></td>
+            <td class="text-end">{{ pts(s.errore_conferma) }} <span class="small text-muted">({{ pts(s.errore_rif_conferma) }})</span></td>
+            <td class="small">{{ s.scelto_perche }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <p class="small text-muted mt-2 mb-0">Fra parentesi l'errore del riferimento sugli stessi casi. Un modello è scelto solo se batte il riferimento di almeno il 5% sia nella scelta sia nella verifica.</p>
+  </section>
+  {% for target, rows in tops.items() %}
+  <section class="panel mb-3">
+    <h2 class="h6">Obiettivo «{{ target }}»: le migliori 8 nella verifica</h2>
+    <div class="table-responsive">
+      <table class="table table-sm align-middle mb-0">
+        <thead><tr><th>Configurazione</th><th class="text-end">Scelta</th><th class="text-end">Verifica</th><th class="text-end">Controllo 2025</th><th class="text-end">Meglio del riferimento</th></tr></thead>
+        <tbody>
+          {% for r in rows %}
+          <tr class="{% if r.modello == references[target] %}fw-semibold{% endif %}">
+            <td>{{ r.modello }}</td><td class="text-end">{{ pts(r.errore_scelta) }}</td><td class="text-end">{{ pts(r.errore_verifica) }}</td>
+            <td class="text-end">{{ pts(r.errore_conferma) }}</td><td class="text-end">{{ "%.0f"|format(100 * (r.meglio_verifica or 0)) }}% dei casi</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+  {% endfor %}
+{% endif %}
+{% endblock %}

@@ -19,6 +19,7 @@ import pandas as pd
 from .benchmark import HORIZONS, INTERVAL_Z, choose_and_verify, contexts, run_bench
 from .breakpoints import BREAKPOINTS_VERSION
 from .dataset_store import covered_period, load_isolates
+from .lab_forecasts import forecast_laboratories
 from .forecasting import FORECASTERS
 from .reference import laboratory_names
 from .series import MIN_ISOLATES_PER_PERIOD, build_series, regional_series, wilson_interval
@@ -57,7 +58,8 @@ def quarter_label(period: str | pd.Period) -> str:
 # Bump when the way forecasts are computed changes (population, series, models, choice rule):
 # results stored with an older method are then shown as out of date, like after new data.
 # 2: invasive isolates of non-hospitalised patients ("altro") outside the regional series
-METHOD_VERSION = 2
+# 3: per-laboratory forecasts of the next 12 months (partial pooling toward the region)
+METHOD_VERSION = 3
 
 
 def stale_reason(stored: dict | None, dataset_folder: str | Path) -> str | None:
@@ -110,12 +112,15 @@ def compute_forecasts(dataset_folder: str | Path, until: str | None = None, quar
     verdicts = choose_and_verify(run_bench(labs_eligible, READING)) if not labs_eligible.empty else pd.DataFrame()
     verdict_index = verdicts.set_index(["microorganismo", "antibiotic", "orizzonte_mesi"]) if not verdicts.empty else None
     contexts_by_key = {(p, a): (periods, ctx) for p, a, periods, ctx in contexts(labs_eligible, READING)}
+    by_laboratory = forecast_laboratories(labs_eligible, READING, eligible) if not labs_eligible.empty else {}
 
     combos = []
     for (pathogen, antibiotic), hist in regional.groupby(["microorganismo", "antibiotic"]):
         hist = hist.sort_values("period_start")
         entry = _history_entry(pathogen, antibiotic, hist)
         entry["laboratori"] = _laboratory_last_year(labs, pathogen, antibiotic, last_period)
+        entry["tendenza_rete_costante"] = _constant_panel_trend(labs, pathogen, antibiotic, last_period)
+        entry["previsioni_laboratori"] = by_laboratory.get((pathogen, antibiotic))
         if (pathogen, antibiotic) in eligible and verdict_index is not None:
             periods, ctx = contexts_by_key[(pathogen, antibiotic)]
             entry["previsioni"] = _forecasts(ctx, periods, verdict_index, pathogen, antibiotic)
@@ -191,6 +196,30 @@ def _laboratory_last_year(labs: pd.DataFrame, pathogen: str, antibiotic: str, la
         for lab, row in grouped.iterrows()
     ]
     return sorted(rows, key=lambda r: -r["n"])
+
+
+def _constant_panel_trend(labs: pd.DataFrame, pathogen: str, antibiotic: str, last_period) -> str:
+    """Last 12 months against the 12 before on the laboratories present in both, each
+    weighing as in the earlier year (ECDC repeats its trends on the laboratories that
+    reported throughout): a change here is not a change of which laboratories report."""
+    data = labs[(labs["microorganismo"] == pathogen) & (labs["antibiotic"] == antibiotic)]
+    period = pd.PeriodIndex(data["period"], freq="Q")
+    last = data[period > last_period - 4].groupby("laboratorio")[[f"n_{READING}", f"r_{READING}"]].sum()
+    prev = data[(period > last_period - 8) & (period <= last_period - 4)].groupby("laboratorio")[
+        [f"n_{READING}", f"r_{READING}"]].sum()
+    both = last.join(prev, lsuffix="_1", rsuffix="_0", how="inner")
+    both = both[(both[f"n_{READING}_1"] > 0) & (both[f"n_{READING}_0"] > 0)]
+    n0, n1 = both[f"n_{READING}_0"], both[f"n_{READING}_1"]
+    if n0.sum() < MIN_ISOLATES_PER_PERIOD or n1.sum() < MIN_ISOLATES_PER_PERIOD:
+        return "non valutabile"
+    w = n0 / n0.sum()
+    p0, p1 = both[f"r_{READING}_0"] / n0, both[f"r_{READING}_1"] / n1
+    P0, P1 = float((w * p0).sum()), float((w * p1).sum())
+    se = float(np.sqrt((w ** 2 * (p0 * (1 - p0) / n0 + p1 * (1 - p1) / n1)).sum()))
+    if se <= 0 or abs(P1 - P0) / se < 1.96:
+        return "stabile"
+    return (f"in aumento ({100 * P0:.0f}% → {100 * P1:.0f}%)" if P1 > P0
+            else f"in calo ({100 * P0:.0f}% → {100 * P1:.0f}%)")
 
 
 def _trend_words(r1, n1, r0, n0) -> str:

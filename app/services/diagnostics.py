@@ -49,6 +49,7 @@ SHEET_NOTES = {
     "Laboratori": "Per laboratorio: in quante combinazioni è quello che sposta di più il dato regionale e di quanto in media. I laboratori nuovi o molto cresciuti sono la prima cosa da guardare.",
     "Modelli": "Errore di ogni modello candidato sugli stessi confronti. \"Migliore in\" = combinazioni in cui avrebbe sbagliato meno, col senno di poi: è una diagnosi, non un criterio di scelta.",
     "Modello mostrato": "Errore delle previsioni mostrate, raggruppate per il modello che il sistema aveva scelto.",
+    "Laboratori 2025": "Previsione dei 12 mesi successivi per ogni laboratorio, fatta con i dati fino al taglio, contro il valore osservato dal laboratorio (almeno 30 testati). Accanto, l'errore se si fosse usato l'ultimo anno del laboratorio o il dato regionale.",
 }
 
 CAUSE_LABELS = {"rumore": "Nella variabilità casuale", "mix": "Mix dei laboratori",
@@ -366,6 +367,14 @@ def build_validation_workbook(validation: dict, app_version: str) -> bytes:
     sheets.update(_analysis_sheets(validation))
     if validation.get("righe"):
         sheets["Verifica dati nuovi"] = _validation_sheet(validation)
+    if (validation.get("laboratori") or {}).get("righe"):
+        sheets["Laboratori 2025"] = _round(pd.DataFrame(validation["laboratori"]["righe"]).rename(columns={
+            "microorganismo": "Microrganismo", "antibiotico": "Antibiotico", "laboratorio": "Laboratorio",
+            "nome": "Ente", "semaforo": "Semaforo", "n": "Testati osservati", "previsto": "Previsto (%)",
+            "basso": "Intervallo 80% min", "alto": "Intervallo 80% max", "osservato": "Osservato (%)",
+            "errore": "Errore (punti)", "dentro": "Dentro l'intervallo",
+            "errore_laboratorio_12_mesi": "Errore ultimo anno del laboratorio",
+            "errore_regionale_12_mesi": "Errore dato regionale"}))
     return _write(sheets)
 
 

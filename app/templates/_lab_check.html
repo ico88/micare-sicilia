@@ -1,0 +1,18 @@
+{# 2025 check of the per-laboratory forecasts of the next 12 months (out_of_sample._laboratory_check) #}
+{% set lc = (result.laboratori or {}).get('sintesi') %}
+{% if lc %}
+<section class="panel mb-3">
+  <h2 class="h6">Previsioni per laboratorio, alla prova del 2025</h2>
+  <p class="small text-muted">Previsione dei 12 mesi successivi per ogni laboratorio, fatta con i dati fino al {{ result.dati_fino_al }}, confrontata con quanto il laboratorio ha osservato (almeno 30 testati, solo previsioni mostrate).</p>
+  <div class="row g-3">
+    <div class="col-md-4"><div class="text-muted small">Errore medio</div><div class="fs-4 fw-semibold">{{ "%.1f"|format(lc.errore)|replace(".", ",") }} punti</div>
+      <div class="small">{{ lc.prove }} confronti, {{ lc.laboratori }} laboratori, {{ lc.combinazioni }} combinazioni</div></div>
+    <div class="col-md-4"><div class="text-muted small">Al posto della previsione</div>
+      <div class="small">l'ultimo anno del laboratorio: <strong>{{ "%.1f"|format(lc.errore_laboratorio_12_mesi)|replace(".", ",") }} punti</strong></div>
+      <div class="small">il dato regionale: <strong>{{ "%.1f"|format(lc.errore_regionale_12_mesi)|replace(".", ",") }} punti</strong></div></div>
+    <div class="col-md-4"><div class="text-muted small">Valore reale dentro l'intervallo</div><div class="fs-4 fw-semibold">{{ lc.dentro }} su {{ lc.prove }}</div>
+      <div class="small">{{ "%.0f"|format(lc.copertura) }}%, l'obiettivo è circa 80%:
+        {% if lc.copertura_compatibile %}<span class="text-success fw-semibold">in linea</span>{% elif lc.copertura < 80 %}<span class="text-danger fw-semibold">intervalli troppo stretti</span>{% else %}<span class="text-warning fw-semibold">intervalli più larghi del necessario</span>{% endif %}</div></div>
+  </div>
+</section>
+{% endif %}

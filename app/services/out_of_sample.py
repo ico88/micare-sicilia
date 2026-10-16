@@ -86,6 +86,9 @@ def compute_validation(dataset_folder: str | Path) -> dict:
             rows.append(row)
 
     table = pd.DataFrame(rows)
+    labs = quarterly[(quarterly["popolazione"] == POPULATION)
+                     & (pd.PeriodIndex(quarterly["period"], freq="Q") > cutoff)
+                     & (pd.PeriodIndex(quarterly["period"], freq="Q") <= last)]
     return {
         "available": True,
         "calcolato_il": datetime.now().strftime("%d/%m/%Y %H:%M"),
@@ -99,6 +102,7 @@ def compute_validation(dataset_folder: str | Path) -> dict:
                          if not table.empty else {},
         "righe": rows,
         "analisi": _analysis(dataset_folder, rows, cutoff) if rows else {},
+        "laboratori": _laboratory_check(then, labs, pd.period_range(cutoff + 1, last, freq="Q")),
     }
 
 
@@ -107,6 +111,53 @@ def _analysis(dataset_folder, rows: list[dict], cutoff: pd.Period) -> dict:
     another kind of patient (e.g. non-hospitalised) shows up as a new stratum, i.e. as mix."""
     strata = build_series(dataset_folder, "Q", split_by="paziente_ricoverato")
     return analyse(rows, strata[strata["popolazione"] == POPULATION], cutoff, ANALYSED, READING)
+
+
+def _laboratory_check(then: dict, labs: pd.DataFrame, quarters) -> dict:
+    """Per-laboratory forecasts of the next 12 months made at the cutoff, against what each
+    laboratory observed after it (only when all four quarters are observed, >= 30 tested)."""
+    if len(quarters) < 4:
+        return {}
+    window = {str(q) for q in quarters[:4]}
+    observed = (labs[labs["period"].isin(window)]
+                .groupby(["microorganismo", "antibiotic", "laboratorio"])[[f"n_{READING}", f"r_{READING}"]].sum())
+    rows = []
+    for combo in then["combinations"]:
+        block = combo.get("previsioni_laboratori") or {}
+        last_year = {lab["codice"]: lab for lab in combo.get("laboratori", [])}
+        regional = (combo.get("ultimi_12_mesi") or {}).get("pct")
+        for f in block.get("laboratori", []):
+            key = (combo["microorganismo"], combo["antibiotico"], f["codice"])
+            if f["semaforo"] == "grigio" or key not in observed.index:
+                continue
+            n, r = observed.loc[key]
+            if n < MIN_ISOLATES_PER_PERIOD:
+                continue
+            pct = 100 * r / n
+            own = last_year.get(f["codice"], {}).get("pct")
+            rows.append({
+                "microorganismo": combo["microorganismo"], "antibiotico": combo["antibiotico"],
+                "laboratorio": f["codice"], "nome": f["nome"], "semaforo": f["semaforo"], "n": int(n),
+                "previsto": f["pct"], "basso": f["low"], "alto": f["high"], "osservato": pct,
+                "errore": abs(f["pct"] - pct), "dentro": bool(f["low"] <= pct <= f["high"]),
+                "errore_laboratorio_12_mesi": None if own is None else abs(own - pct),
+                "errore_regionale_12_mesi": None if regional is None else abs(regional - pct),
+            })
+    if not rows:
+        return {}
+    t = pd.DataFrame(rows)
+    return {
+        "righe": rows,
+        "sintesi": {
+            "prove": len(t), "laboratori": int(t["laboratorio"].nunique()),
+            "combinazioni": int(t[["microorganismo", "antibiotico"]].drop_duplicates().shape[0]),
+            "errore": float(t["errore"].mean()),
+            "errore_laboratorio_12_mesi": float(t["errore_laboratorio_12_mesi"].dropna().mean()),
+            "errore_regionale_12_mesi": float(t["errore_regionale_12_mesi"].dropna().mean()),
+            "dentro": int(t["dentro"].sum()), "copertura": float(100 * t["dentro"].mean()),
+            "copertura_compatibile": bool(coverage_compatible(int(t["dentro"].sum()), len(t))),
+        },
+    }
 
 
 def _summary(table: pd.DataFrame) -> dict | None:

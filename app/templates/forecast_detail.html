@@ -14,7 +14,8 @@
       {% if combo.ultimi_12_mesi %}
         <p class="mb-1 fs-5"><strong>{{ "%.0f"|format(combo.ultimi_12_mesi.pct) }}%</strong> di resistenti su {{ combo.ultimi_12_mesi.n }} isolati
           <span class="text-muted small">(fra {{ "%.0f"|format(combo.ultimi_12_mesi.low) }}% e {{ "%.0f"|format(combo.ultimi_12_mesi.high) }}%)</span></p>
-        <p class="mb-3 small">Tendenza rispetto ai 12 mesi precedenti: <strong>{{ combo.tendenza }}</strong>.</p>
+        <p class="mb-3 small">Tendenza rispetto ai 12 mesi precedenti: <strong>{{ combo.tendenza }}</strong>{% if combo.tendenza_rete_costante %}; a laboratori costanti: <strong>{{ combo.tendenza_rete_costante }}</strong>{% endif %}.
+          {% if combo.tendenza_rete_costante and combo.tendenza_rete_costante.split(' ')[0] != combo.tendenza.split(' ')[0] %}<span class="text-warning">La differenza viene dai laboratori che sono entrati, usciti o cambiati di peso, non dalla resistenza.</span>{% endif %}</p>
       {% else %}
         <p class="text-muted">Nessun isolato testato negli ultimi 12 mesi.</p>
       {% endif %}
@@ -51,20 +52,34 @@
   </div>
 </div>
 
+{% set pl = combo.previsioni_laboratori %}
 {% if combo.laboratori %}
 <section class="panel mt-3">
-  <h2 class="h6 mb-1">Per laboratorio, ultimi 12 mesi <span class="badge text-bg-light border">indicativo</span></h2>
-  <p class="text-muted small">Dati osservati, non previsioni: per singolo laboratorio gli isolati sono pochi e la percentuale oscilla molto. Sotto i 30 isolati il valore non è riportabile.</p>
+  <h2 class="h6 mb-1">Per laboratorio</h2>
+  {% if pl %}
+    {% set v = pl.verifica %}
+    <p class="text-muted small mb-2">Previsione dei prossimi 12 mesi per ogni laboratorio: il suo ultimo anno, avvicinato al dato regionale tanto più quanto meno isolati ha. Così un laboratorio con pochi isolati non mostra oscillazioni casuali come se fossero vere.
+      {% if v.errore is not none %}Nelle prove degli ultimi due anni ha sbagliato in media di {{ "%.1f"|format(v.errore)|replace(".", ",") }} punti; l'intervallo ha contenuto il valore reale nel {{ "%.0f"|format(v.copertura) }}% dei casi ({{ v.prove }} prove).{% endif %}</p>
+  {% else %}
+    <p class="text-muted small">Dati osservati negli ultimi 12 mesi: per singolo laboratorio gli isolati sono pochi e la percentuale oscilla molto. Sotto i 30 isolati il valore non è riportabile.</p>
+  {% endif %}
   <div class="table-responsive">
     <table class="table table-sm align-middle mb-0">
-      <thead><tr><th>Laboratorio</th><th class="text-end">Isolati</th><th class="text-end">% resistenti</th><th>Incertezza</th></tr></thead>
+      <thead><tr><th>Laboratorio</th><th class="text-end">Isolati, ultimi 12 mesi</th><th class="text-end">Osservato, ultimi 12 mesi</th>
+        {% if pl %}<th class="text-end">Previsto, prossimi 12 mesi</th><th>Affidabilità</th>{% endif %}</tr></thead>
       <tbody>
+        {% set forecast_by_lab = {} %}
+        {% if pl %}{% for f in pl.laboratori %}{% set _ = forecast_by_lab.update({f.codice: f}) %}{% endfor %}{% endif %}
         {% for lab in combo.laboratori %}
+          {% set f = forecast_by_lab.get(lab.codice) %}
           <tr class="{% if not lab.riportabile %}text-muted{% endif %}">
             <td>{{ lab.nome }} <span class="text-muted small">{{ lab.codice }}</span></td>
             <td class="text-end">{{ lab.n }}</td>
-            <td class="text-end">{% if lab.riportabile %}{{ "%.0f"|format(lab.pct) }}%{% else %}<span class="small">non riportabile</span>{% endif %}</td>
-            <td class="small">{% if lab.riportabile %}fra {{ "%.0f"|format(lab.low) }}% e {{ "%.0f"|format(lab.high) }}%{% endif %}</td>
+            <td class="text-end">{% if lab.riportabile %}{{ "%.0f"|format(lab.pct) }}% <span class="small text-muted">({{ "%.0f"|format(lab.low) }}-{{ "%.0f"|format(lab.high) }}%)</span>{% else %}<span class="small">non riportabile</span>{% endif %}</td>
+            {% if pl %}
+              <td class="text-end">{% if f and f.semaforo != 'grigio' %}<strong>{{ "%.0f"|format(f.pct) }}%</strong> <span class="small text-muted">({{ "%.0f"|format(f.low) }}-{{ "%.0f"|format(f.high) }}%)</span>{% else %}<span class="small">–</span>{% endif %}</td>
+              <td>{% if f %}<span class="badge text-bg-{{ traffic[f.semaforo].badge }}">{{ traffic[f.semaforo].label }}</span>{% endif %}</td>
+            {% endif %}
           </tr>
         {% endfor %}
       </tbody>
