@@ -32,6 +32,7 @@ import pandas as pd
 from .series import MIN_ISOLATES_PER_PERIOD
 
 Z_NOISE = 1.96
+LISTED_SHARE = 0.05  # new / gone strata named only from this share of the tested isolates
 CAUSES = {
     "rumore": "nella variabilità casuale",
     "mix": "cambiato il mix dei laboratori",
@@ -127,7 +128,9 @@ def _combination(group: pd.DataFrame, series: pd.DataFrame, base_periods: list[s
         "errore_casuale": 100 * se, "causa": cause,
         "sovrastime": int((signed < 0).sum()), "sottostime": int((signed > 0).sum()),
         "stesso_verso": bool((signed > 0).all() or (signed < 0).all()),
-        "laboratori_nuovi": sorted(lab.index[new | thin]), "laboratori_usciti": sorted(lab.index[gone]),
+        # only strata that weigh in the regional figure: tiny ones are noise in a list
+        "laboratori_nuovi": sorted(lab.index[(new | thin) & (w1 >= LISTED_SHARE)]),
+        "laboratori_usciti": sorted(lab.index[gone & (w0 >= LISTED_SHARE)]),
     }
     errors = {name: _mean_abs(group.get(f"errore_{name}")) for name in models}
     errors["mostrato"] = float(group["errore"].mean())

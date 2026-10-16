@@ -51,7 +51,8 @@ def analysis():
     real = _labs("CTX", {"A": ((400, 80), (400, 140))})                              # 20% -> 35% in place
     noise = _labs("CIP", {"A": ((100, 20), (100, 21))})                              # 20% -> 21%
     # few tested before (5 a quarter = 20 a year), then many: in practice a new laboratory
-    grown = _labs("AMK", {"A": ((100, 20), (100, 20)), "C": ((5, 3), (300, 30)), "Z": ((0, 0), (0, 0))})
+    grown = _labs("AMK", {"A": ((100, 20), (100, 20)), "C": ((5, 3), (300, 30)), "Z": ((0, 0), (0, 0)),
+                          "T": (None, (4, 1))})  # new but 1% of the tested: not named
     series = pd.concat([mix, real, noise, grown])
     rows = (_rows("MEM", mix, 20.0) + _rows("CTX", real, 20.0, trend_pct=30.0) + _rows("CIP", noise, 20.0)
             + _rows("AMK", grown, 21.0))
