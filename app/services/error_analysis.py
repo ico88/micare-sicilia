@@ -11,6 +11,10 @@ year before the cutoff (P0, 2024):
                joining / leaving: sum of (w1 - w0)(p0 - P0), entries w1 (p1 - P0)
   real change  resistance moving inside the laboratories: sum of w1 (p1 - p0)
 
+A laboratory with fewer than MIN_ISOLATES_PER_PERIOD tested in the year before
+is in practice new: its earlier resistance is not known (24 isolates, then 588
+a year later and 59% of the region), so its whole contribution counts as mix.
+
 with w the share of tested isolates and p the % resistant of each laboratory,
 F the forecast pooled with the observed isolates of each quarter. A deviation
 within 1.96 standard errors of the pooled observed value is called noise.
@@ -24,6 +28,8 @@ from __future__ import annotations
 
 import numpy as np
 import pandas as pd
+
+from .series import MIN_ISOLATES_PER_PERIOD
 
 Z_NOISE = 1.96
 CAUSES = {
@@ -89,6 +95,10 @@ def _combination(group: pd.DataFrame, series: pd.DataFrame, base_periods: list[s
     mix[gone] = (-w0 * (p0 - P0))[gone]
     real = pd.Series(0.0, index=lab.index)
     real[both] = (w1 * (p1 - p0))[both]
+    # too few tested before to know its resistance then: all of it is a change of mix
+    thin = both & (n0 < MIN_ISOLATES_PER_PERIOD)
+    mix[thin] += real[thin]
+    real[thin] = 0.0
 
     weights = group.set_index("periodo")["n"]
     forecast = float((group.set_index("periodo")["previsto"] * weights).sum() / weights.sum()) / 100
@@ -116,7 +126,7 @@ def _combination(group: pd.DataFrame, series: pd.DataFrame, base_periods: list[s
         "errore_casuale": 100 * se, "causa": cause,
         "sovrastime": int((signed < 0).sum()), "sottostime": int((signed > 0).sum()),
         "stesso_verso": bool((signed > 0).all() or (signed < 0).all()),
-        "laboratori_nuovi": sorted(lab.index[new]), "laboratori_usciti": sorted(lab.index[gone]),
+        "laboratori_nuovi": sorted(lab.index[new | thin]), "laboratori_usciti": sorted(lab.index[gone]),
     }
     errors = {name: _mean_abs(group.get(f"errore_{name}")) for name in models}
     errors["mostrato"] = float(group["errore"].mean())
@@ -128,7 +138,7 @@ def _combination(group: pd.DataFrame, series: pd.DataFrame, base_periods: list[s
     for code in lab.index:
         contributions.append({
             "microorganismo": combo["microorganismo"], "antibiotico": combo["antibiotico"], "laboratorio": code,
-            "stato": "nuovo" if new[code] else "uscito" if gone[code] else "presente",
+            "stato": "nuovo" if new[code] else "quasi nuovo" if thin[code] else "uscito" if gone[code] else "presente",
             "n_base": int(n0[code]), "n_osservati": int(n1[code]),
             "peso_base": 100 * float(w0[code]), "peso_osservato": 100 * float(w1[code]),
             "resistenza_base": _pct(p0[code]), "resistenza_osservata": _pct(p1[code]),
@@ -173,8 +183,9 @@ def _laboratory_summary(lab_rows: list[dict], lab_series: pd.DataFrame, base_per
     for code, g in rows.groupby("laboratorio"):
         out.append({
             "laboratorio": code,
-            "stato": "nuovo" if (g["stato"] == "nuovo").all() else "uscito" if (g["stato"] == "uscito").all()
-                     else "presente",
+            "stato": "nuovo" if (g["stato"] == "nuovo").all()
+                     else "quasi nuovo" if g["stato"].isin(["nuovo", "quasi nuovo"]).all()
+                     else "uscito" if (g["stato"] == "uscito").all() else "presente",
             "isolati_base": int(base.get(code, 0)), "isolati_osservati": int(now.get(code, 0)),
             "combinazioni": int(len(g)),
             "primo_contributo": int((top["laboratorio"] == code).sum()),

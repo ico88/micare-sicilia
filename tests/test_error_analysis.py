@@ -50,14 +50,18 @@ def analysis():
     mix = _labs("MEM", {"A": ((100, 20), (100, 20)), "B": (None, (100, 60))})      # new laboratory at 60%
     real = _labs("CTX", {"A": ((400, 80), (400, 140))})                              # 20% -> 35% in place
     noise = _labs("CIP", {"A": ((100, 20), (100, 21))})                              # 20% -> 21%
-    series = pd.concat([mix, real, noise])
-    rows = _rows("MEM", mix, 20.0) + _rows("CTX", real, 20.0, trend_pct=30.0) + _rows("CIP", noise, 20.0)
+    # few tested before (5 a quarter = 20 a year), then many: in practice a new laboratory
+    grown = _labs("AMK", {"A": ((100, 20), (100, 20)), "C": ((5, 3), (300, 30))})
+    series = pd.concat([mix, real, noise, grown])
+    rows = (_rows("MEM", mix, 20.0) + _rows("CTX", real, 20.0, trend_pct=30.0) + _rows("CIP", noise, 20.0)
+            + _rows("AMK", grown, 21.0))
     return analyse(rows, series, pd.Period("2024Q4", freq="Q"), MODELS)
 
 
 def test_deviation_is_split_into_laboratory_mix_and_unforeseen_change(analysis):
     combos = {c["antibiotico"]: c for c in analysis["combinazioni"]}
-    assert {k: c["causa"] for k, c in combos.items()} == {"MEM": "mix", "CTX": "reale", "CIP": "rumore"}
+    assert {k: c["causa"] for k, c in combos.items()} == {"MEM": "mix", "CTX": "reale", "CIP": "rumore", "AMK": "mix"}
+    assert combos["AMK"]["laboratori_nuovi"] == ["C"] and combos["AMK"]["di_cui_non_previsto"] < 1
 
     mem = combos["MEM"]
     assert mem["base"] == pytest.approx(20) and mem["osservato"] == pytest.approx(40)
@@ -78,14 +82,14 @@ def test_deviation_is_split_into_laboratory_mix_and_unforeseen_change(analysis):
 
 def test_summary_and_models(analysis):
     s = analysis["sintesi"]
-    assert s["cause"] == {"rumore": 1, "mix": 1, "reale": 1}
-    assert s["sottostima"] == 3 and s["distorsione_trimestri"] > 0
+    assert s["cause"] == {"rumore": 1, "mix": 2, "reale": 1}
+    assert s["sottostima"] == 3 and s["sovrastima"] == 1
     assert analysis["combinazioni"][0]["antibiotico"] == "MEM"  # largest deviation first
     models = {m["modello"]: m for m in analysis["modelli"]["complessivo"]}
     assert set(models) == {"mostrato", *MODELS}
     assert models["trend"]["migliore_in"] == 1
     lab_a = next(l for l in analysis["laboratori_sintesi"] if l["laboratorio"] == "A")
-    assert lab_a["combinazioni"] == 3
+    assert lab_a["combinazioni"] == 4
 
 
 @pytest.fixture

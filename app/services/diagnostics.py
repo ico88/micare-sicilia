@@ -45,7 +45,7 @@ SHEET_NOTES = {
     "Leggimi analisi": "Analisi degli scostamenti della verifica sui dati nuovi: cosa contiene questo file e come leggerlo. Solo dati aggregati per laboratorio, nessun codice paziente o campione.",
     "Sintesi scostamenti": "I numeri chiave: quante combinazioni sbagliano e in che verso, e quanta parte dello scostamento viene dal mix dei laboratori o da variazioni della resistenza non previste.",
     "Scostamenti combinazione": "Una riga per microrganismo x antibiotico, trimestri osservati sommati, dal più grande scostamento al più piccolo. Scostamento = osservato - previsto = di cui mix laboratori + di cui variazione non prevista (in punti di % R).",
-    "Contributi laboratori": "Per ogni combinazione e laboratorio: peso e resistenza nell'anno prima del taglio e nei trimestri osservati, e quanto il laboratorio ha spostato il dato regionale. La somma dei contributi di una combinazione è la variazione regionale osservata.",
+    "Contributi laboratori": "Per ogni combinazione e laboratorio, diviso per tipo di paziente (ricoverati, pronto soccorso, non ricoverati...): peso e resistenza nell'anno prima del taglio e nei trimestri osservati, e quanto il laboratorio ha spostato il dato regionale. La somma dei contributi di una combinazione è la variazione regionale osservata.",
     "Laboratori": "Per laboratorio: in quante combinazioni è quello che sposta di più il dato regionale e di quanto in media. I laboratori nuovi o molto cresciuti sono la prima cosa da guardare.",
     "Modelli": "Errore di ogni modello candidato sugli stessi confronti. \"Migliore in\" = combinazioni in cui avrebbe sbagliato meno, col senno di poi: è una diagnosi, non un criterio di scelta.",
     "Modello mostrato": "Errore delle previsioni mostrate, raggruppate per il modello che il sistema aveva scelto.",
@@ -441,14 +441,14 @@ def _analysis_sheets(validation: dict) -> dict[str, pd.DataFrame]:
         "contributo": "Contributo totale (punti)",
     })
     names = laboratory_names()
-    labs.insert(3, "Ente", labs["Laboratorio"].map(lambda code: names.get(code, "")))
+    labs.insert(3, "Ente", labs["Laboratorio"].map(lambda unit: names.get(unit.split(" · ")[0], "")))
     lab_summary = pd.DataFrame(analysis["laboratori_sintesi"]).rename(columns={
         "laboratorio": "Laboratorio", "stato": "Stato", "isolati_base": "Primi isolati anno prima",
         "isolati_osservati": "Primi isolati nei trimestri osservati", "combinazioni": "Combinazioni",
         "primo_contributo": "Combinazioni in cui sposta di più", "contributo_medio_assoluto": "Spostamento medio (punti)",
         "contributo_mix_medio": "di cui mix (media, con segno)", "contributo_reale_medio": "di cui variazione (media, con segno)",
     })
-    lab_summary.insert(1, "Ente", lab_summary["Laboratorio"].map(lambda code: names.get(code, "")))
+    lab_summary.insert(1, "Ente", lab_summary["Laboratorio"].map(lambda unit: names.get(unit.split(" · ")[0], "")))
     model_names = {**MODEL_NAMES, "mostrato": "Previsione mostrata"}
     models = pd.DataFrame(analysis["modelli"]["complessivo"]).assign(
         modello=lambda d: d["modello"].map(model_names)).rename(columns={

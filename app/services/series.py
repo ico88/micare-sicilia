@@ -59,8 +59,16 @@ def wilson_interval(k: pd.Series, n: pd.Series, z: float = 1.96) -> tuple[pd.Ser
     return 100 * (centre - half), 100 * (centre + half)
 
 
-def build_series(folder: str | Path, freq: str = "Q") -> pd.DataFrame:
+# Patient type (PAZIENTE_RICOVERATO) as a short stratum label for split_by
+SETTING_LABELS = {"1": "ricoverati", "2": "day hospital", "3": "pronto soccorso", "4": "RSA",
+                  "5": "non ricoverati, altro"}
+
+
+def build_series(folder: str | Path, freq: str = "Q", split_by: str | None = None) -> pd.DataFrame:
     """One row per laboratory x pathogen x antibiotic x period ("Q" or "M").
+
+    split_by="paziente_ricoverato" splits each laboratory by patient type
+    ("IT168 · ricoverati"): the strata add up to the same regional figures.
 
     Columns per reading r in (reported, harmonized):
       n_<r>         first isolates with a usable result
@@ -73,6 +81,10 @@ def build_series(folder: str | Path, freq: str = "Q") -> pd.DataFrame:
     if isolates.empty:
         return pd.DataFrame()
     isolates = isolates[first_isolate_mask(isolates, freq, by=["popolazione"])]
+    if split_by == "paziente_ricoverato" and split_by in isolates:
+        # after the first-isolate rule, so the strata add up to the regional series
+        setting = isolates[split_by].astype(str).str.strip().map(SETTING_LABELS).fillna("tipo non indicato")
+        isolates = isolates.assign(laboratorio=isolates["laboratorio"] + " · " + setting)
     ast = load_ast_results(folder, with_isolate_columns=False)
     ast = ast.merge(isolates[["upload_id", "isolate_id", "popolazione", "laboratorio", "microorganismo", "data_prelievo"]],
                     on=["upload_id", "isolate_id"], how="inner")

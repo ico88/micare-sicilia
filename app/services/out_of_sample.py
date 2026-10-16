@@ -96,9 +96,15 @@ def compute_validation(dataset_folder: str | Path) -> dict:
         "per_orizzonte": {int(h): _summary(g) for h, g in table[table["semaforo"] != "grigio"].groupby("orizzonte_mesi")}
                          if not table.empty else {},
         "righe": rows,
-        "analisi": analyse(rows, quarterly[quarterly["popolazione"] == POPULATION], cutoff, ANALYSED, READING)
-                   if rows else {},
+        "analisi": _analysis(dataset_folder, rows, cutoff) if rows else {},
     }
+
+
+def _analysis(dataset_folder, rows: list[dict], cutoff: pd.Period) -> dict:
+    """Error analysis on laboratory x patient type strata: a laboratory that starts sending
+    another kind of patient (e.g. non-hospitalised) shows up as a new stratum, i.e. as mix."""
+    strata = build_series(dataset_folder, "Q", split_by="paziente_ricoverato")
+    return analyse(rows, strata[strata["popolazione"] == POPULATION], cutoff, ANALYSED, READING)
 
 
 def _summary(table: pd.DataFrame) -> dict | None:

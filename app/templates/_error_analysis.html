@@ -12,6 +12,7 @@
   {% else %}
   {% set a = analysis.sintesi %}
   <p class="small text-muted">Trimestri osservati sommati per ogni combinazione e confrontati con l'anno prima del taglio ({{ analysis.periodo_base }}).
+    Ogni laboratorio è diviso per tipo di paziente (ricoverati, pronto soccorso, non ricoverati…): un laboratorio che inizia a inviare un altro tipo di paziente cambia il mix, non la resistenza.
     Scostamento = osservato − previsto: <strong>positivo, il modello ha sottostimato</strong>; negativo, ha sovrastimato. Il file Excel contiene tutto, solo dati aggregati: si può condividere.</p>
   <ul class="small">
     <li>Su <strong>{{ a.combinazioni }}</strong> combinazioni il modello ha sottostimato in <strong>{{ a.sottostima }}</strong> e sovrastimato in <strong>{{ a.sovrastima }}</strong>;
@@ -53,14 +54,15 @@
 
   <div class="row g-3">
     <div class="col-lg-6">
-      <h3 class="h6">I laboratori che spostano di più il dato regionale</h3>
+      <h3 class="h6">Laboratori e tipi di paziente che spostano di più il dato regionale</h3>
       <table class="table table-sm align-middle mb-0">
-        <thead><tr><th>Laboratorio</th><th class="text-end">Primi isolati<br><span class="fw-normal small">anno prima → dopo</span></th><th class="text-end">Sposta di più in</th><th class="text-end">Spostamento medio</th></tr></thead>
+        <thead><tr><th>Laboratorio · tipo di paziente</th><th class="text-end">Primi isolati<br><span class="fw-normal small">anno prima → dopo</span></th><th class="text-end">Sposta di più in</th><th class="text-end">Spostamento medio</th></tr></thead>
         <tbody>
           {% for l in analysis.laboratori_sintesi[:10] %}
             <tr>
-              <td>{{ l.laboratorio }}{% if lab_names.get(l.laboratorio) %} <span class="small text-muted">{{ lab_names[l.laboratorio] }}</span>{% endif %}
-                {% if l.stato == 'nuovo' %}<span class="badge text-bg-info">nuovo</span>{% endif %}</td>
+              {% set code = l.laboratorio.split(' · ')[0] %}
+              <td>{{ l.laboratorio }}{% if lab_names.get(code) %} <span class="small text-muted">{{ lab_names[code] }}</span>{% endif %}
+                {% if l.stato in ('nuovo', 'quasi nuovo') %}<span class="badge text-bg-info">{{ l.stato }}</span>{% endif %}</td>
               <td class="text-end">{{ l.isolati_base }} → {{ l.isolati_osservati }}</td>
               <td class="text-end">{{ l.primo_contributo }} comb.</td>
               <td class="text-end">{{ pts(l.contributo_medio_assoluto, false) }} punti</td>
