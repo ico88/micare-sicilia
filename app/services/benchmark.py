@@ -39,7 +39,8 @@ def contexts(lab_series: pd.DataFrame, reading: str = "harmonized"):
         n_tab = n_tab.reindex(columns=periods_all).fillna(0)
         r_tab = r_tab.reindex(columns=periods_all).fillna(0)
         lab_n, lab_r = n_tab.to_numpy(dtype=float), r_tab.to_numpy(dtype=float)
-        yield pathogen, antibiotic, np.array(periods_all), Context(lab_n.sum(0), lab_r.sum(0), lab_n, lab_r)
+        yield pathogen, antibiotic, np.array(periods_all), Context(lab_n.sum(0), lab_r.sum(0), lab_n, lab_r,
+                                                                   str(periods_all[0]))
 
 
 def run_bench(lab_series: pd.DataFrame, reading: str = "harmonized", forecasters=None) -> pd.DataFrame:

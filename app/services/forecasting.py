@@ -10,16 +10,19 @@ var_mean  variance of p itself (estimation uncertainty)
 phi       dispersion (>= 1): extra quarter-to-quarter variability beyond binomial
           sampling, so the interval for an observed quarter of n isolates is
           p +/- z * sqrt(var_mean + phi * p (1 - p) / n)
+          (0 for Prophet, whose interval already includes the noise it saw)
 
 Inputs are count arrays over quarters: regional n, r (length T) and the same per
 laboratory (L x T) for the laboratory-effect model.
 """
 from __future__ import annotations
 
+import logging
 import warnings
 from dataclasses import dataclass
 
 import numpy as np
+import pandas as pd
 
 EPS = 1e-6
 
@@ -30,6 +33,7 @@ class Context:
     r: np.ndarray          # regional resistant per quarter
     lab_n: np.ndarray      # laboratories x quarters
     lab_r: np.ndarray
+    first_period: str = "2019Q1"   # calendar quarter of index 0 (seasonality needs real dates)
 
 
 def _expit(x):
@@ -177,10 +181,55 @@ def trend_by_laboratory(ctx: Context, origin: int, horizons):
     return out
 
 
+# ---------------------------------------------------------------------------
+# Prophet, as in the original project: %R on the logit scale, linear growth,
+# yearly seasonality; its own 80% interval
+# ---------------------------------------------------------------------------
+
+PROPHET_MIN_TESTED = 10        # the original pipeline dropped periods with fewer samples
+PROPHET_INTERVAL_Z = 1.2816    # Prophet interval_width=0.8, converted back to a standard deviation
+
+
+def prophet_model(ctx: Context, origin: int, horizons):
+    if not horizons:
+        return {}
+    try:
+        from prophet import Prophet
+    except ImportError:
+        return {}
+    for name in ("prophet", "cmdstanpy"):
+        logging.getLogger(name).disabled = True
+    n, r = ctx.n[:origin + 1], ctx.r[:origin + 1]
+    keep = n >= PROPHET_MIN_TESTED
+    if keep.sum() < MIN_QUARTERS:
+        return {}
+    starts = pd.period_range(ctx.first_period, periods=origin + 1 + max(horizons, default=0), freq="Q").start_time
+    y = (r[keep] + 0.5) / (n[keep] + 1)
+    history = pd.DataFrame({"ds": starts[:origin + 1][keep], "y": np.log(y / (1 - y))})
+    # Quarterly data identify at most two yearly harmonics
+    model = Prophet(growth="linear", yearly_seasonality=2, weekly_seasonality=False, daily_seasonality=False,
+                    interval_width=0.8, uncertainty_samples=300)
+    try:
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            model.fit(history, seed=0)
+            np.random.seed(0)  # interval by simulation: same data, same interval
+            future = pd.DataFrame({"ds": [starts[origin + h] for h in horizons]})
+            pred = model.predict(future)
+    except Exception:
+        return {}
+    out = {}
+    for h, (_, row) in zip(horizons, pred.iterrows()):
+        p, lo, hi = (float(_expit(row[c])) for c in ("yhat", "yhat_lower", "yhat_upper"))
+        out[h] = (p, ((hi - lo) / (2 * PROPHET_INTERVAL_Z)) ** 2, 0.0)
+    return out
+
+
 FORECASTERS = {
     "persistenza_12m": persistence,
     "persistenza_tarata": persistence_calibrated,
     "trend": trend,
     "trend_laboratori": trend_by_laboratory,
+    "prophet": prophet_model,
 }
 REFERENCE = "persistenza_12m"

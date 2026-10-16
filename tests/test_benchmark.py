@@ -1,7 +1,15 @@
 import numpy as np
 import pandas as pd
 
-from app.services.benchmark import choose_and_verify, overview, run_bench, summarize
+from app.services.benchmark import choose_and_verify, contexts, overview, run_bench as _run_bench, summarize
+from app.services.forecasting import FORECASTERS, prophet_model
+
+# Prophet takes a fraction of a second per fit: the bench tests use the fast models
+FAST = {name: f for name, f in FORECASTERS.items() if name != "prophet"}
+
+
+def run_bench(data):
+    return _run_bench(data, forecasters=FAST)
 
 
 def _regional(p_by_quarter, n=400, seed=0):
@@ -74,3 +82,21 @@ def test_traffic_light_never_improves_further_ahead():
         levels = combo["semaforo"].map(order).tolist()
         assert levels == sorted(levels)
         assert (combo["semaforo"].map(order) >= combo["semaforo_orizzonte"].map(order)).all()
+
+
+def test_prophet_follows_a_stable_series_with_its_own_interval():
+    data = _regional([0.3] * 16, n=400, seed=3)
+    (_, _, periods, ctx), = contexts(data)
+    assert ctx.first_period == "2019Q1"
+    out = prophet_model(ctx, 15, [1, 4])
+    assert set(out) == {1, 4}
+    for p, var_mean, phi in out.values():
+        assert 0.2 < p < 0.4
+        assert var_mean > 0 and phi == 0.0
+    assert prophet_model(ctx, 3, [1]) == {}       # too little history
+
+
+def test_prophet_takes_part_in_the_bench():
+    bench = _run_bench(_regional([0.3] * 12), forecasters={"persistenza_12m": FORECASTERS["persistenza_12m"],
+                                                         "prophet": prophet_model})
+    assert {"persistenza_12m", "prophet"} == set(bench["modello"])
