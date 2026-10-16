@@ -60,19 +60,30 @@ def archive_signature(dataset_folder: str | Path) -> str:
     return ";".join(f"{f.parent.name}/{f.name}:{f.stat().st_size}:{int(f.stat().st_mtime)}" for f in files)
 
 
-def compute_forecasts(dataset_folder: str | Path) -> dict:
+def last_complete_quarter(data_end: pd.Timestamp) -> pd.Period:
+    """A quarter is complete only if the data reach (almost) its last day."""
+    period = pd.Period(data_end, freq="Q")
+    if data_end < period.end_time.normalize() - pd.Timedelta(days=7):
+        period -= 1
+    return period
+
+
+def compute_forecasts(dataset_folder: str | Path, until: str | None = None, quarterly: pd.DataFrame | None = None,
+                      compare: tuple[str, ...] = ()) -> dict:
+    """until: forecast as if the data stopped at the end of this quarter (out-of-sample validation).
+    compare: other forecasters whose point forecasts are stored next to the one shown."""
     isolates = load_isolates(dataset_folder)
     if isolates.empty:
         return {"meta": {"available": False}, "combinations": []}
-    quarterly = build_series(dataset_folder, "Q")
+    quarterly = build_series(dataset_folder, "Q") if quarterly is None else quarterly
     labs = quarterly[quarterly["popolazione"] == POPULATION]
     regional = regional_series(quarterly, POPULATION)
 
     data_end = pd.Timestamp(isolates["data_prelievo"].max())
-    last_period = pd.Period(data_end, freq="Q")
-    # A quarter is complete only if the data reach (almost) its last day
-    if data_end < last_period.end_time.normalize() - pd.Timedelta(days=7):
-        last_period -= 1
+    last_period = last_complete_quarter(data_end)
+    if until is not None and pd.Period(until, freq="Q") < last_period:
+        last_period = pd.Period(until, freq="Q")
+        data_end = last_period.end_time.normalize()
     labs = labs[pd.PeriodIndex(labs["period"], freq="Q") <= last_period]
     regional = regional[pd.PeriodIndex(regional["period"], freq="Q") <= last_period]
 
@@ -91,6 +102,12 @@ def compute_forecasts(dataset_folder: str | Path) -> dict:
         if (pathogen, antibiotic) in eligible and verdict_index is not None:
             periods, ctx = contexts_by_key[(pathogen, antibiotic)]
             entry["previsioni"] = _forecasts(ctx, periods, verdict_index, pathogen, antibiotic)
+            if compare and entry["previsioni"]:
+                origin = len(periods) - 1
+                entry["confronto"] = {
+                    name: {3 * h: 100 * v[0] for h, v in FORECASTERS[name](ctx, origin, list(HORIZONS)).items()}
+                    for name in compare
+                }
         else:
             entry["previsioni"] = []
             entry["motivo_assenza"] = (
@@ -174,13 +191,14 @@ def _trend_words(r1, n1, r0, n0) -> str:
 def _forecasts(ctx, periods, verdicts: pd.DataFrame, pathogen: str, antibiotic: str) -> list[dict]:
     origin = len(periods) - 1
     expected_n = max(float(ctx.n[max(0, origin - 3):origin + 1].mean()), 1.0)
+    rows = {h: verdicts.loc[(pathogen, antibiotic, 3 * h)] for h in HORIZONS
+            if (pathogen, antibiotic, 3 * h) in verdicts.index}
+    if not rows:
+        return []
+    # One model per combination: fit it once for all horizons
+    preds = FORECASTERS[next(iter(rows.values()))["mostrato"]](ctx, origin, list(rows))
     out = []
-    for h in HORIZONS:
-        key = (pathogen, antibiotic, 3 * h)
-        if key not in verdicts.index:
-            continue
-        v = verdicts.loc[key]
-        preds = FORECASTERS[v["mostrato"]](ctx, origin, [h])
+    for h, v in rows.items():
         if h not in preds:
             continue
         p, var_mean, phi = preds[h]

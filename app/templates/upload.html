@@ -21,8 +21,8 @@
     {% if has_imports %}
     <section class="panel mt-3">
       <h2 class="h6 mb-1">2 · Calcola le previsioni</h2>
-      <p class="text-muted small mb-3">Dopo ogni caricamento ricalcola le previsioni. Richiede circa un minuto.</p>
-      <form method="post" action="{{ url_for('forecasts.compute') }}" data-busy="Calcolo delle previsioni in corso, circa un minuto. Non chiudere la pagina.">
+      <p class="text-muted small mb-3">Dopo ogni caricamento ricalcola le previsioni. Richiede alcuni minuti.</p>
+      <form method="post" action="{{ url_for('forecasts.compute') }}" data-busy="Calcolo delle previsioni in corso, alcuni minuti. Non chiudere la pagina.">
         <button class="btn btn-primary w-100" type="submit">Calcola le previsioni</button>
       </form>
       <form class="mt-2" method="post" action="{{ url_for('dashboard.train') }}">

@@ -15,6 +15,8 @@ MIC RES Sicilia forecasts antimicrobial resistance for the Sicilian Rete MIC.
 
 **Validated forecasts (page "Previsioni di resistenza").** Regional invasive isolates (blood and CSF), the next four quarters after the last complete quarter of data. For each pathogen × antibiotic one forecaster is chosen on the 2020-22 rolling-origin tests and judged on 2023-24 only (`app/services/benchmark.py`). The operator sees the value in words, an 80% interval, the last 12 months, the typical past error and a traffic light (affidabile / indicativa / non affidabile) that never improves with the horizon. Forecasts are computed with "Calcola previsioni" and stored in `instance/previsioni/previsioni.json` (`app/services/forecast_run.py`); laboratory figures are shown as observed, indicative values.
 
+**Out-of-sample check (page "Verifica sui dati nuovi").** Once the archive holds complete quarters after 2024, the forecasts are recomputed with data cut at 31/12/2024 and scored against what was observed, next to "as the last 12 months" and Prophet (`app/services/out_of_sample.py`). Prophet, the model of the original project, is a candidate in the test bench like the others.
+
 **Earlier tools (not validated).** The original pipeline trains **Meta Prophet** models on monthly data per combination and forecasts S / I / R up to 5 years ahead. It is kept under "Strumenti precedenti (non validati)" and supports:
 
 | Feature | Details |

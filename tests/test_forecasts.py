@@ -7,12 +7,12 @@ from app.services import dataset_store
 from app.services.forecast_run import compute_forecasts, load_forecasts
 
 
-def _store(folder, data_end="2024-12-30"):
+def _store(folder, data_end="2024-12-30", last_quarter="2024Q4"):
     """Two laboratories, invasive E. coli tested for CTX every quarter 2019-2024 (about 30% R),
     plus a rare K. pneumoniae combination that cannot be forecast."""
     rng = np.random.default_rng(1)
     rows, ast = [], []
-    quarters = pd.period_range("2019Q1", "2024Q4", freq="Q")
+    quarters = pd.period_range("2019Q1", last_quarter, freq="Q")
     for q in quarters:
         for lab in ("IT173", "IT174"):
             for k in range(25):
@@ -27,6 +27,7 @@ def _store(folder, data_end="2024-12-30"):
                                       "data_prelievo", "materiale"])
     iso.loc[len(iso) - 1, "data_prelievo"] = pd.Timestamp(data_end)
     iso["codice_campione"] = iso["isolate_id"].astype(str)
+    iso["paziente_ricoverato"] = "1"
     ast = pd.DataFrame(ast, columns=["isolate_id", "antibiotic", "result"])
     ast["result_harmonized"] = ast["result"]
     ast["intrinsic"] = False
@@ -188,3 +189,53 @@ def test_validation_page_points_to_next_step(client):
     html = http.get("/upload/1/validazione").get_data(as_text=True)
     assert "Prossimo passo: calcola le previsioni" in html
     assert 'action="/previsioni/calcola"' in html
+
+
+
+def test_validation_scores_forecasts_made_with_data_up_to_2024(tmp_path):
+    from app.services.out_of_sample import compute_validation, validation_possible
+
+    assert not validation_possible(_store(tmp_path / "a"))
+    assert not compute_validation(tmp_path / "a")["available"]
+
+    folder = _store(tmp_path / "b", data_end="2025-06-29", last_quarter="2025Q2")
+    assert validation_possible(folder)
+    result = compute_validation(folder)
+    assert result["available"]
+    assert result["dati_fino_al"] == "31/12/2024"
+    assert result["trimestri_osservati"] == ["1° trimestre 2025", "2° trimestre 2025"]
+    rows = result["righe"]
+    # Only E. coli / CTX has a forecast; K. pneumoniae has too few isolates
+    assert {(r["microorganismo"], r["antibiotico"]) for r in rows} == {("ESCCOL", "CTX")}
+    assert {r["periodo"] for r in rows} == {"2025Q1", "2025Q2"}
+    for r in rows:
+        assert r["orizzonte_mesi"] in (3, 6)
+        assert r["errore"] < 15
+        assert r["previsto_persistenza_12m"] is not None and r["previsto_prophet"] is not None
+    # The forecasts are those made with data up to 2024: the same as computing with that archive
+    then = compute_forecasts(tmp_path / "a")
+    expected = {f["periodo"]: f["pct"] for c in then["combinations"] if c["microorganismo"] == "ESCCOL"
+                for f in c["previsioni"]}
+    for r in rows:
+        assert abs(r["previsto"] - expected[r["periodo"]]) < 1e-9
+
+    from app.services.diagnostics import _validation_sheet
+    sheet = _validation_sheet(result)
+    assert {"Previsto (%)", "Osservato (%)", "Errore Prophet", "Dentro l'intervallo"} <= set(sheet.columns)
+    assert len(sheet) == len(rows)
+
+
+def test_validation_page_and_guide_panel(client):
+    http, app = client
+    html = http.get("/validazione").get_data(as_text=True)
+    assert "Servono i dati successivi al 31/12/2024" in html
+
+    folder = app.config["DATASET_FOLDER"]
+    _store(folder, data_end="2025-06-29", last_quarter="2025Q2")
+    _mark_imported(app, folder, date_to="2025-06-29")
+    assert "Verifica sui dati nuovi" in http.get("/").get_data(as_text=True)
+    assert http.post("/validazione/calcola").status_code == 302
+    html = http.get("/validazione").get_data(as_text=True)
+    assert "Errore tipico delle previsioni mostrate" in html and "Prophet" in html
+    assert "Il semaforo ha funzionato?" in html
+    assert "hanno sbagliato in media di" in http.get("/").get_data(as_text=True)

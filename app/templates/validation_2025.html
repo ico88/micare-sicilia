@@ -1,0 +1,159 @@
+{% extends "base.html" %}
+{% block title %}Verifica sui dati nuovi - MIC RES Sicilia{% endblock %}
+{% block content %}
+<div class="mb-3">
+  <h1 class="page-heading mb-1">Verifica: le previsioni alla prova dei fatti</h1>
+  <div class="text-muted">Le previsioni sono rifatte con i soli dati fino al {{ result.dati_fino_al if result else cutoff }}, come se i mesi successivi non esistessero, e confrontate con quanto è stato osservato davvero. Nessun modello ha visto quei dati.</div>
+</div>
+
+{% set busy = "Verifica in corso: il sistema rifà le previsioni con i dati fino al " ~ cutoff ~ ". Richiede alcuni minuti, non chiudere la pagina." %}
+{% if not result %}
+  <div class="next-step">
+    {% if wf.validazione_possibile %}
+      <div>
+        <div class="fw-semibold">In archivio ci sono dati successivi al {{ cutoff }}: la verifica si può fare.</div>
+        <div class="small text-muted">Richiede alcuni minuti.</div>
+      </div>
+      <form method="post" action="{{ url_for('forecasts.compute_validation_route') }}" data-busy="{{ busy }}">
+        <button class="btn btn-primary btn-lg" type="submit">Fai la verifica</button>
+      </form>
+    {% else %}
+      <div>
+        <div class="fw-semibold">Servono i dati successivi al {{ cutoff }}.</div>
+        <div class="small text-muted">Carica l'export della Rete MIC che comprende almeno un trimestre completo del 2025, poi torna qui.</div>
+      </div>
+      <a class="btn btn-primary btn-lg" href="{{ url_for('guide.home') }}#passo-carica">Vai al caricamento</a>
+    {% endif %}
+  </div>
+{% else %}
+  {% set s = result.sintesi %}
+  {% if stale %}
+    <div class="alert alert-warning d-flex justify-content-between align-items-center gap-3">
+      <span>I dati in archivio sono cambiati dopo questa verifica.</span>
+      <form method="post" action="{{ url_for('forecasts.compute_validation_route') }}" data-busy="{{ busy }}">
+        <button class="btn btn-warning btn-sm text-nowrap" type="submit">Rifai la verifica</button>
+      </form>
+    </div>
+  {% endif %}
+  <div class="alert alert-info small">
+    Previsioni fatte con i dati fino al <strong>{{ result.dati_fino_al }}</strong>, confrontate con: {{ result.trimestri_osservati|join(", ") }}.
+    Contano solo i trimestri con almeno 30 isolati testati. Verifica calcolata il {{ result.calcolato_il }}.
+  </div>
+
+  {% if not s %}
+    <section class="panel"><p class="mb-0">Nessuna previsione da confrontare: nei trimestri osservati nessuna combinazione ha abbastanza isolati.</p></section>
+  {% else %}
+  {% set ref = s['errore_' ~ compared[0]] %}{% set pro = s['errore_' ~ compared[1]] %}
+  <div class="row g-3 mb-3">
+    <div class="col-md-4">
+      <div class="panel h-100">
+        <div class="text-muted small">Errore tipico delle previsioni mostrate</div>
+        <div class="fs-3 fw-semibold">{{ "%.1f"|format(s.errore)|replace(".", ",") }} punti</div>
+        <div class="small">su {{ s.prove }} confronti ({{ s.combinazioni }} combinazioni)</div>
+      </div>
+    </div>
+    <div class="col-md-4">
+      <div class="panel h-100">
+        <div class="text-muted small">Valore reale dentro l'intervallo</div>
+        <div class="fs-3 fw-semibold">{{ s.dentro }} su {{ s.prove }}</div>
+        <div class="small">{{ "%.0f"|format(s.copertura) }}%, l'obiettivo è circa 80%:
+          {% if s.copertura_compatibile %}<span class="text-success fw-semibold">in linea</span>
+          {% elif s.copertura < 80 %}<span class="text-danger fw-semibold">intervalli troppo stretti</span>
+          {% else %}<span class="text-warning fw-semibold">intervalli più larghi del necessario</span>{% endif %}</div>
+      </div>
+    </div>
+    <div class="col-md-4">
+      <div class="panel h-100">
+        <div class="text-muted small">Confronto con altri metodi, sugli stessi trimestri</div>
+        <div class="small mt-1">"Come gli ultimi 12 mesi": <strong>{{ "%.1f"|format(ref)|replace(".", ",") if ref is not none else "–" }} punti</strong></div>
+        <div class="small">Prophet: <strong>{{ "%.1f"|format(pro)|replace(".", ",") if pro is not none else "–" }} punti</strong></div>
+        <div class="small mt-1">
+          {% if s.guadagno_pct is none %}–
+          {% elif s.guadagno_pct >= 10 %}<span class="text-success fw-semibold">Il sistema ha sbagliato il {{ "%.0f"|format(s.guadagno_pct) }}% in meno.</span>
+          {% elif s.guadagno_pct > -10 %}<span class="fw-semibold">Il sistema ha sbagliato quanto "come gli ultimi 12 mesi".</span>
+          {% else %}<span class="text-danger fw-semibold">Il sistema ha sbagliato il {{ "%.0f"|format(-s.guadagno_pct) }}% in più.</span>{% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="row g-3 mb-3">
+    <div class="col-lg-6">
+      <section class="panel h-100">
+        <h2 class="h6">Il semaforo ha funzionato?</h2>
+        <p class="small text-muted">Le previsioni "affidabili" dovrebbero aver sbagliato meno delle "indicative".</p>
+        <table class="table table-sm align-middle mb-0">
+          <thead><tr><th>Semaforo di allora</th><th class="text-end">Confronti</th><th class="text-end">Errore tipico</th><th class="text-end">Dentro l'intervallo</th></tr></thead>
+          <tbody>
+            {% for key in ['verde', 'giallo', 'grigio'] %}{% set g = result.per_semaforo.get(key) %}
+              {% if g %}
+              <tr>
+                <td><span class="badge text-bg-{{ traffic[key].badge }}">{{ traffic[key].label }}</span></td>
+                <td class="text-end">{{ g.prove }}</td>
+                <td class="text-end">{{ "%.1f"|format(g.errore)|replace(".", ",") }} punti</td>
+                <td class="text-end">{{ g.dentro }} su {{ g.prove }}</td>
+              </tr>
+              {% endif %}
+            {% endfor %}
+          </tbody>
+        </table>
+        <p class="small text-muted mt-2 mb-0">Le previsioni "non affidabili" non erano mostrate all'operatore: sono qui solo per controllo.</p>
+      </section>
+    </div>
+    <div class="col-lg-6">
+      <section class="panel h-100">
+        <h2 class="h6">Per distanza nel tempo</h2>
+        <p class="small text-muted">Più la previsione è lontana, più è naturale che sbagli.</p>
+        <table class="table table-sm align-middle mb-0">
+          <thead><tr><th>Previsione a</th><th class="text-end">Confronti</th><th class="text-end">Errore tipico</th><th class="text-end">Come gli ultimi 12 mesi</th><th class="text-end">Dentro l'intervallo</th></tr></thead>
+          <tbody>
+            {% for h, g in result.per_orizzonte.items() %}
+              <tr>
+                <td>{{ h }} mesi</td>
+                <td class="text-end">{{ g.prove }}</td>
+                <td class="text-end">{{ "%.1f"|format(g.errore)|replace(".", ",") }}</td>
+                <td class="text-end">{{ "%.1f"|format(g['errore_' ~ compared[0]])|replace(".", ",") if g['errore_' ~ compared[0]] is not none else "–" }}</td>
+                <td class="text-end">{{ g.dentro }} su {{ g.prove }}</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </section>
+    </div>
+  </div>
+
+  <section class="panel">
+    <form class="row g-2 align-items-end mb-3" method="get">
+      <div class="col-md-5">
+        <label class="form-label small mb-1" for="microrganismo">Dettaglio per microrganismo</label>
+        <select class="form-select" id="microrganismo" name="microrganismo" onchange="this.form.submit()">
+          {% for code, name in pathogens %}<option value="{{ code }}" {% if code == selected %}selected{% endif %}>{{ name }}</option>{% endfor %}
+        </select>
+      </div>
+    </form>
+    <div class="table-responsive">
+      <table class="table table-sm align-middle mb-0">
+        <thead><tr><th>Antibiotico</th><th>Trimestre</th><th>Semaforo di allora</th><th class="text-end">Previsto</th><th class="text-end">Osservato</th><th class="text-end">Errore</th><th>Dentro l'intervallo</th></tr></thead>
+        <tbody>
+          {% for r in rows %}
+            <tr class="{% if r.semaforo == 'grigio' %}text-muted{% endif %}">
+              <td>{{ r.antibiotico_nome }}</td>
+              <td>{{ r.trimestre }}</td>
+              <td><span class="badge text-bg-{{ traffic[r.semaforo].badge }}">{{ traffic[r.semaforo].label }}</span></td>
+              <td class="text-end">{{ "%.0f"|format(r.previsto) }}% <span class="text-muted small">({{ "%.0f"|format(r.basso) }}-{{ "%.0f"|format(r.alto) }}%)</span></td>
+              <td class="text-end">{{ "%.0f"|format(r.osservato) }}% <span class="text-muted small">su {{ r.n }}</span></td>
+              <td class="text-end">{{ "%.1f"|format(r.errore)|replace(".", ",") }}</td>
+              <td>{% if r.dentro %}<span class="text-success">&#10003; sì</span>{% else %}<span class="text-danger">&#10007; no</span>{% endif %}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+  {% endif %}
+
+  <form class="mt-3" method="post" action="{{ url_for('forecasts.compute_validation_route') }}" data-busy="{{ busy }}">
+    <button class="btn btn-outline-secondary btn-sm" type="submit">Rifai la verifica con i dati attuali</button>
+  </form>
+{% endif %}
+{% endblock %}

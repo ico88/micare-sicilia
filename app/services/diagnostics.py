@@ -41,6 +41,7 @@ SHEET_NOTES = {
     "Breakpoint": f"Riga EUCAST v{BREAKPOINTS_VERSION} usata per ogni coppia e quanto la lettura armonizzata differisce dal refertato.",
     "Breakpoint per anno": "Quota di risultati in cui R/non-R cambia rileggendo la MIC con la versione attuale: i salti indicano cambi di breakpoint.",
     "Anomalie import": "Riepilogo delle anomalie trovate nella validazione di ogni file caricato.",
+    "Verifica dati nuovi": "Previsioni fatte con i soli dati fino al 31/12/2024 confrontate con i trimestri osservati dopo (almeno 30 isolati). Accanto, l'errore di \"come gli ultimi 12 mesi\" e di Prophet sugli stessi trimestri.",
 }
 
 COLUMN_LABELS = {
@@ -54,8 +55,9 @@ COLUMN_LABELS = {
 }
 
 
-def build_diagnostic(dataset_folder: str | Path, uploads: list[dict], app_version: str) -> bytes:
-    """Return the diagnostic workbook as .xlsx bytes."""
+def build_diagnostic(dataset_folder: str | Path, uploads: list[dict], app_version: str,
+                     validation: dict | None = None) -> bytes:
+    """Return the diagnostic workbook as .xlsx bytes. validation: stored out-of-sample check, if any."""
     folder = Path(dataset_folder)
     isolates = load_isolates(folder)
     sheets: dict[str, pd.DataFrame] = {}
@@ -82,6 +84,8 @@ def build_diagnostic(dataset_folder: str | Path, uploads: list[dict], app_versio
     sheets["Breakpoint"] = by_pair
     sheets["Breakpoint per anno"] = by_year
     sheets["Anomalie import"] = _anomalies(folder, uploads)
+    if validation and validation.get("righe"):
+        sheets["Verifica dati nuovi"] = _validation_sheet(validation)
     return _write(sheets)
 
 
@@ -116,6 +120,7 @@ MODEL_NAMES = {
     "persistenza_tarata": "Come gli ultimi 12 mesi, intervallo tarato",
     "trend": "Trend smorzato",
     "trend_laboratori": "Trend con effetto laboratorio",
+    "prophet": "Prophet (modello del progetto originale)",
 }
 TRAFFIC_LABELS = {
     "verde": "Affidabile",
@@ -322,3 +327,20 @@ def _write(sheets: dict[str, pd.DataFrame]) -> bytes:
                 width = max([len(str(col))] + [len(str(v)) for v in frame[col].head(200)])
                 ws.column_dimensions[get_column_letter(i)].width = min(60, max(10, width + 2))
     return buffer.getvalue()
+
+
+def _validation_sheet(validation: dict) -> pd.DataFrame:
+    table = pd.DataFrame(validation["righe"])
+    table = table.assign(
+        semaforo=table["semaforo"].map(lambda v: f"{v} - {TRAFFIC_LABELS[v]}"),
+        modello=table["modello"].map(MODEL_NAMES),
+        dentro=np.where(table["dentro"], "sì", "no"),
+    ).drop(columns=["microorganismo_nome", "antibiotico_nome", "periodo"])
+    return _round(table.rename(columns={
+        "microorganismo": "Microrganismo", "antibiotico": "Antibiotico", "trimestre": "Trimestre",
+        "orizzonte_mesi": "Orizzonte (mesi)", "semaforo": "Semaforo di allora", "modello": "Previsione mostrata",
+        "n": "Testati", "previsto": "Previsto (%)", "basso": "Intervallo 80% min", "alto": "Intervallo 80% max",
+        "osservato": "Osservato (%)", "errore": "Errore (punti)", "dentro": "Dentro l'intervallo",
+        "previsto_persistenza_12m": "Come gli ultimi 12 mesi (%)", "errore_persistenza_12m": "Errore ultimi 12 mesi",
+        "previsto_prophet": "Prophet (%)", "errore_prophet": "Errore Prophet",
+    }))

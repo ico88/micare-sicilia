@@ -4,6 +4,9 @@ from __future__ import annotations
 from flask import Blueprint, abort, current_app, flash, redirect, render_template, request, url_for
 
 from app.routes.guide import current_workflow
+from app.services.out_of_sample import (
+    COMPARED, compute_validation, cutoff_label, load_validation, save_validation,
+)
 from app.services.forecast_run import archive_signature, compute_forecasts, load_forecasts, save_forecasts
 
 bp = Blueprint("forecasts", __name__)
@@ -24,7 +27,10 @@ MODEL_WORDS = {
     "trend": "Previsione basata sulla tendenza recente, smorzata per non estrapolare troppo lontano.",
     "trend_laboratori": "Previsione basata sulla tendenza recente, al netto dei cambiamenti nel numero di isolati "
                         "inviati dai singoli laboratori.",
+    "prophet": "Previsione del modello Prophet (tendenza e andamento stagionale), che nelle prove sul passato "
+               "ha sbagliato meno degli altri.",
 }
+COMPARED_NAMES = {"persistenza_12m": "come gli ultimi 12 mesi", "prophet": "Prophet"}
 HORIZONS = (3, 6, 9, 12)
 
 
@@ -93,3 +99,28 @@ def compute():
     flash(f"Passo 3 completato: previsioni calcolate per {meta['con_previsione']} combinazioni, "
           f"dati fino al {meta['dati_fino_al']}. Ora scegli un microrganismo e leggi la tabella.", "success")
     return redirect(url_for("forecasts.overview"))
+
+
+@bp.get("/validazione")
+def validation():
+    result = load_validation(_folder())
+    rows = (result or {}).get("righe", [])
+    pathogens = sorted({(r["microorganismo"], r["microorganismo_nome"]) for r in rows}, key=lambda p: p[1])
+    selected = request.args.get("microrganismo") or (pathogens[0][0] if pathogens else "")
+    shown = sorted((r for r in rows if r["microorganismo"] == selected),
+                   key=lambda r: (r["antibiotico_nome"], r["periodo"]))
+    stale = bool(result) and result.get("archivio") != archive_signature(current_app.config["DATASET_FOLDER"])
+    return render_template("validation_2025.html", result=result, rows=shown, pathogens=pathogens, stale=stale,
+                           selected=selected, traffic=TRAFFIC, compared=COMPARED, compared_names=COMPARED_NAMES,
+                           cutoff=cutoff_label(), wf=current_workflow())
+
+
+@bp.post("/validazione/calcola")
+def compute_validation_route():
+    result = compute_validation(current_app.config["DATASET_FOLDER"])
+    if not result.get("available"):
+        flash(f"Per la verifica servono dati successivi al {cutoff_label()}: carica l'export aggiornato.", "warning")
+        return redirect(url_for("guide.home"))
+    save_validation(result, _folder())
+    flash("Verifica completata: confronto fra le previsioni e i valori osservati.", "success")
+    return redirect(url_for("forecasts.validation"))

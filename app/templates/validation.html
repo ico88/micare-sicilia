@@ -11,9 +11,9 @@
   <div class="next-step mb-3">
     <div>
       <div class="fw-semibold">Il file è stato caricato. Prossimo passo: calcola le previsioni.</div>
-      <div class="small text-muted">Leggi qui sotto l'esito del controllo{% if report.warnings %}: gli avvisi in giallo di solito non bloccano il calcolo{% endif %}. Il calcolo richiede circa un minuto.</div>
+      <div class="small text-muted">Leggi qui sotto l'esito del controllo{% if report.warnings %}: gli avvisi in giallo di solito non bloccano il calcolo{% endif %}. Il calcolo richiede alcuni minuti.</div>
     </div>
-    <form method="post" action="{{ url_for('forecasts.compute') }}" data-busy="Calcolo delle previsioni in corso, circa un minuto. Non chiudere la pagina.">
+    <form method="post" action="{{ url_for('forecasts.compute') }}" data-busy="Calcolo delle previsioni in corso, alcuni minuti. Non chiudere la pagina.">
       <button class="btn btn-primary btn-lg" type="submit">Calcola le previsioni</button>
     </form>
   </div>

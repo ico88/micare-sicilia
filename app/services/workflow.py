@@ -12,8 +12,11 @@ from __future__ import annotations
 
 from datetime import date, datetime
 
+import pandas as pd
+
 from . import dataset_store
 from .forecast_run import archive_signature, load_forecasts
+from .out_of_sample import CUTOFF, load_validation
 
 STEPS = (
     ("carica", "Carica i dati"),
@@ -60,6 +63,12 @@ def workflow_state(dataset_folder: str, forecast_folder: str, uploads: list, tod
         three_months = [f for c in forecasts["combinations"] for f in c["previsioni"] if f["orizzonte_mesi"] == 3]
         meta = meta | {"affidabili_3_mesi": sum(f["semaforo"] == "verde" for f in three_months)}
 
+    # The out-of-sample check needs at least one complete quarter after the cutoff
+    first_after = pd.Period(CUTOFF, freq="Q") + 1
+    validation_possible = has_data and pd.Timestamp(max(r["stats"]["date_to"] for _, r in reports)) >= (
+        first_after.end_time.normalize() - pd.Timedelta(days=7))
+    validation = load_validation(forecast_folder)
+
     if not has_data:
         current = "carica"
     elif not meta or stale:
@@ -78,7 +87,8 @@ def workflow_state(dataset_folder: str, forecast_folder: str, uploads: list, tod
         else:
             status[key] = "dopo"
     return {"current": current, "status": status, "data": data, "forecasts": meta, "stale": stale,
-            "steps": STEPS}
+            "steps": STEPS, "validazione_possibile": validation_possible,
+            "validazione": (validation or {}).get("sintesi"), "validazione_calcolata": (validation or {}).get("calcolato_il")}
 
 
 def _it_date(iso: str) -> str:

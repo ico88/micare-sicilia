@@ -16,6 +16,7 @@ from app.services import dataset_store
 from app.services.database import aggregated_to_db, observation_month_totals_from_db, observations_to_db
 from app.services.diagnostics import build_diagnostic
 from app.services.forecast_run import RESULT_FILE
+from app.services.out_of_sample import RESULT_FILE as VALIDATION_FILE, load_validation
 from app.routes.guide import current_workflow
 from app.services.preprocessing import aggregate_observations, load_tabular_file, normalize_uploaded_dataframe
 
@@ -128,7 +129,8 @@ def diagnostic():
          "uploaded_at": u.uploaded_at.strftime("%d/%m/%Y") if u.uploaded_at else ""}
         for u in UploadedFile.query.order_by(UploadedFile.uploaded_at.asc()).all()
     ]
-    content = build_diagnostic(current_app.config["DATASET_FOLDER"], uploads, APP_VERSION)
+    content = build_diagnostic(current_app.config["DATASET_FOLDER"], uploads, APP_VERSION,
+                               load_validation(current_app.config["FORECAST_FOLDER"]))
     return send_file(
         io.BytesIO(content),
         mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
@@ -167,6 +169,7 @@ def reset_db():
     shutil.rmtree(current_app.config["DATASET_FOLDER"], ignore_errors=True)
     Path(current_app.config["DATASET_FOLDER"]).mkdir(parents=True, exist_ok=True)
     (Path(current_app.config["FORECAST_FOLDER"]) / RESULT_FILE).unlink(missing_ok=True)
+    (Path(current_app.config["FORECAST_FOLDER"]) / VALIDATION_FILE).unlink(missing_ok=True)
 
     # cancella file modello su disco
     model_folder = Path(current_app.config["MODEL_FOLDER"])
