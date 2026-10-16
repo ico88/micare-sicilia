@@ -41,8 +41,18 @@ SHEET_NOTES = {
     "Breakpoint": f"Riga EUCAST v{BREAKPOINTS_VERSION} usata per ogni coppia e quanto la lettura armonizzata differisce dal refertato.",
     "Breakpoint per anno": "Quota di risultati in cui R/non-R cambia rileggendo la MIC con la versione attuale: i salti indicano cambi di breakpoint.",
     "Anomalie import": "Riepilogo delle anomalie trovate nella validazione di ogni file caricato.",
-    "Verifica dati nuovi": "Previsioni fatte con i soli dati fino al 31/12/2024 confrontate con i trimestri osservati dopo (almeno 30 isolati). Accanto, l'errore di \"come gli ultimi 12 mesi\" e di Prophet sugli stessi trimestri.",
+    "Verifica dati nuovi": "Previsioni fatte con i soli dati fino al 31/12/2024 confrontate con i trimestri osservati dopo (almeno 30 isolati). Scostamento = osservato - previsto (positivo: il modello ha sottostimato). Accanto, cosa avrebbero previsto gli altri modelli candidati sugli stessi trimestri.",
+    "Leggimi analisi": "Analisi degli scostamenti della verifica sui dati nuovi: cosa contiene questo file e come leggerlo. Solo dati aggregati per laboratorio, nessun codice paziente o campione.",
+    "Sintesi scostamenti": "I numeri chiave: quante combinazioni sbagliano e in che verso, e quanta parte dello scostamento viene dal mix dei laboratori o da variazioni della resistenza non previste.",
+    "Scostamenti combinazione": "Una riga per microrganismo x antibiotico, trimestri osservati sommati, dal più grande scostamento al più piccolo. Scostamento = osservato - previsto = di cui mix laboratori + di cui variazione non prevista (in punti di % R).",
+    "Contributi laboratori": "Per ogni combinazione e laboratorio: peso e resistenza nell'anno prima del taglio e nei trimestri osservati, e quanto il laboratorio ha spostato il dato regionale. La somma dei contributi di una combinazione è la variazione regionale osservata.",
+    "Laboratori": "Per laboratorio: in quante combinazioni è quello che sposta di più il dato regionale e di quanto in media. I laboratori nuovi o molto cresciuti sono la prima cosa da guardare.",
+    "Modelli": "Errore di ogni modello candidato sugli stessi confronti. \"Migliore in\" = combinazioni in cui avrebbe sbagliato meno, col senno di poi: è una diagnosi, non un criterio di scelta.",
+    "Modello mostrato": "Errore delle previsioni mostrate, raggruppate per il modello che il sistema aveva scelto.",
 }
+
+CAUSE_LABELS = {"rumore": "Nella variabilità casuale", "mix": "Mix dei laboratori",
+                "reale": "Resistenza cambiata in modo non previsto"}
 
 COLUMN_LABELS = {
     "popolazione": "Popolazione", "laboratorio": "Laboratorio", "ente": "Ente", "microorganismo": "Microrganismo", "antibiotic": "Antibiotico",
@@ -86,6 +96,7 @@ def build_diagnostic(dataset_folder: str | Path, uploads: list[dict], app_versio
     sheets["Anomalie import"] = _anomalies(folder, uploads)
     if validation and validation.get("righe"):
         sheets["Verifica dati nuovi"] = _validation_sheet(validation)
+        sheets.update(_analysis_sheets(validation))
     return _write(sheets)
 
 
@@ -336,11 +347,123 @@ def _validation_sheet(validation: dict) -> pd.DataFrame:
         modello=table["modello"].map(MODEL_NAMES),
         dentro=np.where(table["dentro"], "sì", "no"),
     ).drop(columns=["microorganismo_nome", "antibiotico_nome", "periodo"])
-    return _round(table.rename(columns={
+    names = {
         "microorganismo": "Microrganismo", "antibiotico": "Antibiotico", "trimestre": "Trimestre",
         "orizzonte_mesi": "Orizzonte (mesi)", "semaforo": "Semaforo di allora", "modello": "Previsione mostrata",
         "n": "Testati", "previsto": "Previsto (%)", "basso": "Intervallo 80% min", "alto": "Intervallo 80% max",
-        "osservato": "Osservato (%)", "errore": "Errore (punti)", "dentro": "Dentro l'intervallo",
-        "previsto_persistenza_12m": "Come gli ultimi 12 mesi (%)", "errore_persistenza_12m": "Errore ultimi 12 mesi",
-        "previsto_prophet": "Prophet (%)", "errore_prophet": "Errore Prophet",
-    }))
+        "osservato": "Osservato (%)", "errore": "Errore (punti)", "scostamento": "Scostamento (punti)",
+        "dentro": "Dentro l'intervallo",
+    }
+    for model, model_name in MODEL_NAMES.items():
+        names[f"previsto_{model}"] = f"{model_name} (%)"
+        names[f"errore_{model}"] = f"Errore {model_name}"
+    return _round(table.rename(columns=names))
+
+
+def build_validation_workbook(validation: dict, app_version: str) -> bytes:
+    """The out-of-sample comparison and its error analysis, aggregated figures only."""
+    sheets = {"Leggimi analisi": _analysis_readme(validation, app_version)}
+    sheets.update(_analysis_sheets(validation))
+    if validation.get("righe"):
+        sheets["Verifica dati nuovi"] = _validation_sheet(validation)
+    return _write(sheets)
+
+
+def _analysis_readme(validation: dict, app_version: str) -> pd.DataFrame:
+    analysis = validation.get("analisi") or {}
+    rows = [
+        ("Generato il", datetime.now().strftime("%d/%m/%Y %H:%M")),
+        ("Versione applicazione", app_version),
+        ("Commit", _git_commit()),
+        ("Verifica calcolata il", validation.get("calcolato_il", "")),
+        ("Previsioni fatte con i dati fino al", validation.get("dati_fino_al", "")),
+        ("Trimestri osservati", ", ".join(validation.get("trimestri_osservati", []))),
+        ("Anno di riferimento (prima del taglio)", analysis.get("periodo_base", "")),
+        ("Popolazione", "isolati invasivi (sangue e liquor), lettura armonizzata EUCAST, primo isolato"),
+        ("Confronti contati", f"trimestri con almeno {MIN_ISOLATES_PER_PERIOD} isolati testati; solo previsioni "
+                              "mostrate all'operatore (semaforo verde o giallo)"),
+        ("Scostamento", "osservato - previsto, in punti di % R: positivo = il modello ha sottostimato"),
+        ("Mix dei laboratori", "parte dello scostamento dovuta a laboratori che pesano di più o di meno, "
+                               "o che sono entrati o usciti dalla rete"),
+        ("Variazione non prevista", "variazione della resistenza dentro i laboratori, meno quella che il "
+                                    "modello aveva previsto"),
+        ("Nella variabilità casuale", "scostamento entro 1,96 errori standard del valore osservato: "
+                                      "nessun modello può fare meglio"),
+        ("Migliore col senno di poi", "solo diagnosi: scegliere il modello sui dati 2025 consumerebbe "
+                                      "l'unica verifica che nessun modello ha visto"),
+    ]
+    return pd.DataFrame(rows, columns=["Voce", "Valore"])
+
+
+def _analysis_sheets(validation: dict) -> dict[str, pd.DataFrame]:
+    analysis = validation.get("analisi") or {}
+    if not analysis.get("combinazioni"):
+        return {}
+    s = analysis["sintesi"]
+    summary = [
+        ("Combinazioni analizzate", s["combinazioni"]),
+        ("Il modello ha sovrastimato", s["sovrastima"]),
+        ("Il modello ha sottostimato", s["sottostima"]),
+        ("Sempre nello stesso verso in tutti i trimestri", s["stesso_verso"]),
+        ("Scostamento medio (punti, con segno)", s["scostamento_medio"]),
+        ("Scostamento medio assoluto (punti)", s["scostamento_assoluto_medio"]),
+        ("Quota dello scostamento dal mix dei laboratori (%)", s["quota_mix"]),
+        ("Quota dello scostamento da variazioni non previste (%)", s["quota_non_previsto"]),
+        *[(f"Causa principale: {CAUSE_LABELS[k]}", v) for k, v in s["cause"].items()],
+        *[(f"Scostamento medio a {h} mesi (punti, con segno)", v) for h, v in s["distorsione_per_orizzonte"].items()],
+    ]
+    combos = []
+    for c in analysis["combinazioni"]:
+        row = {
+            "Microrganismo": c["microorganismo"], "Antibiotico": c["antibiotico"],
+            "Previsione mostrata": MODEL_NAMES.get(c["modello"], c["modello"]), "Trimestri": c["trimestri"],
+            "Testati anno prima": c["n_base"], "Testati osservati": c["n_osservati"],
+            "% R anno prima": c["base"], "% R previsto": c["previsto"], "% R osservato": c["osservato"],
+            "Variazione prevista": c["variazione_prevista"], "Variazione osservata": c["variazione_osservata"],
+            "Scostamento": c["scostamento"], "di cui mix laboratori": c["di_cui_mix"],
+            "di cui variazione non prevista": c["di_cui_non_previsto"],
+            "Errore casuale atteso (1 ES)": c["errore_casuale"], "Causa principale": CAUSE_LABELS[c["causa"]],
+            "Trimestri sovrastimati": c["sovrastime"], "Trimestri sottostimati": c["sottostime"],
+            "Stesso verso": "sì" if c["stesso_verso"] else "no",
+            "Laboratori nuovi": ", ".join(c["laboratori_nuovi"]), "Laboratori usciti": ", ".join(c["laboratori_usciti"]),
+            "Migliore col senno di poi": MODEL_NAMES.get(c["migliore_col_senno_di_poi"], c["migliore_col_senno_di_poi"]
+                                                          if c["migliore_col_senno_di_poi"] != "mostrato" else "Previsione mostrata"),
+        }
+        for model, error in c["errori_modelli"].items():
+            row[f"Errore {MODEL_NAMES.get(model, 'previsione mostrata')}"] = error
+        combos.append(row)
+    labs = pd.DataFrame(analysis["laboratori"]).rename(columns={
+        "microorganismo": "Microrganismo", "antibiotico": "Antibiotico", "laboratorio": "Laboratorio",
+        "stato": "Stato", "n_base": "Testati anno prima", "n_osservati": "Testati osservati",
+        "peso_base": "Peso anno prima (%)", "peso_osservato": "Peso osservato (%)",
+        "resistenza_base": "% R anno prima", "resistenza_osservata": "% R osservato",
+        "contributo_mix": "Contributo mix (punti)", "contributo_reale": "Contributo variazione (punti)",
+        "contributo": "Contributo totale (punti)",
+    })
+    names = laboratory_names()
+    labs.insert(3, "Ente", labs["Laboratorio"].map(lambda code: names.get(code, "")))
+    lab_summary = pd.DataFrame(analysis["laboratori_sintesi"]).rename(columns={
+        "laboratorio": "Laboratorio", "stato": "Stato", "isolati_base": "Primi isolati anno prima",
+        "isolati_osservati": "Primi isolati nei trimestri osservati", "combinazioni": "Combinazioni",
+        "primo_contributo": "Combinazioni in cui sposta di più", "contributo_medio_assoluto": "Spostamento medio (punti)",
+        "contributo_mix_medio": "di cui mix (media, con segno)", "contributo_reale_medio": "di cui variazione (media, con segno)",
+    })
+    lab_summary.insert(1, "Ente", lab_summary["Laboratorio"].map(lambda code: names.get(code, "")))
+    model_names = {**MODEL_NAMES, "mostrato": "Previsione mostrata"}
+    models = pd.DataFrame(analysis["modelli"]["complessivo"]).assign(
+        modello=lambda d: d["modello"].map(model_names)).rename(columns={
+        "modello": "Modello", "confronti": "Confronti", "errore": "Errore medio (punti)",
+        "distorsione": "Scostamento medio con segno", "migliore_in": "Migliore in (combinazioni)"})
+    shown = pd.DataFrame(analysis["modelli"]["per_modello_mostrato"]).assign(
+        modello_mostrato=lambda d: d["modello_mostrato"].map(MODEL_NAMES)).rename(columns={
+        "modello_mostrato": "Modello scelto", "confronti": "Confronti", "combinazioni": "Combinazioni",
+        "errore": "Errore medio (punti)", "dentro": "Dentro l'intervallo"})
+    return {
+        "Sintesi scostamenti": _round(pd.DataFrame(summary, columns=["Voce", "Valore"]).assign(
+            Valore=lambda d: d["Valore"].map(lambda v: round(v, 2) if isinstance(v, float) else v))),
+        "Scostamenti combinazione": _round(pd.DataFrame(combos)),
+        "Contributi laboratori": _round(labs),
+        "Laboratori": _round(lab_summary),
+        "Modelli": _round(models),
+        "Modello mostrato": _round(shown),
+    }

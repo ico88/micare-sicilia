@@ -88,12 +88,12 @@
           <p class="step-desc mb-0">Disponibile dopo il caricamento dei dati.</p>
         {% elif s.calcola == 'ora' %}
           <p class="step-desc">{% if wf.stale %}<strong>I dati sono cambiati dopo l'ultimo calcolo.</strong> {% endif %}Il sistema mette alla prova i modelli sui dati passati e calcola la resistenza dei quattro trimestri successivi ai dati. Richiede alcuni minuti.</p>
-          <form method="post" action="{{ url_for('forecasts.compute') }}" data-busy="Calcolo delle previsioni in corso, alcuni minuti. Non chiudere la pagina.">
+          <form method="post" action="{{ url_for('forecasts.compute') }}">
             <button class="btn btn-primary btn-lg" type="submit">Calcola le previsioni</button>
           </form>
         {% else %}
           <p class="step-desc mb-2">Calcolate il {{ fc.calcolato_il }} sui dati fino al {{ fc.dati_fino_al }}.</p>
-          <form method="post" action="{{ url_for('forecasts.compute') }}" data-busy="Calcolo delle previsioni in corso, alcuni minuti. Non chiudere la pagina.">
+          <form method="post" action="{{ url_for('forecasts.compute') }}">
             <button class="btn btn-outline-secondary btn-sm" type="submit">Ricalcola</button>
           </form>
         {% endif %}
@@ -136,7 +136,7 @@
         <a class="btn btn-outline-primary btn-sm" href="{{ url_for('forecasts.validation') }}">Apri la verifica</a>
       {% else %}
         <p class="small text-muted mb-2">Ci sono dati successivi al 2024: si può controllare quanto le previsioni fatte allora erano vicine al vero.</p>
-        <form method="post" action="{{ url_for('forecasts.compute_validation_route') }}" data-busy="Verifica in corso: il sistema rifà le previsioni con i dati fino al 2024. Richiede alcuni minuti, non chiudere la pagina.">
+        <form method="post" action="{{ url_for('forecasts.compute_validation_route') }}">
           <button class="btn btn-primary btn-sm" type="submit">Fai la verifica</button>
         </form>
       {% endif %}

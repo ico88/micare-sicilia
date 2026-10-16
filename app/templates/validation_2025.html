@@ -6,7 +6,6 @@
   <div class="text-muted">Le previsioni sono rifatte con i soli dati fino al {{ result.dati_fino_al if result else cutoff }}, come se i mesi successivi non esistessero, e confrontate con quanto è stato osservato davvero. Nessun modello ha visto quei dati.</div>
 </div>
 
-{% set busy = "Verifica in corso: il sistema rifà le previsioni con i dati fino al " ~ cutoff ~ ". Richiede alcuni minuti, non chiudere la pagina." %}
 {% if not result %}
   <div class="next-step">
     {% if wf.validazione_possibile %}
@@ -14,7 +13,7 @@
         <div class="fw-semibold">In archivio ci sono dati successivi al {{ cutoff }}: la verifica si può fare.</div>
         <div class="small text-muted">Richiede alcuni minuti.</div>
       </div>
-      <form method="post" action="{{ url_for('forecasts.compute_validation_route') }}" data-busy="{{ busy }}">
+      <form method="post" action="{{ url_for('forecasts.compute_validation_route') }}">
         <button class="btn btn-primary btn-lg" type="submit">Fai la verifica</button>
       </form>
     {% else %}
@@ -30,7 +29,7 @@
   {% if stale %}
     <div class="alert alert-warning d-flex justify-content-between align-items-center gap-3">
       <span>I dati in archivio sono cambiati dopo questa verifica.</span>
-      <form method="post" action="{{ url_for('forecasts.compute_validation_route') }}" data-busy="{{ busy }}">
+      <form method="post" action="{{ url_for('forecasts.compute_validation_route') }}">
         <button class="btn btn-warning btn-sm text-nowrap" type="submit">Rifai la verifica</button>
       </form>
     </div>
@@ -122,6 +121,8 @@
     </div>
   </div>
 
+  {% include "_error_analysis.html" %}
+
   <section class="panel">
     <form class="row g-2 align-items-end mb-3" method="get">
       <div class="col-md-5">
@@ -133,7 +134,7 @@
     </form>
     <div class="table-responsive">
       <table class="table table-sm align-middle mb-0">
-        <thead><tr><th>Antibiotico</th><th>Trimestre</th><th>Semaforo di allora</th><th class="text-end">Previsto</th><th class="text-end">Osservato</th><th class="text-end">Errore</th><th>Dentro l'intervallo</th></tr></thead>
+        <thead><tr><th>Antibiotico</th><th>Trimestre</th><th>Semaforo di allora</th><th class="text-end">Previsto</th><th class="text-end">Osservato</th><th class="text-end">Scostamento</th><th>Dentro l'intervallo</th></tr></thead>
         <tbody>
           {% for r in rows %}
             <tr class="{% if r.semaforo == 'grigio' %}text-muted{% endif %}">
@@ -142,7 +143,7 @@
               <td><span class="badge text-bg-{{ traffic[r.semaforo].badge }}">{{ traffic[r.semaforo].label }}</span></td>
               <td class="text-end">{{ "%.0f"|format(r.previsto) }}% <span class="text-muted small">({{ "%.0f"|format(r.basso) }}-{{ "%.0f"|format(r.alto) }}%)</span></td>
               <td class="text-end">{{ "%.0f"|format(r.osservato) }}% <span class="text-muted small">su {{ r.n }}</span></td>
-              <td class="text-end">{{ "%.1f"|format(r.errore)|replace(".", ",") }}</td>
+              <td class="text-end">{{ "%+.1f"|format(r.scostamento if r.scostamento is defined else r.errore)|replace(".", ",") }}</td>
               <td>{% if r.dentro %}<span class="text-success">&#10003; sì</span>{% else %}<span class="text-danger">&#10007; no</span>{% endif %}</td>
             </tr>
           {% endfor %}
@@ -152,7 +153,7 @@
   </section>
   {% endif %}
 
-  <form class="mt-3" method="post" action="{{ url_for('forecasts.compute_validation_route') }}" data-busy="{{ busy }}">
+  <form class="mt-3" method="post" action="{{ url_for('forecasts.compute_validation_route') }}">
     <button class="btn btn-outline-secondary btn-sm" type="submit">Rifai la verifica con i dati attuali</button>
   </form>
 {% endif %}

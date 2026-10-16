@@ -1,8 +1,10 @@
+import io
 import numpy as np
 import pandas as pd
 import pytest
 
 from app import create_app, db
+from app.services import jobs
 from app.services import dataset_store
 from app.services.forecast_run import compute_forecasts, load_forecasts
 
@@ -97,6 +99,7 @@ def test_pages_before_and_after_computing(client, tmp_path):
 
     _store(app.config["DATASET_FOLDER"])
     response = http.post("/previsioni/calcola")
+    jobs.wait("previsioni")  # the computation runs on the server, in background
     assert response.status_code == 302
     assert load_forecasts(app.config["FORECAST_FOLDER"])["meta"]["con_previsione"] == 1
 
@@ -128,6 +131,7 @@ def test_reset_removes_stored_forecasts(client):
     http, app = client
     _store(app.config["DATASET_FOLDER"])
     http.post("/previsioni/calcola")
+    jobs.wait("previsioni")  # the computation runs on the server, in background
     assert load_forecasts(app.config["FORECAST_FOLDER"]) is not None
     http.post("/reset-db")
     assert load_forecasts(app.config["FORECAST_FOLDER"]) is None
@@ -162,6 +166,8 @@ def test_guide_shows_one_step_to_do_now(client):
     assert "1.200 isolati" in html and "30/12/2024" in html
 
     http.post("/previsioni/calcola")
+
+    jobs.wait("previsioni")  # the computation runs on the server, in background
     html = http.get("/").get_data(as_text=True)
     # Data end long before today: ready, but the operator is told to load newer data
     assert "carica l'export aggiornato" in html
@@ -221,7 +227,7 @@ def test_validation_scores_forecasts_made_with_data_up_to_2024(tmp_path):
 
     from app.services.diagnostics import _validation_sheet
     sheet = _validation_sheet(result)
-    assert {"Previsto (%)", "Osservato (%)", "Errore Prophet", "Dentro l'intervallo"} <= set(sheet.columns)
+    assert {"Previsto (%)", "Osservato (%)", "Scostamento (punti)", "Errore Prophet (modello del progetto originale)", "Dentro l'intervallo"} <= set(sheet.columns)
     assert len(sheet) == len(rows)
 
 
@@ -235,7 +241,14 @@ def test_validation_page_and_guide_panel(client):
     _mark_imported(app, folder, date_to="2025-06-29")
     assert "Verifica sui dati nuovi" in http.get("/").get_data(as_text=True)
     assert http.post("/validazione/calcola").status_code == 302
+    jobs.wait("verifica")
     html = http.get("/validazione").get_data(as_text=True)
     assert "Errore tipico delle previsioni mostrate" in html and "Prophet" in html
     assert "Il semaforo ha funzionato?" in html
+    assert "Dove sbaglia il modello" in html and "Scarica l'analisi (Excel)" in html
+    workbook = http.get("/validazione/analisi.xlsx")
+    assert workbook.status_code == 200
+    import openpyxl
+    sheets = openpyxl.load_workbook(io.BytesIO(workbook.data)).sheetnames
+    assert {"Leggimi analisi", "Scostamenti combinazione", "Contributi laboratori", "Modelli"} <= set(sheets)
     assert "hanno sbagliato in media di" in http.get("/").get_data(as_text=True)

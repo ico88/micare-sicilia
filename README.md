@@ -17,6 +17,10 @@ MIC RES Sicilia forecasts antimicrobial resistance for the Sicilian Rete MIC.
 
 **Out-of-sample check (page "Verifica sui dati nuovi").** Once the archive holds complete quarters after 2024, the forecasts are recomputed with data cut at 31/12/2024 and scored against what was observed, next to "as the last 12 months" and Prophet (`app/services/out_of_sample.py`). Prophet, the model of the original project, is a candidate in the test bench like the others.
 
+**Where the model goes wrong (same page).** For every combination the observed quarters are pooled and set against the last year before the cutoff; the deviation (observed − forecast) is split exactly into *laboratory mix* (laboratories joining the network or weighing more or less) and *unforeseen change* of resistance inside the laboratories, or called noise when within 1.96 standard errors (`app/services/error_analysis.py`). The page lists the largest deviations, the laboratories that move the regional figure most and how every candidate model would have done; **Scarica l'analisi (Excel)** exports it all, aggregated figures only, to review and improve the models.
+
+**Background jobs.** Downloading from the dashboard, computing the forecasts and the out-of-sample check run on the server (`app/services/jobs.py`, one at a time): the browser can be closed, every page shows the progress and the outcome.
+
 **Earlier tools (not validated).** The original pipeline trains **Meta Prophet** models on monthly data per combination and forecasts S / I / R up to 5 years ahead. It is kept under "Strumenti precedenti (non validati)" and supports:
 
 | Feature | Details |

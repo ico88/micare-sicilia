@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import datetime
 from pathlib import Path
 
 from flask import Flask
@@ -70,7 +71,9 @@ def create_app(test_config: dict | None = None) -> Flask:
 
     @app.context_processor
     def inject_version():
-        return {"app_version": APP_VERSION, "fonte_dati_url": app.config["FONTE_DATI_URL"]}
+        from .services import jobs
+        return {"app_version": APP_VERSION, "fonte_dati_url": app.config["FONTE_DATI_URL"],
+                "background_job": jobs.shown(), "now": datetime.now}
 
     from . import models  # noqa: F401
     from .routes.dashboard import bp as dashboard_bp

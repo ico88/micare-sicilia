@@ -166,6 +166,7 @@
             <a href="{{ url_for('forecasts.overview') }}">Previsioni di resistenza</a>.
           </div>
         {% endif %}
+        {% include "_job_banner.html" %}
         {% block content %}{% endblock %}
       </main>
 

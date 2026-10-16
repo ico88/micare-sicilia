@@ -7,13 +7,13 @@ import uuid
 from datetime import datetime
 from pathlib import Path
 
-from flask import Blueprint, abort, current_app, flash, jsonify, redirect, render_template, request, send_file, url_for
+from flask import Blueprint, abort, current_app, flash, redirect, render_template, request, send_file, url_for
 from werkzeug.utils import secure_filename
 
 from app import APP_VERSION, db
 from app.models import AggregatedObservation, Observation, Prediction, TrainedModel, UploadedFile, ValidationMetric
 from app.services import dataset_store
-from app.services.dashboard_jobs import get_dashboard_job, start_dashboard_job
+from app.services.dashboard_jobs import start_dashboard_job
 from app.services.diagnostics import build_diagnostic
 from app.services.forecast_run import RESULT_FILE
 from app.services.out_of_sample import RESULT_FILE as VALIDATION_FILE, load_validation
@@ -83,17 +83,10 @@ def upload():
 @bp.post("/upload/cruscotto")
 def dashboard_refresh():
     include_manual = request.form.get("sostituisci_manuali") == "1"
-    if not start_dashboard_job(current_app._get_current_object(), include_manual):
-        flash("Un aggiornamento dal cruscotto è già in corso.", "warning")
+    busy = start_dashboard_job(current_app._get_current_object(), include_manual)
+    if busy:
+        flash(f"È già in corso: {busy['label'].lower()}. Attendi che finisca, poi riprova.", "warning")
     return redirect(url_for("guide.home") + "#passo-carica")
-
-
-@bp.get("/upload/cruscotto/stato")
-def dashboard_status():
-    job = get_dashboard_job()
-    if not job:
-        return jsonify({"status": "none"})
-    return jsonify({k: job[k] for k in ("status", "progress", "message", "upload_id")})
 
 
 @bp.get("/diagnostico.xlsx")

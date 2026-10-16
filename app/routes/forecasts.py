@@ -1,12 +1,19 @@
 """Operator pages: validated regional forecasts with traffic light and plain words."""
 from __future__ import annotations
 
-from flask import Blueprint, abort, current_app, flash, redirect, render_template, request, url_for
+import io
+from datetime import datetime
 
+from flask import Blueprint, abort, current_app, flash, redirect, render_template, request, send_file, url_for
+
+from app import APP_VERSION
 from app.routes.guide import current_workflow
+from app.services import jobs
+from app.services.diagnostics import CAUSE_LABELS, MODEL_NAMES, build_validation_workbook
 from app.services.out_of_sample import (
-    COMPARED, compute_validation, cutoff_label, load_validation, save_validation,
+    COMPARED, compute_validation, cutoff_label, load_validation, save_validation, validation_possible,
 )
+from app.services.reference import laboratory_names
 from app.services.forecast_run import archive_signature, compute_forecasts, load_forecasts, save_forecasts
 
 bp = Blueprint("forecasts", __name__)
@@ -90,15 +97,30 @@ def detail(pathogen: str, antibiotic: str):
 
 @bp.post("/previsioni/calcola")
 def compute():
-    result = compute_forecasts(current_app.config["DATASET_FOLDER"])
+    app = current_app._get_current_object()
+    busy = jobs.start("previsioni", app, lambda progress: _compute_forecasts(app, progress))
+    _flash_started("previsioni", busy)
+    return redirect(request.referrer or url_for("guide.home"))
+
+
+def _compute_forecasts(app, progress) -> dict:
+    progress("Prove dei modelli sui dati passati e calcolo dei quattro trimestri successivi.")
+    result = compute_forecasts(app.config["DATASET_FOLDER"])
     if not result["meta"].get("available"):
-        flash("Nessun dato in archivio: carica prima l'export della Rete MIC (passo 1).", "warning")
-        return redirect(url_for("guide.home"))
-    save_forecasts(result, _folder())
+        raise RuntimeError("Nessun dato in archivio: carica prima l'export della Rete MIC (passo 1).")
+    save_forecasts(result, app.config["FORECAST_FOLDER"])
     meta = result["meta"]
-    flash(f"Passo 3 completato: previsioni calcolate per {meta['con_previsione']} combinazioni, "
-          f"dati fino al {meta['dati_fino_al']}. Ora scegli un microrganismo e leggi la tabella.", "success")
-    return redirect(url_for("forecasts.overview"))
+    return {"message": f"Previsioni calcolate per {meta['con_previsione']} combinazioni, dati fino al "
+                       f"{meta['dati_fino_al']}. Ora scegli un microrganismo e leggi la tabella.",
+            "link_endpoint": "forecasts.overview"}
+
+
+def _flash_started(kind: str, busy: dict | None) -> None:
+    if busy:
+        flash(f"È già in corso: {busy['label'].lower()}. Attendi che finisca, poi riprova.", "warning")
+    else:
+        flash(f"{jobs.LABELS[kind]} avviato sul server: puoi chiudere la pagina, il lavoro continua. "
+              "L'avanzamento è nella barra in alto.", "info")
 
 
 @bp.get("/validazione")
@@ -110,17 +132,41 @@ def validation():
     shown = sorted((r for r in rows if r["microorganismo"] == selected),
                    key=lambda r: (r["antibiotico_nome"], r["periodo"]))
     stale = bool(result) and result.get("archivio") != archive_signature(current_app.config["DATASET_FOLDER"])
+    analysis = (result or {}).get("analisi") or {}
     return render_template("validation_2025.html", result=result, rows=shown, pathogens=pathogens, stale=stale,
+                           analysis=analysis, causes=CAUSE_LABELS, model_names=MODEL_NAMES,
+                           lab_names=laboratory_names(),
                            selected=selected, traffic=TRAFFIC, compared=COMPARED, compared_names=COMPARED_NAMES,
                            cutoff=cutoff_label(), wf=current_workflow())
 
 
+@bp.get("/validazione/analisi.xlsx")
+def validation_workbook():
+    result = load_validation(_folder()) or abort(404)
+    return send_file(
+        io.BytesIO(build_validation_workbook(result, APP_VERSION)),
+        mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        as_attachment=True,
+        download_name=f"analisi_scostamenti_{datetime.now():%Y%m%d_%H%M}.xlsx",
+    )
+
+
 @bp.post("/validazione/calcola")
 def compute_validation_route():
-    result = compute_validation(current_app.config["DATASET_FOLDER"])
-    if not result.get("available"):
+    if not validation_possible(current_app.config["DATASET_FOLDER"]):
         flash(f"Per la verifica servono dati successivi al {cutoff_label()}: carica l'export aggiornato.", "warning")
         return redirect(url_for("guide.home"))
-    save_validation(result, _folder())
-    flash("Verifica completata: confronto fra le previsioni e i valori osservati.", "success")
+    app = current_app._get_current_object()
+    busy = jobs.start("verifica", app, lambda progress: _compute_validation(app, progress))
+    _flash_started("verifica", busy)
     return redirect(url_for("forecasts.validation"))
+
+
+def _compute_validation(app, progress) -> dict:
+    progress(f"Previsioni rifatte con i soli dati fino al {cutoff_label()} e confronto con i trimestri successivi.")
+    result = compute_validation(app.config["DATASET_FOLDER"])
+    if not result.get("available"):
+        raise RuntimeError(f"Per la verifica servono dati successivi al {cutoff_label()}.")
+    save_validation(result, app.config["FORECAST_FOLDER"])
+    return {"message": "Verifica completata: confronto fra le previsioni e i valori osservati, con l'analisi "
+                       "degli scostamenti.", "link_endpoint": "forecasts.validation"}

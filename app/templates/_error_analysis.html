@@ -1,0 +1,91 @@
+{# Where the forecasts made with data up to the cutoff went wrong (error_analysis.py) #}
+{% macro pts(v, signed=true) -%}
+  {%- if v is none -%}–{%- else -%}{{ ("%+.1f" if signed else "%.1f")|format(v)|replace(".", ",") }}{%- endif -%}
+{%- endmacro %}
+<section class="panel mb-3" id="dove-sbaglia">
+  <div class="d-flex justify-content-between align-items-start gap-2 flex-wrap mb-2">
+    <h2 class="h5 mb-0">Dove sbaglia il modello</h2>
+    <a class="btn btn-outline-primary btn-sm" href="{{ url_for('forecasts.validation_workbook') }}">Scarica l'analisi (Excel)</a>
+  </div>
+  {% if not analysis or not analysis.combinazioni %}
+    <p class="small mb-0">Questa verifica è stata calcolata prima dell'analisi degli scostamenti: rifai la verifica per vederla.</p>
+  {% else %}
+  {% set a = analysis.sintesi %}
+  <p class="small text-muted">Trimestri osservati sommati per ogni combinazione e confrontati con l'anno prima del taglio ({{ analysis.periodo_base }}).
+    Scostamento = osservato − previsto: <strong>positivo, il modello ha sottostimato</strong>; negativo, ha sovrastimato. Il file Excel contiene tutto, solo dati aggregati: si può condividere.</p>
+  <ul class="small">
+    <li>Su <strong>{{ a.combinazioni }}</strong> combinazioni il modello ha sottostimato in <strong>{{ a.sottostima }}</strong> e sovrastimato in <strong>{{ a.sovrastima }}</strong>;
+      in {{ a.stesso_verso }} ha sbagliato nello stesso verso in tutti i trimestri. Scostamento medio {{ pts(a.scostamento_medio) }} punti
+      ({{ pts(a.scostamento_assoluto_medio, false) }} in valore assoluto).</li>
+    {% if a.quota_mix is not none %}
+    <li>Dello scostamento complessivo, il <strong>{{ "%.0f"|format(a.quota_mix) }}%</strong> viene dal <strong>mix dei laboratori</strong> (laboratori entrati nella rete o che pesano di più o di meno)
+      e il <strong>{{ "%.0f"|format(a.quota_non_previsto) }}%</strong> da <strong>variazioni della resistenza non previste</strong> dentro i laboratori.</li>
+    {% endif %}
+    <li>Causa principale per combinazione:
+      {% for key, label in causes.items() %}{{ label|lower }} <strong>{{ a.cause[key] }}</strong>{% if not loop.last %}, {% endif %}{% endfor %}.</li>
+  </ul>
+
+  <h3 class="h6 mt-3">Le combinazioni con lo scostamento più grande</h3>
+  <div class="table-responsive">
+    <table class="table table-sm align-middle">
+      <thead><tr>
+        <th>Combinazione</th><th class="text-end">Anno prima</th><th class="text-end">Previsto</th><th class="text-end">Osservato</th>
+        <th class="text-end">Scostamento</th><th class="text-end">di cui mix lab.</th><th class="text-end">di cui non previsto</th>
+        <th>Causa principale</th><th>Col senno di poi</th>
+      </tr></thead>
+      <tbody>
+        {% for c in analysis.combinazioni[:15] %}
+          <tr>
+            <td>{{ c.microorganismo_nome }} · {{ c.antibiotico_nome }}<div class="small text-muted">{{ c.n_osservati }} testati{% if c.laboratori_nuovi %} · nuovi: {{ c.laboratori_nuovi|join(", ") }}{% endif %}</div></td>
+            <td class="text-end">{{ "%.0f"|format(c.base) }}%</td>
+            <td class="text-end">{{ "%.0f"|format(c.previsto) }}%</td>
+            <td class="text-end">{{ "%.0f"|format(c.osservato) }}%</td>
+            <td class="text-end fw-semibold">{{ pts(c.scostamento) }}</td>
+            <td class="text-end">{{ pts(c.di_cui_mix) }}</td>
+            <td class="text-end">{{ pts(c.di_cui_non_previsto) }}</td>
+            <td><span class="badge text-bg-{{ 'secondary' if c.causa == 'rumore' else 'info' if c.causa == 'mix' else 'warning' }}">{{ causes[c.causa] }}</span></td>
+            <td class="small">{% if c.migliore_col_senno_di_poi and c.migliore_col_senno_di_poi != 'mostrato' %}{{ model_names.get(c.migliore_col_senno_di_poi, c.migliore_col_senno_di_poi) }}{% else %}il modello mostrato{% endif %}</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <div class="row g-3">
+    <div class="col-lg-6">
+      <h3 class="h6">I laboratori che spostano di più il dato regionale</h3>
+      <table class="table table-sm align-middle mb-0">
+        <thead><tr><th>Laboratorio</th><th class="text-end">Primi isolati<br><span class="fw-normal small">anno prima → dopo</span></th><th class="text-end">Sposta di più in</th><th class="text-end">Spostamento medio</th></tr></thead>
+        <tbody>
+          {% for l in analysis.laboratori_sintesi[:10] %}
+            <tr>
+              <td>{{ l.laboratorio }}{% if lab_names.get(l.laboratorio) %} <span class="small text-muted">{{ lab_names[l.laboratorio] }}</span>{% endif %}
+                {% if l.stato == 'nuovo' %}<span class="badge text-bg-info">nuovo</span>{% endif %}</td>
+              <td class="text-end">{{ l.isolati_base }} → {{ l.isolati_osservati }}</td>
+              <td class="text-end">{{ l.primo_contributo }} comb.</td>
+              <td class="text-end">{{ pts(l.contributo_medio_assoluto, false) }} punti</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <div class="col-lg-6">
+      <h3 class="h6">Come sarebbero andati gli altri modelli</h3>
+      <table class="table table-sm align-middle mb-1">
+        <thead><tr><th>Modello</th><th class="text-end">Errore medio</th><th class="text-end">Scostamento medio</th><th class="text-end">Migliore in</th></tr></thead>
+        <tbody>
+          {% for m in analysis.modelli.complessivo %}
+            <tr class="{% if m.modello == 'mostrato' %}fw-semibold{% endif %}">
+              <td>{{ "Previsione mostrata" if m.modello == 'mostrato' else model_names.get(m.modello, m.modello) }}</td>
+              <td class="text-end">{{ pts(m.errore, false) }}</td>
+              <td class="text-end">{{ pts(m.distorsione) }}</td>
+              <td class="text-end">{{ m.migliore_in }} comb.</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      <p class="small text-muted mb-0">"Migliore in" è col senno di poi: serve a capire dove migliorare, non a scegliere il modello sul 2025, che è l'unica verifica che nessun modello ha visto.</p>
+    </div>
+  </div>
+  {% endif %}
+</section>

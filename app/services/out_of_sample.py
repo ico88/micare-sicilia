@@ -17,6 +17,8 @@ import numpy as np
 import pandas as pd
 
 from .benchmark import REFERENCE, coverage_compatible
+from .error_analysis import analyse
+from .forecasting import FORECASTERS
 from .dataset_store import covered_period, load_isolates
 from .forecast_run import (
     POPULATION, READING, archive_signature, compute_forecasts, last_complete_quarter, quarter_label,
@@ -25,6 +27,7 @@ from .series import MIN_ISOLATES_PER_PERIOD, build_series, regional_series
 
 CUTOFF = "2024Q4"
 COMPARED = (REFERENCE, "prophet")
+ANALYSED = tuple(FORECASTERS)  # every candidate, for the error analysis
 RESULT_FILE = "validazione.json"
 
 
@@ -49,7 +52,7 @@ def compute_validation(dataset_folder: str | Path) -> dict:
         return {"available": False, "ultimo_trimestre": quarter_label(last)}
 
     quarterly = build_series(dataset_folder, "Q")
-    then = compute_forecasts(dataset_folder, until=CUTOFF, quarterly=quarterly, compare=COMPARED)
+    then = compute_forecasts(dataset_folder, until=CUTOFF, quarterly=quarterly, compare=ANALYSED)
     regional = regional_series(quarterly, POPULATION)
     regional = regional[pd.PeriodIndex(regional["period"], freq="Q") > cutoff]
     regional = regional[pd.PeriodIndex(regional["period"], freq="Q") <= last]
@@ -72,9 +75,10 @@ def compute_validation(dataset_folder: str | Path) -> dict:
                 "trimestre": f["trimestre"], "periodo": f["periodo"], "orizzonte_mesi": f["orizzonte_mesi"],
                 "semaforo": f["semaforo"], "modello": f["modello"], "n": n,
                 "previsto": f["pct"], "basso": f["low"], "alto": f["high"], "osservato": float(pct),
-                "errore": float(abs(f["pct"] - pct)), "dentro": bool(f["low"] <= pct <= f["high"]),
+                "errore": float(abs(f["pct"] - pct)), "scostamento": float(pct - f["pct"]),
+                "dentro": bool(f["low"] <= pct <= f["high"]),
             }
-            for name in COMPARED:
+            for name in ANALYSED:
                 other = combo.get("confronto", {}).get(name, {}).get(f["orizzonte_mesi"])
                 row[f"previsto_{name}"] = other
                 row[f"errore_{name}"] = None if other is None else float(abs(other - pct))
@@ -92,6 +96,8 @@ def compute_validation(dataset_folder: str | Path) -> dict:
         "per_orizzonte": {int(h): _summary(g) for h, g in table[table["semaforo"] != "grigio"].groupby("orizzonte_mesi")}
                          if not table.empty else {},
         "righe": rows,
+        "analisi": analyse(rows, quarterly[quarterly["popolazione"] == POPULATION], cutoff, ANALYSED, READING)
+                   if rows else {},
     }
 
 

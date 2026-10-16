@@ -1,0 +1,44 @@
+{# Long job running on the server (jobs.py), on every page; reloads the page when it ends #}
+{% set job = background_job %}
+{% if job %}
+  {% if job.status == 'running' %}
+    <div class="alert alert-info d-flex flex-column gap-2" id="jobBanner" role="status" aria-live="polite">
+      <div class="d-flex justify-content-between gap-2 flex-wrap">
+        <strong>{{ job.label }} in corso</strong>
+        <span class="small text-muted" id="jobMinutes">da {{ ((now() - job.started_at).total_seconds() // 60)|int }} min</span>
+      </div>
+      <div class="small" id="jobMessage">{{ job.message }}</div>
+      <div class="progress" role="progressbar" aria-label="Avanzamento" aria-valuemin="0" aria-valuemax="100">
+        <div class="progress-bar progress-bar-striped progress-bar-animated" id="jobBar"
+             style="width: {{ job.progress if job.progress is not none else 100 }}%">{% if job.progress is not none %}{{ job.progress }}%{% endif %}</div>
+      </div>
+      <div class="small text-muted">Il lavoro gira sul server: puoi chiudere la pagina o il browser e tornare più tardi.</div>
+    </div>
+    <script>
+      (function poll() {
+        setTimeout(async () => {
+          try {
+            const job = await (await fetch("{{ url_for('guide.job_status') }}")).json();
+            if (job.status !== 'running') { window.location.reload(); return; }
+            document.getElementById('jobMessage').textContent = job.message;
+            document.getElementById('jobMinutes').textContent = 'da ' + job.minutes + ' min';
+            const bar = document.getElementById('jobBar');
+            bar.style.width = (job.progress === null ? 100 : job.progress) + '%';
+            bar.textContent = job.progress === null ? '' : job.progress + '%';
+          } catch (e) { /* server busy: try again */ }
+          poll();
+        }, 5000);
+      })();
+    </script>
+  {% elif job.status == 'success' %}
+    <div class="alert alert-success small" role="status">
+      <strong>{{ job.label }} completato</strong> alle {{ job.finished_at.strftime('%H:%M') }}. {{ job.message }}
+      {% if job.link_endpoint %}<a href="{{ url_for(job.link_endpoint, **job.link_args) }}">Apri il risultato</a>.{% endif %}
+    </div>
+  {% else %}
+    <div class="alert alert-danger small" role="alert">
+      <strong>{{ job.label }} non riuscito</strong> alle {{ job.finished_at.strftime('%H:%M') }}: {{ job.message }}
+      {% if job.link_endpoint %}<a href="{{ url_for(job.link_endpoint, **job.link_args) }}">Vedi i dettagli</a>.{% endif %}
+    </div>
+  {% endif %}
+{% endif %}

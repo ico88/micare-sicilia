@@ -4,7 +4,7 @@ import pytest
 
 from app import create_app, db
 from app.models import Observation, UploadedFile
-from app.services import dashboard_jobs, dataset_store, qlik_source
+from app.services import dashboard_jobs, dataset_store, jobs, qlik_source
 from app.services.importing import import_file
 
 FIELDS = ["KEY_CAMPIONE", "REGIONE", "LABORATORIO", "OSPEDALE", "CODICE_PAZIENTE", "SESSO", "ETA",
@@ -156,17 +156,18 @@ def test_dashboard_refresh_replaces_instead_of_adding(app, tmp_path, small_pages
     monkeypatch.setattr(dashboard_jobs, "extract_to_csv", lambda url, path, progress: qlik_source.extract_to_csv(
         url, path, progress, engine_factory=lambda u: FakeEngine(records)))
     for _ in range(2):  # a second refresh must replace the first one as well
-        assert dashboard_jobs.start_dashboard_job(app, include_manual=True)
-        dashboard_jobs._thread.join(timeout=30)
-        job = dashboard_jobs.get_dashboard_job()
+        assert dashboard_jobs.start_dashboard_job(app, include_manual=True) is None
+        jobs.wait("cruscotto", timeout=30)
+        job = jobs.get("cruscotto")
         assert job["status"] == "success", job["error"]
+        upload_id = job["link_args"]["upload_id"]
 
     with app.app_context():
         imported = UploadedFile.query.filter_by(status="imported").all()
-        assert [u.id for u in imported] == [job["upload_id"]]
+        assert [u.id for u in imported] == [upload_id]
         assert imported[0].original_name.startswith(dashboard_jobs.FILE_PREFIX)
         assert db.session.get(UploadedFile, first.upload_id).status == "replaced"
-        assert {o.uploaded_file_id for o in Observation.query.all()} == {job["upload_id"]}
+        assert {o.uploaded_file_id for o in Observation.query.all()} == {upload_id}
         assert len(dataset_store.load_isolates(app.config["DATASET_FOLDER"])) == 6
         # only the latest download stays on disk; the file uploaded by hand is not touched
         downloads = sorted(p.name for p in (tmp_path / "data").glob(f"{dashboard_jobs.FILE_PREFIX}*"))
@@ -194,9 +195,9 @@ def test_failed_refresh_leaves_the_archive_alone(app, tmp_path, small_pages, mon
         raise qlik_source.QlikSourceError("Cruscotto non raggiungibile: prova")
 
     monkeypatch.setattr(dashboard_jobs, "extract_to_csv", broken)
-    assert dashboard_jobs.start_dashboard_job(app, include_manual=True)
-    dashboard_jobs._thread.join(timeout=30)
-    assert dashboard_jobs.get_dashboard_job()["status"] == "error"
+    assert dashboard_jobs.start_dashboard_job(app, include_manual=True) is None
+    jobs.wait("cruscotto", timeout=30)
+    assert jobs.get("cruscotto")["status"] == "error"
     with app.app_context():
         assert [u.id for u in UploadedFile.query.filter_by(status="imported")] == [first.upload_id]
         assert "non riuscito" in app.test_client().get("/").get_data(as_text=True)
