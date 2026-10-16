@@ -7,18 +7,18 @@ import uuid
 from datetime import datetime
 from pathlib import Path
 
-from flask import Blueprint, abort, current_app, flash, redirect, render_template, request, send_file, url_for
+from flask import Blueprint, abort, current_app, flash, jsonify, redirect, render_template, request, send_file, url_for
 from werkzeug.utils import secure_filename
 
 from app import APP_VERSION, db
 from app.models import AggregatedObservation, Observation, Prediction, TrainedModel, UploadedFile, ValidationMetric
 from app.services import dataset_store
-from app.services.database import aggregated_to_db, observation_month_totals_from_db, observations_to_db
+from app.services.dashboard_jobs import get_dashboard_job, start_dashboard_job
 from app.services.diagnostics import build_diagnostic
 from app.services.forecast_run import RESULT_FILE
 from app.services.out_of_sample import RESULT_FILE as VALIDATION_FILE, load_validation
 from app.routes.guide import current_workflow
-from app.services.preprocessing import aggregate_observations, load_tabular_file, normalize_uploaded_dataframe
+from app.services.importing import import_file
 
 bp = Blueprint("upload", __name__)
 
@@ -57,69 +57,43 @@ def upload():
     saved_path = upload_dir / f"{uuid.uuid4().hex}_{filename}"
     incoming.save(saved_path)
 
-    uploaded = UploadedFile(filename=str(saved_path), original_name=incoming.filename, status="uploaded")
-    db.session.add(uploaded)
-    db.session.commit()
-    uploaded_id = uploaded.id
-
-    dataset_folder = current_app.config["DATASET_FOLDER"]
-    report = None
     try:
-        raw = dataset_store.read_raw_file(saved_path)
-        if dataset_store.is_mic_export(raw.columns):
-            # Isolate-level export: validate and keep the full record for any model
-            isolates, ast, report, issues = dataset_store.build_and_validate(raw)
-            dataset_store.save_dataset(dataset_folder, uploaded_id, isolates, ast, report, issues)
-            normalized = dataset_store.to_observations(isolates, ast)
-        else:
-            raw = load_tabular_file(saved_path)
-            normalized = normalize_uploaded_dataframe(raw)
-        uploaded.row_count = len(normalized)
-        uploaded.status = "imported"
-
-        observations_to_db(normalized, uploaded)
-        db.session.flush()
-        aggregated = aggregate_observations(observation_month_totals_from_db())
-        validated = (
-            f"{report['stats']['isolates_valid']} isolati validi su {report['stats']['rows_read']} righe, "
-            if report else ""
-        )
-        uploaded.message = (
-            f"{validated}Importate {len(normalized)} nuove osservazioni. "
-            f"Storico aggregato: {len(aggregated)} righe mensili."
-        )
-        aggregated_to_db(aggregated)
-        db.session.commit()
-        flash(uploaded.message, "success")
-        if report:
-            # Guided path: the next thing to do is read the outcome of the check
-            return redirect(url_for("upload.validation_report", upload_id=uploaded_id))
-        return render_template(
-            "preview.html",
-            uploaded=uploaded,
-            report=report,
-            columns=list(raw.columns),
-            normalized_preview=normalized.head(20).to_dict(orient="records"),
-            aggregated_preview=aggregated.head(20).to_dict(orient="records"),
-        )
+        outcome = import_file(saved_path, incoming.filename, current_app.config["DATASET_FOLDER"])
     except dataset_store.DatasetValidationError as exc:
-        db.session.rollback()
-        dataset_store.save_report(dataset_folder, uploaded_id, exc.report)
-        uploaded = db.session.get(UploadedFile, uploaded_id)
-        uploaded.status = "error"
-        uploaded.message = f"Validazione fallita: {exc}"
-        db.session.commit()
-        flash(uploaded.message, "danger")
-        return redirect(url_for("upload.validation_report", upload_id=uploaded_id))
+        flash(f"Validazione fallita: {exc}", "danger")
+        return redirect(url_for("upload.validation_report", upload_id=exc.upload_id))
     except Exception as exc:
-        db.session.rollback()
-        dataset_store.delete_upload_data(dataset_folder, uploaded_id)
-        uploaded = db.session.get(UploadedFile, uploaded_id)
-        uploaded.status = "error"
-        uploaded.message = str(exc)
-        db.session.commit()
         flash(f"Errore import: {exc}", "danger")
         return redirect(url_for("guide.home"))
+
+    flash(outcome.message, "success")
+    if outcome.report:
+        # Guided path: the next thing to do is read the outcome of the check
+        return redirect(url_for("upload.validation_report", upload_id=outcome.upload_id))
+    return render_template(
+        "preview.html",
+        uploaded=db.session.get(UploadedFile, outcome.upload_id),
+        report=outcome.report,
+        columns=outcome.columns,
+        normalized_preview=outcome.normalized.head(20).to_dict(orient="records"),
+        aggregated_preview=outcome.aggregated.head(20).to_dict(orient="records"),
+    )
+
+
+@bp.post("/upload/cruscotto")
+def dashboard_refresh():
+    include_manual = request.form.get("sostituisci_manuali") == "1"
+    if not start_dashboard_job(current_app._get_current_object(), include_manual):
+        flash("Un aggiornamento dal cruscotto è già in corso.", "warning")
+    return redirect(url_for("guide.home") + "#passo-carica")
+
+
+@bp.get("/upload/cruscotto/stato")
+def dashboard_status():
+    job = get_dashboard_job()
+    if not job:
+        return jsonify({"status": "none"})
+    return jsonify({k: job[k] for k in ("status", "progress", "message", "upload_id")})
 
 
 @bp.get("/diagnostico.xlsx")

@@ -114,7 +114,20 @@ Input files should be Excel or CSV with columns (names are flexible; the system 
 **Source.** The data come from the public Rete MIC dashboard of the Sicilian regional
 health service (Qualità Sicilia SSR, Qlik Sense, anonymous access):
 <https://qlik.qualitasiciliassr.it/anonimo/single/?appid=85ada16c-4b41-4bc6-9ca1-405b8243d0c2&sheet=6ad6f3ac-3369-41c5-bd72-792243f9091b&opt=ctxmenu,currsel>.
-Export the table from that sheet to Excel and upload it in step 1.
+The records can be downloaded straight from it, without going through Excel:
+
+- **in the app**: step 1 → **Scarica dal cruscotto** (runs in the background, about 10 minutes,
+  progress shown on the page);
+- **from the command line**: `python scripts/estrai_qlik_retemic.py [file.csv]`, then upload the file.
+
+`app/services/qlik_source.py` reads the dashboard table `Dati_Grezzi` (one row per isolate, same
+columns as the export) through the Qlik Engine API with the anonymous session a browser gets:
+no browser and no login. It drops the fields the dashboard adds on load (`KEY_CAMPIONE`,
+`ETA_PZ`, `CHK_*`, …) and turns the `"<code> - <label>"` cells (`MATERIALE`, `OSPEDALE`,
+`PAZIENTE_RICOVERATO`, `REPARTO_DI_RICOVERO`) back into codes. The dashboard holds the whole
+history, so each refresh **replaces** the previous dashboard downloads (and, if ticked, the files
+uploaded by hand from the same dashboard) instead of adding to them. The CSV holds
+patient-level records and stays in `data/`, which is not committed.
 
 The network export (one row per isolate, `<ABX>_QUALITATIVO` / `<ABX>_QUANTITATIVO`
 column pairs, e.g. `DATA_PRELIEVO`, `CODICE_PAZIENTE`, `REPARTO_DI_RICOVERO`, `MICROORGANISMO`)

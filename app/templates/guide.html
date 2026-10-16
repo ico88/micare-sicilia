@@ -35,6 +35,7 @@
             <input class="form-control" name="dataset" type="file" accept=".csv,.xls,.xlsx" required>
             <button class="btn btn-primary btn-lg mt-3" type="submit">Carica il file</button>
           </form>
+          {% include "_dashboard_refresh.html" %}
         {% else %}
           <p class="step-desc mb-1">In archivio: <strong>{{ "{:,}".format(d.isolates).replace(",", ".") }} isolati</strong> dal {{ d.date_from }} al <strong>{{ d.date_to }}</strong>, {{ d.laboratories }} laboratori ({{ d.files }} file {{ "caricato" if d.files == 1 else "caricati" }}).</p>
           {% if d.old %}
@@ -49,6 +50,7 @@
               <div class="form-text">Lo stesso file caricato due volte viene riconosciuto e ignorato.</div>
             </form>
           </details>
+          {% include "_dashboard_refresh.html" %}
         {% endif %}
       </div>
     </section>

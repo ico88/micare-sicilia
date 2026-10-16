@@ -39,6 +39,8 @@ APP_VERSION: str = _read_version()
 
 
 def create_app(test_config: dict | None = None) -> Flask:
+    from .services.qlik_source import DASHBOARD_URL
+
     app = Flask(__name__, instance_relative_config=True)
     base_dir = Path(__file__).resolve().parent.parent
     instance_dir = base_dir / "instance"
@@ -54,11 +56,7 @@ def create_app(test_config: dict | None = None) -> Flask:
         FORECAST_FOLDER=str(instance_dir / "previsioni"),
         MAX_CONTENT_LENGTH=128 * 1024 * 1024,
         # Public Rete MIC dashboard (Qualità Sicilia SSR) the export is taken from
-        FONTE_DATI_URL=(
-            "https://qlik.qualitasiciliassr.it/anonimo/single/"
-            "?appid=85ada16c-4b41-4bc6-9ca1-405b8243d0c2"
-            "&sheet=6ad6f3ac-3369-41c5-bd72-792243f9091b&opt=ctxmenu,currsel"
-        ),
+        FONTE_DATI_URL=DASHBOARD_URL,
     )
     if test_config:
         app.config.update(test_config)

@@ -1,0 +1,51 @@
+{# Step 1: refresh the archive from the public Rete MIC dashboard (background job) #}
+{% set job = dashboard_job %}
+<div class="border rounded p-3 mt-3" id="cruscotto">
+  <div class="fw-semibold mb-1">Scarica dal cruscotto regionale</div>
+  {% if job and job.status in ('queued', 'running') %}
+    <p class="small mb-2" id="cruscottoMessage">{{ job.message }}</p>
+    <div class="progress" role="progressbar" aria-label="Avanzamento" aria-valuemin="0" aria-valuemax="100">
+      <div class="progress-bar progress-bar-striped progress-bar-animated" id="cruscottoBar" style="width: {{ job.progress }}%">{{ job.progress }}%</div>
+    </div>
+    <div class="form-text">Circa 10 minuti in tutto. Puoi chiudere la pagina: il lavoro continua sul server.</div>
+    <script>
+      (function poll() {
+        setTimeout(async () => {
+          try {
+            const job = await (await fetch("{{ url_for('upload.dashboard_status') }}")).json();
+            if (job.status !== 'queued' && job.status !== 'running') { window.location.reload(); return; }
+            document.getElementById('cruscottoMessage').textContent = job.message;
+            const bar = document.getElementById('cruscottoBar');
+            bar.style.width = job.progress + '%'; bar.textContent = job.progress + '%';
+          } catch (e) { /* server busy: try again */ }
+          poll();
+        }, 4000);
+      })();
+    </script>
+  {% else %}
+    {% if job and job.status == 'success' %}
+      <div class="alert alert-success small py-2">
+        Aggiornamento del {{ job.finished_at.strftime('%d/%m/%Y %H:%M') }} completato. {{ job.message }}
+        {% if job.upload_id %}<a href="{{ url_for('upload.validation_report', upload_id=job.upload_id) }}">Leggi il controllo dei dati</a>.{% endif %}
+      </div>
+    {% elif job and job.status == 'error' %}
+      <div class="alert alert-danger small py-2">
+        Aggiornamento non riuscito: {{ job.message }} L'archivio non è cambiato.
+        {% if job.upload_id %}<a href="{{ url_for('upload.validation_report', upload_id=job.upload_id) }}">Vedi il controllo dei dati</a>.{% endif %}
+      </div>
+    {% endif %}
+    <p class="small mb-2">Scarica tutti gli isolati dal <a href="{{ fonte_dati_url }}" target="_blank" rel="noopener">cruscotto pubblico della Rete MIC</a> e li archivia, senza passare da Excel. Il cruscotto contiene tutto lo storico: i dati scaricati prima dal cruscotto vengono sostituiti, non sommati.</p>
+    <form method="post" action="{{ url_for('upload.dashboard_refresh') }}">
+      {% if manual_uploads %}
+        <div class="form-check small mb-2">
+          <input class="form-check-input" type="checkbox" name="sostituisci_manuali" value="1" id="sostituisciManuali" checked>
+          <label class="form-check-label" for="sostituisciManuali">
+            Sostituisci anche {{ "il file caricato" if manual_uploads|length == 1 else "i " ~ manual_uploads|length ~ " file caricati" }} a mano
+            ({{ manual_uploads|map(attribute='original_name')|join(', ') }}), se {{ "viene" if manual_uploads|length == 1 else "vengono" }} dallo stesso cruscotto: altrimenti gli isolati sarebbero contati due volte.
+          </label>
+        </div>
+      {% endif %}
+      <button class="btn {{ 'btn-primary' if s.carica == 'ora' else 'btn-outline-primary btn-sm' }}" type="submit">Scarica dal cruscotto</button>
+    </form>
+  {% endif %}
+</div>

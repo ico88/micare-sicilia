@@ -185,6 +185,7 @@ info "Installo scikit-learn, statsmodels, pandas, matplotlib, plotly..."
     "openpyxl>=3.1" \
     "pyarrow>=15.0" \
     "python-calamine>=0.2" \
+    "websocket-client>=1.6" \
     --quiet
 
 # Flask e server

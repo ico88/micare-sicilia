@@ -25,6 +25,7 @@ dependencies = [
   "statsmodels>=0.14",
   "gunicorn>=21.0",
   "tqdm>=4.66",
+  "websocket-client>=1.6",
 ]
 
 [project.optional-dependencies]
