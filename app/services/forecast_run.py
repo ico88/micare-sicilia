@@ -54,6 +54,23 @@ def quarter_label(period: str | pd.Period) -> str:
     return f"{QUARTER_NAMES[p.quarter]} {p.year}"
 
 
+# Bump when the way forecasts are computed changes (population, series, models, choice rule):
+# results stored with an older method are then shown as out of date, like after new data.
+# 2: invasive isolates of non-hospitalised patients ("altro") outside the regional series
+METHOD_VERSION = 2
+
+
+def stale_reason(stored: dict | None, dataset_folder: str | Path) -> str | None:
+    """Why stored forecasts or a stored check no longer match the archive, if they do not."""
+    if not stored:
+        return None
+    if stored.get("archivio") != archive_signature(dataset_folder):
+        return "I dati in archivio sono cambiati"
+    if stored.get("metodo") != METHOD_VERSION:
+        return "Il metodo di calcolo è stato aggiornato"
+    return None
+
+
 def archive_signature(dataset_folder: str | Path) -> str:
     """Stored uploads with their size and time: changes when data are added or removed."""
     files = sorted(Path(dataset_folder).glob("*/upload_*.parquet"))
@@ -119,6 +136,7 @@ def compute_forecasts(dataset_folder: str | Path, until: str | None = None, quar
     meta = {
         "available": True,
         "archivio": archive_signature(dataset_folder),
+        "metodo": METHOD_VERSION,
         "calcolato_il": datetime.now().strftime("%d/%m/%Y %H:%M"),
         "popolazione": "isolati invasivi (sangue e liquor), tutti i laboratori della rete, esclusi i pazienti non ricoverati \"altro\"",
         "dati_fino_al": data_end.strftime("%d/%m/%Y"),

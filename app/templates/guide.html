@@ -11,7 +11,7 @@
   <div class="now-label">Cosa fare adesso</div>
   <div class="now-text">
     {% if wf.current == 'carica' %}Carica il file Excel esportato dalla Rete MIC (passo 1).
-    {% elif wf.current == 'calcola' %}{% if wf.stale %}I dati sono cambiati: ricalcola le previsioni (passo 3).{% else %}Calcola le previsioni (passo 3).{% endif %}
+    {% elif wf.current == 'calcola' %}{% if wf.stale %}{{ wf.stale_why }}: ricalcola le previsioni (passo 3).{% else %}Calcola le previsioni (passo 3).{% endif %}
     {% elif d and d.old %}Le previsioni sono pronte, ma i dati finiscono il {{ d.date_to }}: carica l'export aggiornato (passo 1) e poi ricalcola.
     {% else %}Le previsioni sono pronte: aprile (passo 4).{% endif %}
   </div>
@@ -87,7 +87,7 @@
         {% if s.calcola == 'dopo' %}
           <p class="step-desc mb-0">Disponibile dopo il caricamento dei dati.</p>
         {% elif s.calcola == 'ora' %}
-          <p class="step-desc">{% if wf.stale %}<strong>I dati sono cambiati dopo l'ultimo calcolo.</strong> {% endif %}Il sistema mette alla prova i modelli sui dati passati e calcola la resistenza dei quattro trimestri successivi ai dati. Richiede alcuni minuti.</p>
+          <p class="step-desc">{% if wf.stale %}<strong>{{ wf.stale_why }} dopo l'ultimo calcolo.</strong> {% endif %}Il sistema mette alla prova i modelli sui dati passati e calcola la resistenza dei quattro trimestri successivi ai dati. Richiede alcuni minuti.</p>
           <form method="post" action="{{ url_for('forecasts.compute') }}">
             <button class="btn btn-primary btn-lg" type="submit">Calcola le previsioni</button>
           </form>
@@ -131,9 +131,19 @@
     {% if wf.validazione_possibile %}
     <section class="panel mb-3 border-primary">
       <h2 class="h6">Verifica sui dati nuovi</h2>
-      {% if wf.validazione %}
+      {% if wf.validazione and wf.validazione_superata %}
+        <p class="small mb-2"><strong>{{ wf.validazione_superata }} dopo l'ultima verifica</strong> ({{ wf.validazione_calcolata }}): va rifatta.</p>
+        <form method="post" action="{{ url_for('forecasts.compute_validation_route') }}">
+          <button class="btn btn-primary btn-sm" type="submit">Rifai la verifica</button>
+        </form>
+      {% elif wf.validazione %}
         <p class="small mb-2">Le previsioni fatte con i dati fino al 2024 hanno sbagliato in media di <strong>{{ "%.1f"|format(wf.validazione.errore)|replace(".", ",") }} punti</strong>; il valore reale era dentro l'intervallo {{ wf.validazione.dentro }} volte su {{ wf.validazione.prove }}.</p>
-        <a class="btn btn-outline-primary btn-sm" href="{{ url_for('forecasts.validation') }}">Apri la verifica</a>
+        <div class="d-flex gap-2 flex-wrap">
+          <a class="btn btn-outline-primary btn-sm" href="{{ url_for('forecasts.validation') }}">Apri la verifica</a>
+          <form method="post" action="{{ url_for('forecasts.compute_validation_route') }}">
+            <button class="btn btn-outline-secondary btn-sm" type="submit">Rifai la verifica</button>
+          </form>
+        </div>
       {% else %}
         <p class="small text-muted mb-2">Ci sono dati successivi al 2024: si può controllare quanto le previsioni fatte allora erano vicine al vero.</p>
         <form method="post" action="{{ url_for('forecasts.compute_validation_route') }}">

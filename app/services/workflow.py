@@ -15,7 +15,7 @@ from datetime import date, datetime
 import pandas as pd
 
 from . import dataset_store
-from .forecast_run import archive_signature, load_forecasts
+from .forecast_run import load_forecasts, stale_reason
 from .out_of_sample import CUTOFF, load_validation
 
 STEPS = (
@@ -58,7 +58,8 @@ def workflow_state(dataset_folder: str, forecast_folder: str, uploads: list, tod
 
     forecasts = load_forecasts(forecast_folder)
     meta = forecasts["meta"] if forecasts and forecasts["meta"].get("available") else None
-    stale = bool(meta) and meta.get("archivio") != archive_signature(dataset_folder)
+    stale_why = stale_reason(meta, dataset_folder)
+    stale = bool(stale_why)
     if meta:
         three_months = [f for c in forecasts["combinations"] for f in c["previsioni"] if f["orizzonte_mesi"] == 3]
         meta = meta | {"affidabili_3_mesi": sum(f["semaforo"] == "verde" for f in three_months)}
@@ -87,6 +88,7 @@ def workflow_state(dataset_folder: str, forecast_folder: str, uploads: list, tod
         else:
             status[key] = "dopo"
     return {"current": current, "status": status, "data": data, "forecasts": meta, "stale": stale,
+            "stale_why": stale_why, "validazione_superata": stale_reason(validation, dataset_folder),
             "steps": STEPS, "validazione_possibile": validation_possible,
             "validazione": (validation or {}).get("sintesi"), "validazione_calcolata": (validation or {}).get("calcolato_il")}
 

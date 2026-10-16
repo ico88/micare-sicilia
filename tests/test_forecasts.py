@@ -252,3 +252,32 @@ def test_validation_page_and_guide_panel(client):
     sheets = openpyxl.load_workbook(io.BytesIO(workbook.data)).sheetnames
     assert {"Leggimi analisi", "Scostamenti combinazione", "Contributi laboratori", "Modelli"} <= set(sheets)
     assert "hanno sbagliato in media di" in http.get("/").get_data(as_text=True)
+
+
+def test_results_of_an_older_method_are_out_of_date(client):
+    """After an update that changes the method the archive is the same, yet the stored
+    forecasts and check must be redone: the pages say so and offer to redo them."""
+    import json
+    from pathlib import Path
+
+    http, app = client
+    folder = app.config["DATASET_FOLDER"]
+    _store(folder, data_end="2025-06-29", last_quarter="2025Q2")
+    _mark_imported(app, folder, date_to="2025-06-29")
+    http.post("/previsioni/calcola")
+    jobs.wait("previsioni")
+    http.post("/validazione/calcola")
+    jobs.wait("verifica")
+    assert "metodo di calcolo" not in http.get("/").get_data(as_text=True)
+    assert "Rifai la verifica" in http.get("/").get_data(as_text=True)  # always possible
+
+    for name in ("previsioni/previsioni.json", "validazione.json"):
+        path = Path(app.config["FORECAST_FOLDER"]) / Path(name).name
+        stored = json.loads(path.read_text())
+        (stored.get("meta") or stored).pop("metodo")  # as saved before the method version existed
+        path.write_text(json.dumps(stored))
+
+    home = http.get("/").get_data(as_text=True)
+    assert "Il metodo di calcolo è stato aggiornato: ricalcola le previsioni" in home
+    assert "Il metodo di calcolo è stato aggiornato dopo l'ultima verifica" in home
+    assert "i numeri qui sotto non valgono più" in http.get("/validazione").get_data(as_text=True)

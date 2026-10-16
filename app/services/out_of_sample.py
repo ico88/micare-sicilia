@@ -21,7 +21,8 @@ from .error_analysis import analyse
 from .forecasting import FORECASTERS
 from .dataset_store import covered_period, load_isolates
 from .forecast_run import (
-    POPULATION, READING, archive_signature, compute_forecasts, last_complete_quarter, quarter_label,
+    METHOD_VERSION, POPULATION, READING, archive_signature, compute_forecasts, last_complete_quarter,
+    quarter_label,
 )
 from .series import MIN_ISOLATES_PER_PERIOD, build_series, regional_series
 
@@ -89,6 +90,7 @@ def compute_validation(dataset_folder: str | Path) -> dict:
         "available": True,
         "calcolato_il": datetime.now().strftime("%d/%m/%Y %H:%M"),
         "archivio": archive_signature(dataset_folder),
+        "metodo": METHOD_VERSION,
         "dati_fino_al": cutoff_label(),
         "trimestri_osservati": [quarter_label(p) for p in pd.period_range(cutoff + 1, last, freq="Q")],
         "sintesi": _summary(table[table["semaforo"] != "grigio"]) if not table.empty else None,

@@ -14,7 +14,7 @@ from app.services.out_of_sample import (
     COMPARED, compute_validation, cutoff_label, load_validation, save_validation, validation_possible,
 )
 from app.services.reference import laboratory_names
-from app.services.forecast_run import archive_signature, compute_forecasts, load_forecasts, save_forecasts
+from app.services.forecast_run import compute_forecasts, load_forecasts, save_forecasts, stale_reason
 
 bp = Blueprint("forecasts", __name__)
 
@@ -75,7 +75,7 @@ def overview():
     order = {"verde": 0, "giallo": 1, "grigio": 2}
     rows.sort(key=lambda r: (r["forecast"] is None, order.get((r["forecast"] or {}).get("semaforo"), 3),
                              r["combo"]["antibiotico_nome"]))
-    stale = data["meta"].get("archivio") != archive_signature(current_app.config["DATASET_FOLDER"])
+    stale = stale_reason(data["meta"], current_app.config["DATASET_FOLDER"])
     return render_template("forecasts.html", data=data, rows=rows, pathogens=pathogens, selected=selected,
                            horizon=horizon, horizons=HORIZONS, traffic=TRAFFIC, stale=stale, wf=current_workflow())
 
@@ -131,7 +131,7 @@ def validation():
     selected = request.args.get("microrganismo") or (pathogens[0][0] if pathogens else "")
     shown = sorted((r for r in rows if r["microorganismo"] == selected),
                    key=lambda r: (r["antibiotico_nome"], r["periodo"]))
-    stale = bool(result) and result.get("archivio") != archive_signature(current_app.config["DATASET_FOLDER"])
+    stale = stale_reason(result, current_app.config["DATASET_FOLDER"])
     analysis = (result or {}).get("analisi") or {}
     return render_template("validation_2025.html", result=result, rows=shown, pathogens=pathogens, stale=stale,
                            analysis=analysis, causes=CAUSE_LABELS, model_names=MODEL_NAMES,
