@@ -80,6 +80,7 @@ def _combination(group: pd.DataFrame, series: pd.DataFrame, base_periods: list[s
     base = series[series["period"].isin(base_periods)].groupby("laboratorio")[[n_col, r_col]].sum()
     now = series[series["period"].isin(periods)].groupby("laboratorio")[[n_col, r_col]].sum()
     lab = base.join(now, how="outer", lsuffix="_0", rsuffix="_1").fillna(0)
+    lab = lab[(lab[f"{n_col}_0"] > 0) | (lab[f"{n_col}_1"] > 0)]  # series carry explicit zero rows
     n0, r0, n1, r1 = (lab[f"{c}_{s}"] for s in ("0", "1") for c in (n_col, r_col))
     N0, N1 = n0.sum(), n1.sum()
     if N0 <= 0 or N1 <= 0:

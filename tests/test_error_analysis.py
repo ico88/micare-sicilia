@@ -51,7 +51,7 @@ def analysis():
     real = _labs("CTX", {"A": ((400, 80), (400, 140))})                              # 20% -> 35% in place
     noise = _labs("CIP", {"A": ((100, 20), (100, 21))})                              # 20% -> 21%
     # few tested before (5 a quarter = 20 a year), then many: in practice a new laboratory
-    grown = _labs("AMK", {"A": ((100, 20), (100, 20)), "C": ((5, 3), (300, 30))})
+    grown = _labs("AMK", {"A": ((100, 20), (100, 20)), "C": ((5, 3), (300, 30)), "Z": ((0, 0), (0, 0))})
     series = pd.concat([mix, real, noise, grown])
     rows = (_rows("MEM", mix, 20.0) + _rows("CTX", real, 20.0, trend_pct=30.0) + _rows("CIP", noise, 20.0)
             + _rows("AMK", grown, 21.0))
@@ -88,7 +88,9 @@ def test_summary_and_models(analysis):
     models = {m["modello"]: m for m in analysis["modelli"]["complessivo"]}
     assert set(models) == {"mostrato", *MODELS}
     assert models["trend"]["migliore_in"] == 1
-    lab_a = next(l for l in analysis["laboratori_sintesi"] if l["laboratorio"] == "A")
+    summary = {l["laboratorio"]: l for l in analysis["laboratori_sintesi"]}
+    assert summary["C"]["stato"] == "quasi nuovo" and "Z" not in summary  # zero rows are no laboratory
+    lab_a = summary["A"]
     assert lab_a["combinazioni"] == 4
 
 
