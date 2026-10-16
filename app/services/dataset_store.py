@@ -44,6 +44,9 @@ CODE_COLUMNS = [
 
 MAX_ISSUE_ROWS = 100_000
 MIN_DATE = pd.Timestamp("2000-01-01")
+# An edge month with fewer isolates than this share of the median of the 12 months
+# next to it is an isolated date (typing errors, a stray record): outside the period
+ISOLATED_MONTH_SHARE = 0.05
 
 # Operator, first number (primary drug), optional "/inhibitor" part: "<=0,25/4", ">32/2", "1."
 _MIC_RE = re.compile(r"^(<=|>=|=<|=>|<|>|=)?(\d+(?:[.,]\d*)?|[.,]\d+)(?:[/\\]\d+(?:[.,]\d+)?)?$")
@@ -439,6 +442,15 @@ def build_and_validate(raw: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame, d
         )
     report["stats"] = _stats(n_rows, isolates, ast, antibiotics) | {"harmonization": report["stats"]["harmonization"]}
     pts = report["stats"]
+    if pts["isolates_outside_period"]:
+        outside = ~isolates["data_prelievo"].between(pd.Timestamp(pts["date_from"]), pd.Timestamp(pts["date_to"]))
+        dates = isolates.loc[outside, "data_prelievo"].dt.strftime("%d/%m/%Y").value_counts().sort_index()
+        report["warnings"].append(
+            f"{pts['isolates_outside_period']} isolati con date isolate, fuori dal periodo coperto "
+            f"({pts['date_from']} → {pts['date_to']}): restano in archivio ma non contano per il periodo né per "
+            "le previsioni. Date: " + ", ".join(f"{d} ({n})" for d, n in dates.head(10).items())
+            + (" …" if len(dates) > 10 else "")
+        )
     if pts.get("repeat_isolates", 0):
         report["info"].append(
             f"{pts['repeat_isolates']} isolati ripetuti sullo stesso paziente/microrganismo: "
@@ -496,6 +508,7 @@ def _harmonize(ast: pd.DataFrame, isolates: pd.DataFrame, report: dict) -> None:
 
 
 def _stats(n_rows: int, isolates: pd.DataFrame, ast: pd.DataFrame, antibiotics: list[str]) -> dict:
+    date_from, date_to = covered_period(isolates["data_prelievo"])
     stats = {
         "rows_read": int(n_rows),
         "isolates_valid": int(len(isolates)),
@@ -503,8 +516,9 @@ def _stats(n_rows: int, isolates: pd.DataFrame, ast: pd.DataFrame, antibiotics: 
         "ast_results": int(ast["result"].notna().sum()),
         "mic_values": int(ast["mic_value"].notna().sum()),
         "antibiotics": antibiotics,
-        "date_from": str(isolates["data_prelievo"].min().date()),
-        "date_to": str(isolates["data_prelievo"].max().date()),
+        "date_from": str(date_from.date()),
+        "date_to": str(date_to.date()),
+        "isolates_outside_period": int(len(isolates) - isolates["data_prelievo"].between(date_from, date_to).sum()),
         "years": sorted(int(y) for y in isolates["data_prelievo"].dt.year.unique()),
         "laboratories": int(isolates["laboratorio"].nunique()),
         "hospitals": int(isolates["ospedale"].replace("", np.nan).nunique()),
@@ -519,6 +533,30 @@ def _stats(n_rows: int, isolates: pd.DataFrame, ast: pd.DataFrame, antibiotics: 
         stats["first_isolates"] = int(first.sum())
         stats["repeat_isolates"] = int((~first & has_patient).sum())
     return stats
+
+
+def covered_period(dates: pd.Series) -> tuple[pd.Timestamp, pd.Timestamp]:
+    """First and last sampling date of the period the data really cover.
+
+    Dates before 2000 or in the future are left out, then isolated months at
+    either edge (e.g. 4 isolates in January 2026 after ~3,800 a month in 2025):
+    an edge month counts only if it has at least ISOLATED_MONTH_SHARE of the
+    median of the 12 months with data next to it (gaps skipped).
+    """
+    dates = dates.dropna()
+    valid = dates[(dates >= MIN_DATE) & (dates <= pd.Timestamp.today().normalize())]
+    if valid.empty:
+        valid = dates
+    if valid.empty:
+        return pd.NaT, pd.NaT
+    counts = valid.dt.to_period("M").value_counts().sort_index()  # months with data only
+    first, last = 0, len(counts) - 1
+    while last > first and counts.iloc[last] < ISOLATED_MONTH_SHARE * counts.iloc[max(first, last - 12):last].median():
+        last -= 1
+    while first < last and counts.iloc[first] < ISOLATED_MONTH_SHARE * counts.iloc[first + 1:min(last, first + 12) + 1].median():
+        first += 1
+    kept = valid[valid.dt.to_period("M").between(counts.index[first], counts.index[last])]
+    return kept.min(), kept.max()
 
 
 def first_isolate_mask(isolates: pd.DataFrame, period: str = "Y", by: list[str] | None = None) -> pd.Series:

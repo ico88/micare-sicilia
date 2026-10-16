@@ -253,3 +253,33 @@ def test_regional_long_flow_csv_is_converted(tmp_path):
     assert any("AMR-RETEMIC" in m for m in report["info"])
     assert any("ripetute" in m for m in report["warnings"])
     assert not any("PROVINCIA_RESIDENZA" in m for m in report["warnings"])
+
+
+def _dates(per_month: dict[str, int]) -> pd.Series:
+    return pd.Series([pd.Timestamp(f"{month}-{1 + i % 28:02d}") for month, n in per_month.items() for i in range(n)])
+
+
+def test_covered_period_ignores_isolated_dates():
+    months = {str(m): 300 for m in pd.period_range("2023-01", "2025-12", freq="M")}
+    dates = _dates({"1900-01": 1, "2018-06": 2, **months, "2026-01": 4})
+    # 2018: 2 isolates, then nothing until 2023 -> isolated as well
+    assert dataset_store.covered_period(dates) == (pd.Timestamp("2023-01-01"), pd.Timestamp("2025-12-28"))
+
+
+def test_covered_period_keeps_a_real_partial_last_month_and_small_files():
+    months = {str(m): 300 for m in pd.period_range("2024-01", "2024-12", freq="M")}
+    assert dataset_store.covered_period(_dates({**months, "2025-01": 40}))[1] == pd.Timestamp("2025-01-28")
+    few = _dates({"2022-01": 1, "2022-02": 3, "2022-09": 1})
+    assert dataset_store.covered_period(few) == (pd.Timestamp("2022-01-01"), pd.Timestamp("2022-09-01"))
+
+
+def test_report_warns_about_isolated_dates():
+    months = [str(m) for m in pd.period_range("2023-01", "2024-12", freq="M")]
+    rows = [_row(f"{i:08d}", f"{i:010d}", f"{1 + i % 28:02d}/{m[5:]}/{m[:4]}", AMK=("R", ">32"))
+            for i, m in enumerate(m for m in months for _ in range(30))]
+    rows.append(_row("12345678", "9999999999", "03/01/2025", AMK=("S", "8")))
+    raw = pd.DataFrame(rows, columns=HEADER)
+    _, _, report, _ = dataset_store.build_and_validate(raw)
+    assert report["stats"]["date_to"] == "2024-12-28"
+    assert report["stats"]["isolates_outside_period"] == 1
+    assert any("date isolate" in w and "03/01/2025 (1)" in w for w in report["warnings"])

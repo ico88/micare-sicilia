@@ -18,7 +18,7 @@ import pandas as pd
 
 from .benchmark import HORIZONS, INTERVAL_Z, choose_and_verify, contexts, run_bench
 from .breakpoints import BREAKPOINTS_VERSION
-from .dataset_store import load_isolates
+from .dataset_store import covered_period, load_isolates
 from .forecasting import FORECASTERS
 from .reference import laboratory_names
 from .series import MIN_ISOLATES_PER_PERIOD, build_series, regional_series, wilson_interval
@@ -79,7 +79,7 @@ def compute_forecasts(dataset_folder: str | Path, until: str | None = None, quar
     labs = quarterly[quarterly["popolazione"] == POPULATION]
     regional = regional_series(quarterly, POPULATION)
 
-    data_end = pd.Timestamp(isolates["data_prelievo"].max())
+    data_end = covered_period(isolates["data_prelievo"])[1]
     last_period = last_complete_quarter(data_end)
     if until is not None and pd.Period(until, freq="Q") < last_period:
         last_period = pd.Period(until, freq="Q")

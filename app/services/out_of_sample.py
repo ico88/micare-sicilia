@@ -17,7 +17,7 @@ import numpy as np
 import pandas as pd
 
 from .benchmark import REFERENCE, coverage_compatible
-from .dataset_store import load_isolates
+from .dataset_store import covered_period, load_isolates
 from .forecast_run import (
     POPULATION, READING, archive_signature, compute_forecasts, last_complete_quarter, quarter_label,
 )
@@ -36,14 +36,14 @@ def validation_possible(dataset_folder: str | Path) -> bool:
     isolates = load_isolates(dataset_folder)
     if isolates.empty:
         return False
-    return last_complete_quarter(pd.Timestamp(isolates["data_prelievo"].max())) > pd.Period(CUTOFF, freq="Q")
+    return last_complete_quarter(covered_period(isolates["data_prelievo"])[1]) > pd.Period(CUTOFF, freq="Q")
 
 
 def compute_validation(dataset_folder: str | Path) -> dict:
     isolates = load_isolates(dataset_folder)
     if isolates.empty:
         return {"available": False}
-    last = last_complete_quarter(pd.Timestamp(isolates["data_prelievo"].max()))
+    last = last_complete_quarter(covered_period(isolates["data_prelievo"])[1])
     cutoff = pd.Period(CUTOFF, freq="Q")
     if last <= cutoff:
         return {"available": False, "ultimo_trimestre": quarter_label(last)}
