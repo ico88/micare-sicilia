@@ -53,6 +53,12 @@ def create_app(test_config: dict | None = None) -> Flask:
         DATASET_FOLDER=str(instance_dir / "dataset"),
         FORECAST_FOLDER=str(instance_dir / "previsioni"),
         MAX_CONTENT_LENGTH=128 * 1024 * 1024,
+        # Public Rete MIC dashboard (Qualità Sicilia SSR) the export is taken from
+        FONTE_DATI_URL=(
+            "https://qlik.qualitasiciliassr.it/anonimo/single/"
+            "?appid=85ada16c-4b41-4bc6-9ca1-405b8243d0c2"
+            "&sheet=6ad6f3ac-3369-41c5-bd72-792243f9091b&opt=ctxmenu,currsel"
+        ),
     )
     if test_config:
         app.config.update(test_config)
@@ -66,7 +72,7 @@ def create_app(test_config: dict | None = None) -> Flask:
 
     @app.context_processor
     def inject_version():
-        return {"app_version": APP_VERSION}
+        return {"app_version": APP_VERSION, "fonte_dati_url": app.config["FONTE_DATI_URL"]}
 
     from . import models  # noqa: F401
     from .routes.dashboard import bp as dashboard_bp

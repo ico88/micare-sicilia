@@ -30,6 +30,7 @@
         </div>
         {% if s.carica == 'ora' %}
           <p class="step-desc">Scegli il file Excel (o CSV) esportato dalla Rete MIC. Può contenere più anni. Un file di circa 40 MB richiede qualche minuto: non chiudere la pagina.</p>
+          <p class="small mb-2">Il file si scarica dal <a href="{{ fonte_dati_url }}" target="_blank" rel="noopener">cruscotto pubblico della Rete MIC (Qualità Sicilia SSR)</a>: esporta la tabella in Excel.</p>
           <form method="post" action="{{ url_for('upload.upload') }}" enctype="multipart/form-data" data-busy="Caricamento e controllo del file in corso. Può richiedere qualche minuto: non chiudere la pagina.">
             <input class="form-control" name="dataset" type="file" accept=".csv,.xls,.xlsx" required>
             <button class="btn btn-primary btn-lg mt-3" type="submit">Carica il file</button>
@@ -41,6 +42,7 @@
           {% endif %}
           <details {% if d.old %}open{% endif %}>
             <summary class="small">Aggiungi un file più recente</summary>
+            <p class="small mt-2 mb-0">Fonte: <a href="{{ fonte_dati_url }}" target="_blank" rel="noopener">cruscotto pubblico della Rete MIC (Qualità Sicilia SSR)</a>.</p>
             <form class="mt-2" method="post" action="{{ url_for('upload.upload') }}" enctype="multipart/form-data" data-busy="Caricamento e controllo del file in corso. Può richiedere qualche minuto: non chiudere la pagina.">
               <input class="form-control form-control-sm" name="dataset" type="file" accept=".csv,.xls,.xlsx" required>
               <button class="btn btn-outline-primary btn-sm mt-2" type="submit">Carica il file</button>

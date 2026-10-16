@@ -111,6 +111,11 @@ Input files should be Excel or CSV with columns (names are flexible; the system 
 
 ### Rete MIC isolate-level export
 
+**Source.** The data come from the public Rete MIC dashboard of the Sicilian regional
+health service (Qualità Sicilia SSR, Qlik Sense, anonymous access):
+<https://qlik.qualitasiciliassr.it/anonimo/single/?appid=85ada16c-4b41-4bc6-9ca1-405b8243d0c2&sheet=6ad6f3ac-3369-41c5-bd72-792243f9091b&opt=ctxmenu,currsel>.
+Export the table from that sheet to Excel and upload it in step 1.
+
 The network export (one row per isolate, `<ABX>_QUALITATIVO` / `<ABX>_QUANTITATIVO`
 column pairs, e.g. `DATA_PRELIEVO`, `CODICE_PAZIENTE`, `REPARTO_DI_RICOVERO`, `MICROORGANISMO`)
 is uploaded once (a 40 MB workbook imports in about a minute) and:
