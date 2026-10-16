@@ -66,3 +66,14 @@ def test_blood_and_urine_are_separate_series(tmp_path):
     # Urine exist only from 2023: no empty urine quarters in 2022
     assert "2022Q1" not in s.loc["urine"].index
     assert s.loc[("invasivi", "2022Q2"), "n_reported"] == 0
+
+
+def test_non_hospitalised_invasive_isolates_are_a_population_of_their_own():
+    from app.services.series import NON_HOSPITALISED_INVASIVE, add_population
+
+    isolates = pd.DataFrame({"materiale": ["1", "1", "2", "3", "1"], "paziente_ricoverato": ["1", "5", "5", "5", "3"]})
+    assert add_population(isolates)["popolazione"].tolist() == [
+        "invasivi", NON_HOSPITALISED_INVASIVE, NON_HOSPITALISED_INVASIVE, "urine", "invasivi"]
+    # older files without the patient type keep the material rule
+    assert add_population(isolates[["materiale"]])["popolazione"].tolist() == [
+        "invasivi", "invasivi", "invasivi", "urine", "invasivi"]

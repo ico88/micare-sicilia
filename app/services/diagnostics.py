@@ -30,12 +30,12 @@ MIN_REPORTABLE_QUARTERS = 12
 SHEET_NOTES = {
     "Leggimi": "Cosa ha prodotto questo file: versioni, soglie e dati inclusi.",
     "Combinazioni": "Una riga per laboratorio x microrganismo x antibiotico: quanti dati ci sono e se bastano per una previsione trimestrale.",
-    "Serie trimestrali": "Resistenza per trimestre, separata per popolazione: invasivi (sangue, liquor), urine (dal 2023), altri materiali. Primo isolato per paziente, reparti sommati, intrinseche escluse.",
+    "Serie trimestrali": "Resistenza per trimestre, separata per popolazione: invasivi (sangue, liquor), invasivi non ricoverati («altro», a parte, fuori dalle previsioni), urine (dal 2023), altri materiali. Primo isolato per paziente, reparti sommati, intrinseche escluse.",
     "Serie mensili": "Come le serie trimestrali, per mese. Utile solo dove i numeri sono alti.",
     "Semaforo": "Per ogni combinazione e orizzonte: quale previsione verrà mostrata e con che affidabilità. Il modello è scelto sulle prove 2020-22 e giudicato solo sulle prove 2023-24. Un orizzonte non ha mai un semaforo migliore di quelli più vicini (colonna \"Semaforo del solo orizzonte\": il giudizio prima di questa regola).",
     "Banco di prova sintesi": "Quanto sbaglia la previsione più semplice (\"come gli ultimi 12 mesi\") sugli invasivi regionali, per orizzonte. È il riferimento che ogni modello deve battere.",
     "Banco di prova": "Dettaglio per combinazione e orizzonte. Errore medio e rumore in punti di % R; copertura = % di valori reali dentro l'intervallo dell'80% (accettabile 75-85%).",
-    "Serie regionali invasivi": "Laboratori sommati, solo sangue e liquor: la serie su cui si costruisce la previsione regionale.",
+    "Serie regionali invasivi": "Laboratori sommati, solo sangue e liquor, esclusi i pazienti non ricoverati \"altro\" (popolazione a parte nelle serie trimestrali): la serie su cui si costruisce la previsione regionale.",
     "Composizione": "Primi isolati per anno, per materiale e per tipo di paziente: un cambio di composizione cambia la % R senza che i batteri cambino.",
     "Antibiogramma": "Antibiogramma cumulativo annuale (CLSI M39): da confrontare con i report dei laboratori.",
     "Breakpoint": f"Riga EUCAST v{BREAKPOINTS_VERSION} usata per ogni coppia e quanto la lettura armonizzata differisce dal refertato.",
@@ -379,7 +379,7 @@ def _analysis_readme(validation: dict, app_version: str) -> pd.DataFrame:
         ("Previsioni fatte con i dati fino al", validation.get("dati_fino_al", "")),
         ("Trimestri osservati", ", ".join(validation.get("trimestri_osservati", []))),
         ("Anno di riferimento (prima del taglio)", analysis.get("periodo_base", "")),
-        ("Popolazione", "isolati invasivi (sangue e liquor), lettura armonizzata EUCAST, primo isolato"),
+        ("Popolazione", "isolati invasivi (sangue e liquor) esclusi i pazienti non ricoverati \"altro\", lettura armonizzata EUCAST, primo isolato"),
         ("Confronti contati", f"trimestri con almeno {MIN_ISOLATES_PER_PERIOD} isolati testati; solo previsioni "
                               "mostrate all'operatore (semaforo verde o giallo)"),
         ("Scostamento", "osservato - previsto, in punti di % R: positivo = il modello ha sottostimato"),

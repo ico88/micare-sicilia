@@ -31,6 +31,14 @@ KEYS = ["popolazione", "laboratorio", "microorganismo", "antibiotic"]
 # 4 urethral, 5 cervical, 6 rectal, 7 pharyngeal, 8 other
 POPULATIONS = {"1": "invasivi", "2": "invasivi", "3": "urine"}
 OTHER_POPULATION = "altri materiali"
+# Invasive isolates of non-hospitalised patients ("5 - altro", PAZIENTE_RICOVERATO) form a
+# population of their own, outside the regional forecasts. In 2025 one laboratory started
+# sending them by the thousand (2,057 tested in 2024, 12,073 in 2025), with far lower
+# resistance: pooled with the inpatients they turned a change of who is tested into an
+# apparent fall of resistance. Without them the 2025 out-of-sample error went from 4.1 to
+# 3.2 points, the bias from -2.1 to -0.3 and the 80% interval coverage from 71% to 84%.
+NON_HOSPITALISED_INVASIVE = "invasivi non ricoverati"
+NON_HOSPITALISED_CODES = {"5"}
 
 
 def _series_isolates(folder: str | Path) -> pd.DataFrame:
@@ -46,7 +54,12 @@ def _series_isolates(folder: str | Path) -> pd.DataFrame:
 
 def add_population(isolates: pd.DataFrame) -> pd.DataFrame:
     material = isolates["materiale"].astype(str).str.strip() if "materiale" in isolates else ""
-    return isolates.assign(popolazione=pd.Series(material, index=isolates.index).map(POPULATIONS).fillna(OTHER_POPULATION))
+    population = pd.Series(material, index=isolates.index).map(POPULATIONS).fillna(OTHER_POPULATION)
+    if "paziente_ricoverato" in isolates:
+        setting = isolates["paziente_ricoverato"].astype(str).str.strip()
+        population = population.mask(population.eq("invasivi") & setting.isin(NON_HOSPITALISED_CODES),
+                                     NON_HOSPITALISED_INVASIVE)
+    return isolates.assign(popolazione=population)
 READINGS = {"reported": "result", "harmonized": "result_harmonized"}
 
 

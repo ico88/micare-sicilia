@@ -120,7 +120,7 @@ def compute_forecasts(dataset_folder: str | Path, until: str | None = None, quar
         "available": True,
         "archivio": archive_signature(dataset_folder),
         "calcolato_il": datetime.now().strftime("%d/%m/%Y %H:%M"),
-        "popolazione": "isolati invasivi (sangue e liquor), tutti i laboratori della rete",
+        "popolazione": "isolati invasivi (sangue e liquor), tutti i laboratori della rete, esclusi i pazienti non ricoverati \"altro\"",
         "dati_fino_al": data_end.strftime("%d/%m/%Y"),
         "ultimo_trimestre": quarter_label(last_period),
         "trimestri_previsti": [quarter_label(last_period + h) for h in HORIZONS],
