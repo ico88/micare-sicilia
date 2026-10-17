@@ -172,16 +172,11 @@ info "Installo prophet..."
 "$PIP" install "prophet>=1.1" --quiet
 
 # Dipendenze scientifiche
-info "Installo scikit-learn, statsmodels, pandas, matplotlib, plotly..."
+info "Installo pandas, scikit-learn, scipy, openpyxl..."
 "$PIP" install \
     "pandas>=2.1" \
     "scikit-learn>=1.4" \
     "scipy>=1.11" \
-    "statsmodels>=0.14" \
-    "matplotlib>=3.8" \
-    "plotly>=5.20" \
-    "joblib>=1.3" \
-    "tqdm>=4.66" \
     "openpyxl>=3.1" \
     "pyarrow>=15.0" \
     "python-calamine>=0.2" \
@@ -205,21 +200,21 @@ ok "Tutte le dipendenze Python installate."
 # Verifica importazioni critiche
 info "Verifico importazioni critiche..."
 "$PYTHON" -c "
-import flask, sqlalchemy, prophet, sklearn, pandas, numpy, statsmodels, gunicorn
+import flask, sqlalchemy, prophet, sklearn, pandas, numpy, scipy, gunicorn
 print('  flask', flask.__version__)
 print('  pandas', pandas.__version__)
 print('  numpy', numpy.__version__)
 print('  prophet OK')
 print('  scikit-learn', sklearn.__version__)
-print('  statsmodels', statsmodels.__version__)
+print('  scipy', scipy.__version__)
 " || die "Alcune importazioni fallite. Controlla $LOG_FILE"
 ok "Importazioni verificate."
 
 # ── 6. Directory e struttura dati ─────────────────────────────────────────────
 step "6/9 · Directory di lavoro"
 
-mkdir -p "$APP_DIR/data" "$APP_DIR/models" "$APP_DIR/instance"
-ok "data/, models/, instance/ pronti."
+mkdir -p "$APP_DIR/data" "$APP_DIR/instance"
+ok "data/, instance/ pronti."
 
 # ── 7. Configurazione Flask ───────────────────────────────────────────────────
 step "7/9 · Configurazione applicazione"

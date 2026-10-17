@@ -11,8 +11,8 @@ from flask import Blueprint, abort, current_app, flash, redirect, render_templat
 from werkzeug.utils import secure_filename
 
 from app import APP_VERSION, db
-from app.models import AggregatedObservation, Observation, Prediction, TrainedModel, UploadedFile, ValidationMetric
-from app.services import dataset_store
+from app.models import UploadedFile
+from app.services import dataset_store, model_search
 from app.services.dashboard_jobs import start_dashboard_job
 from app.services.diagnostics import build_diagnostic
 from app.services.forecast_run import RESULT_FILE
@@ -34,7 +34,7 @@ def upload():
 
     incoming = request.files.get("dataset")
     if not incoming or incoming.filename == "":
-        flash("Seleziona un file CSV/XLSX.", "danger")
+        flash("Seleziona l'export della Rete MIC (CSV o XLSX).", "danger")
         return redirect(url_for("guide.home"))
 
     filename = secure_filename(incoming.filename)
@@ -67,17 +67,8 @@ def upload():
         return redirect(url_for("guide.home"))
 
     flash(outcome.message, "success")
-    if outcome.report:
-        # Guided path: the next thing to do is read the outcome of the check
-        return redirect(url_for("upload.validation_report", upload_id=outcome.upload_id))
-    return render_template(
-        "preview.html",
-        uploaded=db.session.get(UploadedFile, outcome.upload_id),
-        report=outcome.report,
-        columns=outcome.columns,
-        normalized_preview=outcome.normalized.head(20).to_dict(orient="records"),
-        aggregated_preview=outcome.aggregated.head(20).to_dict(orient="records"),
-    )
+    # Guided path: the next thing to do is read the outcome of the check
+    return redirect(url_for("upload.validation_report", upload_id=outcome.upload_id))
 
 
 @bp.post("/upload/cruscotto")
@@ -125,28 +116,14 @@ def validation_issues(upload_id: int):
 
 @bp.post("/reset-db")
 def reset_db():
-    Prediction.query.delete()
-    ValidationMetric.query.delete()
-    TrainedModel.query.delete()
-    AggregatedObservation.query.delete()
-    Observation.query.delete()
     UploadedFile.query.delete()
     db.session.commit()
-
     shutil.rmtree(current_app.config["DATASET_FOLDER"], ignore_errors=True)
     Path(current_app.config["DATASET_FOLDER"]).mkdir(parents=True, exist_ok=True)
-    (Path(current_app.config["FORECAST_FOLDER"]) / RESULT_FILE).unlink(missing_ok=True)
-    (Path(current_app.config["FORECAST_FOLDER"]) / VALIDATION_FILE).unlink(missing_ok=True)
-
-    # cancella file modello su disco
-    model_folder = Path(current_app.config["MODEL_FOLDER"])
-    for item in model_folder.iterdir():
-        if item.is_file():
-            item.unlink(missing_ok=True)
-        elif item.is_dir():
-            shutil.rmtree(item, ignore_errors=True)
-
-    flash("Database e modelli azzerati. Puoi ricaricare i file Excel.", "success")
+    folder = Path(current_app.config["FORECAST_FOLDER"])
+    for name in (RESULT_FILE, VALIDATION_FILE, model_search.SUMMARY_FILE, model_search.WORKBOOK_FILE):
+        (folder / name).unlink(missing_ok=True)
+    flash("Archivio azzerato. Puoi ricaricare l'export della Rete MIC.", "success")
     return redirect(url_for("guide.home"))
 
 

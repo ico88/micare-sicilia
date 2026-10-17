@@ -27,19 +27,6 @@ MIC RES Sicilia forecasts antimicrobial resistance for the Sicilian Rete MIC.
 
 **Background jobs.** Downloading from the dashboard, computing the forecasts and the out-of-sample check run on the server (`app/services/jobs.py`, one at a time): the browser can be closed, every page shows the progress and the outcome.
 
-**Earlier tools (not validated).** The original pipeline trains **Meta Prophet** models on monthly data per combination and forecasts S / I / R up to 5 years ahead. It is kept under "Strumenti precedenti (non validati)" and supports:
-
-| Feature | Details |
-|---|---|
-| **Data ingestion** | Upload Excel/CSV files with raw antibiogram records; automated normalisation and aggregation |
-| **Expanding-window cross-validation** | Walk-forward validation to estimate real-world forecast error before final training |
-| **ARIMA baseline** | Parallel SARIMAX(1,1,1) baseline for each combination; Prophet is compared against it |
-| **Pre-computed forecasts** | All combinations × 60 future months stored in SQLite for instant clinical queries |
-| **Confidence intervals** | Prophet 80% CI propagated through normalization to S/I/R percentages |
-| **Clinical query UI** | Doctor-facing form: select pathogen + antibiotic + laboratory + month → get forecast with CI |
-| **Async pipeline** | Training runs in a background thread; closing the browser does not interrupt it; state persists across server restarts |
-| **Dashboard** | Historical trends, annual summaries, model-comparison tables |
-
 ---
 
 ## Tech stack
@@ -47,10 +34,9 @@ MIC RES Sicilia forecasts antimicrobial resistance for the Sicilian Rete MIC.
 | Layer | Library |
 |---|---|
 | Web framework | Flask 3 + Gunicorn |
-| Database | SQLite via SQLAlchemy |
-| Time-series forecasting | [Meta Prophet](https://facebook.github.io/prophet/) |
-| Baseline model | statsmodels SARIMAX |
-| Parallelism | joblib `Parallel` |
+| Database | SQLite via SQLAlchemy (list of uploaded files) |
+| Archive | Parquet (pyarrow), one partition per upload |
+| Forecasting | own binomial models (numpy), gradient boosting (scikit-learn), Prophet as a candidate |
 | Frontend | Bootstrap 5, Chart.js 4 |
 
 ---
@@ -67,7 +53,7 @@ pip install -e ".[dev]"
 flask --app run:app run --debug
 ```
 
-Open http://localhost:5000 → upload your CSV data → run the pipeline.
+Open http://localhost:5000 → step 1 "Scarica dal cruscotto" (or upload the Rete MIC export) → step 3 "Calcola le previsioni".
 
 ---
 
@@ -92,32 +78,7 @@ sudo systemctl status mic-res-sicilia
 
 ---
 
-## Pipeline steps
-
-```
-Step 1  Load data          ← upload CSV/Excel via web UI
-Step 2  Expanding CV       ← train on first 3 years, validate on remaining
-Step 3  Refined CV         ← train on all years minus last, validate on last year
-Step 4  Final training     ← train on all data, pre-compute 60-month forecasts
-```
-
-All steps run asynchronously. If the browser is closed, the process continues in the background. On page reload the live status is restored from the database.
-
----
-
 ## Data format
-
-Input files should be Excel or CSV with columns (names are flexible; the system maps them):
-
-| Column | Example |
-|---|---|
-| Date / Month | `2023-04` or `01/04/2023` |
-| Pathogen | `Escherichia coli` |
-| Antibiotic / Material code | `AMC` / `Amoxicillina-clavulanato` |
-| Laboratory | `Laboratorio Catania` |
-| Ward (optional) | `Terapia Intensiva` |
-| Result | `S` / `I` / `R` |
-| Sample count | `42` |
 
 ### Rete MIC isolate-level export
 
@@ -148,7 +109,7 @@ is uploaded once (a 40 MB workbook imports in about a minute) and:
    The report is shown after upload and row-level anomalies can be downloaded as CSV;
 2. **archived in full** as Parquet under `instance/dataset/` (codes keep leading zeros,
    MIC split into operator + value);
-3. aggregated into the monthly S/I/R table used by the forecasting pipeline.
+3. read by the forecasts as quarterly series per laboratory (`app/services/series.py`).
 
 Each result is kept in two readings: as reported by the laboratory (breakpoints in force
 that year) and harmonised (MIC re-read with EUCAST v16.1, `app/resources/breakpoints/`).
@@ -175,16 +136,26 @@ ast = load_ast_results("instance/dataset", first_isolate_only=True)     # isolat
 ## Project structure
 
 ```
-app/                    Flask application
-  routes/               Blueprints: dashboard, upload, pipeline
-  services/             pipeline_runner, prediction, prophet_training_adapter
-  templates/            Jinja2 HTML templates
-  static/css/           Custom styles
-src/micare_sicilia/     Core ML library (model.py, config.py, preprocessing.py, …)
-instance/               SQLite database (auto-created)
-models/                 Trained Prophet artifacts (auto-created)
-data/                   Uploaded data files (auto-created)
-installer.sh            One-shot server installer
+app/
+  routes/               guide (home), upload (data), forecasts (forecasts, check, model search)
+  services/
+    qlik_source.py      download from the regional dashboard
+    dataset_store.py    validation and Parquet archive of the isolates
+    series.py           quarterly series per laboratory, populations, strata
+    benchmark.py        rolling-origin test bench, model choice, traffic light
+    forecasting.py      candidate forecasters
+    forecast_run.py     forecasts shown to the operator
+    lab_forecasts.py    per-laboratory and regional 12-month forecasts
+    out_of_sample.py    check on the data after the cutoff
+    error_analysis.py   where the forecasts went wrong (mix vs real change)
+    model_search.py     search over model configurations
+    diagnostics.py      aggregated workbooks
+    jobs.py             background jobs
+  templates/            Jinja2 pages
+src/micare_sicilia/     reference tables (network start, antibiotic classes)
+scripts/                command-line download, model search, EUCAST import
+instance/               SQLite list of uploads, archive, stored results (not committed)
+data/                   downloaded and uploaded files (not committed)
 ```
 
 ---

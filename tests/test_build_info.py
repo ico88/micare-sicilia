@@ -24,3 +24,25 @@ def test_version_without_git_or_build_info(tmp_path, monkeypatch):
     monkeypatch.setattr(app_module, "base_dir_for_version", lambda: tmp_path)
     monkeypatch.setattr(subprocess, "check_output", lambda *a, **k: (_ for _ in ()).throw(OSError()))
     assert app_module._read_version() == "1.1.0"
+
+
+def test_tables_of_the_earlier_pipeline_are_dropped(tmp_path):
+    import sqlite3
+
+    from sqlalchemy import inspect
+
+    from app import create_app, db
+
+    path = tmp_path / "old.sqlite"
+    with sqlite3.connect(path) as con:  # a database left by the earlier version
+        con.execute("CREATE TABLE observations (id INTEGER PRIMARY KEY, pathogen TEXT)")
+        con.execute("INSERT INTO observations (pathogen) VALUES ('ESCCOL')")
+        con.execute("CREATE TABLE trained_models (id INTEGER PRIMARY KEY)")
+    app = create_app({"TESTING": True, "SQLALCHEMY_DATABASE_URI": f"sqlite:///{path}",
+                      "UPLOAD_FOLDER": str(tmp_path / "d"), "DATASET_FOLDER": str(tmp_path / "ds"),
+                      "FORECAST_FOLDER": str(tmp_path / "p")})
+    with app.app_context():
+        tables = set(inspect(db.engine).get_table_names())
+        db.session.remove()
+        db.engine.dispose()
+    assert "observations" not in tables and "trained_models" not in tables and "uploaded_files" in tables

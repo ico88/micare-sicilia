@@ -2,21 +2,7 @@ from __future__ import annotations
 
 import pandas as pd
 
-START_DATE = pd.Timestamp("2019-01-01")
-# None = train on all available data (no fixed cut-off date)
-MAX_TRAINING_DATE: pd.Timestamp | None = None
-MIN_MONTHS_PER_COMBINATION = 24
-FORECAST_PERIODS_MONTHS = 60
-TARGETS = ("resistenti", "intermedi", "sensibili")
-
-# Soglia minima di campioni/mese per una stima percentuale affidabile
-MIN_SAMPLES_PER_MONTH = 10
-
-# Terapia intensiva nella tabella discipline del flusso AMR-RETEMIC (Allegato 1); 26 = Medicina generale
-REPARTO_UTI_CODE = 49
-
-# Codice paziente ricoverato in regime ordinario
-PAZIENTE_RICOVERATO_CODE = 1
+START_DATE = pd.Timestamp("2019-01-01")  # start of the Rete MIC network: series begin here
 
 ANTIBIOTIC_CLASS_CODES = {
     "GLICOPEPTIDI": ["VAN", "TPL"],

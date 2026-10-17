@@ -612,27 +612,6 @@ class _IssueCollector:
 # Long observations for the existing aggregation pipeline
 # ---------------------------------------------------------------------------
 
-def to_observations(isolates: pd.DataFrame, ast: pd.DataFrame) -> pd.DataFrame:
-    """Same shape as preprocessing.normalize_uploaded_dataframe output."""
-    tested = ast[ast["result"].notna()]
-    obs = tested.merge(
-        isolates[["isolate_id", "data_prelievo", "microorganismo", "laboratorio", "reparto_di_ricovero"]],
-        on="isolate_id",
-    )
-    out = pd.DataFrame({
-        "date": obs["data_prelievo"],
-        "pathogen": obs["microorganismo"],
-        "antibiotic": obs["antibiotic"],
-        "laboratory": obs["laboratorio"],
-        "ward": obs["reparto_di_ricovero"].fillna(""),
-        "result": obs["result"],
-        "samples": 1,
-    })
-    for name, code in [("sensitive_count", "S"), ("intermediate_count", "I"), ("resistant_count", "R")]:
-        out[name] = (out["result"] == code).astype(float)
-    return out
-
-
 # ---------------------------------------------------------------------------
 # Storage
 # ---------------------------------------------------------------------------

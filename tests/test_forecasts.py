@@ -122,13 +122,12 @@ def test_pages_before_and_after_computing(client, tmp_path):
     assert "sono cambiati" in http.get("/previsioni").get_data(as_text=True)
 
 
-def test_legacy_pages_carry_the_not_validated_banner(client):
+def test_earlier_pipeline_is_gone(client):
     http, _ = client
-    for url in ("/pipeline", "/clinical"):
-        response = http.get(url)
-        assert response.status_code == 200
-        assert "Strumento precedente, non validato" in response.get_data(as_text=True)
-    assert "non validato" not in http.get("/previsioni").get_data(as_text=True).split("<main")[1]
+    for url in ("/pipeline", "/clinical", "/dashboard", "/explore"):
+        assert http.get(url).status_code == 404
+    home = http.get("/").get_data(as_text=True)
+    assert "Strumenti precedenti" not in home and "non validat" not in home
 
 
 def test_reset_removes_stored_forecasts(client):
@@ -181,7 +180,6 @@ def test_guide_shows_one_step_to_do_now(client):
 
 def test_workflow_state_order():
     from datetime import date
-    from types import SimpleNamespace
 
     from app.services.workflow import workflow_state
 

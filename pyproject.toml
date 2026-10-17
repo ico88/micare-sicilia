@@ -5,26 +5,21 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "micare-sicilia"
 version = "0.1.0"
-description = "Pipeline Prophet per analisi e previsione MIC/antibiotico-resistenza Sicilia."
+description = "Previsione verificata della resistenza antimicrobica per la Rete MIC Sicilia."
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
   "Flask>=3.0",
   "Flask-SQLAlchemy>=3.1",
-  "joblib>=1.3",
-  "matplotlib>=3.8",
   "numpy>=1.26",
   "openpyxl>=3.1",
   "pandas>=2.1",
-  "plotly>=5.20",
   "prophet>=1.1",
   "pyarrow>=15.0",
   "python-calamine>=0.2",
   "scikit-learn>=1.4",
   "scipy>=1.11",
-  "statsmodels>=0.14",
   "gunicorn>=21.0",
-  "tqdm>=4.66",
   "websocket-client>=1.6",
 ]
 
@@ -33,9 +28,6 @@ notebook = [
   "ipykernel>=6.29",
   "ipywidgets>=8.1",
 ]
-
-[project.scripts]
-micare = "micare_sicilia.cli:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]

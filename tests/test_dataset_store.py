@@ -4,8 +4,8 @@ import openpyxl
 import pandas as pd
 import pytest
 
-from app import create_app, db
-from app.models import Observation, UploadedFile
+from app import create_app
+from app.models import UploadedFile
 from app.services import dataset_store
 
 BASE = [
@@ -151,7 +151,7 @@ def test_upload_stores_dataset_for_models(tmp_path):
     with app.app_context():
         uploaded = UploadedFile.query.one()
         assert uploaded.status == "imported"
-        assert Observation.query.count() > 0
+        assert uploaded.row_count == 8  # valid isolates
         upload_id = uploaded.id
 
     folder = tmp_path / "dataset"

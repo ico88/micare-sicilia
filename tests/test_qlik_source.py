@@ -3,7 +3,7 @@ import csv
 import pytest
 
 from app import create_app, db
-from app.models import Observation, UploadedFile
+from app.models import UploadedFile
 from app.services import dashboard_jobs, dataset_store, jobs, qlik_source
 from app.services.importing import import_file
 
@@ -167,7 +167,6 @@ def test_dashboard_refresh_replaces_instead_of_adding(app, tmp_path, small_pages
         assert [u.id for u in imported] == [upload_id]
         assert imported[0].original_name.startswith(dashboard_jobs.FILE_PREFIX)
         assert db.session.get(UploadedFile, first.upload_id).status == "replaced"
-        assert {o.uploaded_file_id for o in Observation.query.all()} == {upload_id}
         assert len(dataset_store.load_isolates(app.config["DATASET_FOLDER"])) == 6
         # only the latest download stays on disk; the file uploaded by hand is not touched
         downloads = sorted(p.name for p in (tmp_path / "data").glob(f"{dashboard_jobs.FILE_PREFIX}*"))

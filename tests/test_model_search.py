@@ -1,6 +1,5 @@
 import numpy as np
 import pandas as pd
-import pytest
 
 from app.services import model_search as ms
 

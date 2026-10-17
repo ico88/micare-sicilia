@@ -25,9 +25,6 @@
       <form method="post" action="{{ url_for('forecasts.compute') }}">
         <button class="btn btn-primary w-100" type="submit">Calcola le previsioni</button>
       </form>
-      <form class="mt-2" method="post" action="{{ url_for('dashboard.train') }}">
-        <button class="btn btn-link btn-sm text-muted p-0" type="submit">Addestra i modelli precedenti (non validati)</button>
-      </form>
     </section>
     {% endif %}
 
@@ -41,7 +38,7 @@
 
     <section class="panel mt-3">
       <h2 class="h6 mb-2 text-danger">Reimposta database</h2>
-      <p class="text-muted small mb-3">Cancella tutti i dati e i modelli per ricominciare da capo con file aggiornati.</p>
+      <p class="text-muted small mb-3">Cancella l'archivio e i risultati per ricominciare da capo con file aggiornati.</p>
       <button class="btn btn-outline-danger w-100" data-bs-toggle="modal" data-bs-target="#resetModal">Azzera tutto</button>
     </section>
 
@@ -53,7 +50,7 @@
             <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
           </div>
           <div class="modal-body">
-            Verranno eliminati <strong>tutti i dati</strong>: osservazioni, aggregazioni, modelli addestrati e previsioni.<br>
+            Verranno eliminati <strong>tutti i dati</strong>: archivio degli isolati, previsioni, verifica e ricerca dei modelli.<br>
             L'operazione è <strong>irreversibile</strong>. Continuare?
           </div>
           <div class="modal-footer">

@@ -95,59 +95,6 @@
           </li>
         </ul>
 
-        <div class="sidebar-section-label">Strumenti precedenti (non validati)</div>
-        <ul class="sidebar-nav">
-          <li>
-            <a href="{{ url_for('pipeline.wizard') }}"
-               class="sidebar-link {% if request.endpoint == 'pipeline.wizard' %}active{% endif %}">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
-              </svg>
-              Pipeline
-            </a>
-          </li>
-          <li>
-            <a href="{{ url_for('pipeline.explore') }}"
-               class="sidebar-link {% if request.endpoint == 'pipeline.explore' %}active{% endif %}">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
-              </svg>
-              Esplora previsioni
-            </a>
-          </li>
-          <li>
-            <a href="{{ url_for('pipeline.clinical') }}"
-               class="sidebar-link {% if request.endpoint in ('pipeline.clinical', 'pipeline.clinical_query', 'pipeline.predictive') %}active{% endif %}">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M22 12h-4l-3 9L9 3l-3 9H2"/>
-              </svg>
-              Consulta clinica
-            </a>
-          </li>
-          <li>
-            <a href="{{ url_for('dashboard.dashboard') }}"
-               class="sidebar-link {% if request.endpoint == 'dashboard.dashboard' %}active{% endif %}">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/>
-                <rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/>
-              </svg>
-              Dashboard
-            </a>
-          </li>
-          <li>
-            <a href="{{ url_for('dashboard.validation_report') }}"
-               class="sidebar-link {% if request.endpoint == 'dashboard.validation_report' %}active{% endif %}">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/>
-                <polyline points="14 2 14 8 20 8"/>
-                <line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/>
-                <polyline points="10 9 9 9 8 9"/>
-              </svg>
-              Rapporto tecnico
-            </a>
-          </li>
-        </ul>
-
         <div class="sidebar-footer">
           <span style="font-size:0.72rem;color:#94a3b8;display:block;">Rete MIC Sicilia · UniCT</span>
           <span style="font-size:0.68rem;color:#64748b;display:block;margin-top:2px;">v{{ app_version }}</span>
@@ -168,13 +115,6 @@
             </div>
           {% endif %}
         {% endwith %}
-        {% if request.blueprint in ('pipeline', 'dashboard') %}
-          <div class="alert alert-warning small">
-            <strong>Strumento precedente, non validato.</strong> Queste previsioni usano il modello iniziale, che non ha superato
-            le prove sui dati passati. Per le previsioni verificate usare
-            <a href="{{ url_for('forecasts.overview') }}">Previsioni di resistenza</a>.
-          </div>
-        {% endif %}
         {% include "_job_banner.html" %}
         {% block content %}{% endblock %}
       </main>
