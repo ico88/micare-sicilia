@@ -446,8 +446,11 @@ def write_workbook(result: dict, path) -> None:
 
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
+    from app import APP_VERSION
+
     readme = pd.DataFrame([
         ("Calcolato il", result["calcolato_il"]),
+        ("Versione del codice", APP_VERSION),
         ("Popolazione", result["popolazione"]), ("Lettura", result["lettura"]),
         ("Combinazioni", result["combinazioni"]), ("Configurazioni provate", result["configurazioni"]),
         ("Prove", len(result["prove"])),

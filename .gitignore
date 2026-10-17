@@ -40,6 +40,9 @@ models/
 # Update script log
 update.log
 
+# Code version written at install/update
+BUILD_INFO
+
 # Build artifacts
 *.egg-info/
 

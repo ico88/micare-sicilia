@@ -10,26 +10,33 @@ from sqlalchemy import inspect, text as sql_text
 db = SQLAlchemy()
 
 
+def build_info() -> dict[str, str]:
+    """Code version: from git, else from BUILD_INFO, which installer.sh and update.sh write
+    (the service may run as a user git does not answer to)."""
+    root = base_dir_for_version()
+    try:
+        import subprocess
+        def git(*args):
+            return subprocess.check_output(["git", *args], cwd=str(root), stderr=subprocess.DEVNULL,
+                                           timeout=5).decode().strip()
+        return {"commit": git("rev-parse", "--short", "HEAD"), "branch": git("rev-parse", "--abbrev-ref", "HEAD")}
+    except Exception:
+        pass
+    try:
+        lines = (root / "BUILD_INFO").read_text().splitlines()
+        return dict(line.split("=", 1) for line in lines if "=" in line)
+    except OSError:
+        return {}
+
+
 def _read_version() -> str:
     """Return version string: VERSION file + branch@sha if available."""
     try:
         v = (base_dir_for_version() / "VERSION").read_text().strip()
     except Exception:
         v = "dev"
-    try:
-        import subprocess
-        cwd = str(base_dir_for_version())
-        sha = subprocess.check_output(
-            ["git", "rev-parse", "--short", "HEAD"],
-            cwd=cwd, stderr=subprocess.DEVNULL,
-        ).decode().strip()
-        branch = subprocess.check_output(
-            ["git", "rev-parse", "--abbrev-ref", "HEAD"],
-            cwd=cwd, stderr=subprocess.DEVNULL,
-        ).decode().strip()
-        return f"{v} ({branch}@{sha})"
-    except Exception:
-        return v
+    info = build_info()
+    return f"{v} ({info['branch']}@{info['commit']})" if info.get("commit") else v
 
 
 def base_dir_for_version() -> Path:

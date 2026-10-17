@@ -187,6 +187,17 @@ else
   log "ATTENZIONE: pip non trovato — dipendenze non aggiornate."
 fi
 
+# ── versione del codice (letta dall'app anche se il servizio non può usare git) ──
+write_build_info() {
+  {
+    echo "commit=$(git -C "$SCRIPT_DIR" rev-parse --short HEAD 2>/dev/null || echo unknown)"
+    echo "branch=$(git -C "$SCRIPT_DIR" rev-parse --abbrev-ref HEAD 2>/dev/null || echo unknown)"
+    echo "date=$(date -u '+%Y-%m-%dT%H:%M:%SZ')"
+  } > "$SCRIPT_DIR/BUILD_INFO"
+}
+write_build_info
+log "Versione registrata in BUILD_INFO: $(head -1 "$SCRIPT_DIR/BUILD_INFO")"
+
 # ── riavvio servizio ───────────────────────────────────────────────────────
 log "──────────────────────────────────────────"
 log "Riavvio servizio..."

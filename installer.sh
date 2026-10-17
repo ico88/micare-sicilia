@@ -237,6 +237,13 @@ else
     ok "instance/config.py già presente, non sovrascritto."
 fi
 
+# Versione del codice, letta dall'app anche se il servizio non può usare git
+{
+    echo "commit=$(git -C "$APP_DIR" rev-parse --short HEAD 2>/dev/null || echo unknown)"
+    echo "branch=$(git -C "$APP_DIR" rev-parse --abbrev-ref HEAD 2>/dev/null || echo unknown)"
+    echo "date=$(date -u '+%Y-%m-%dT%H:%M:%SZ')"
+} > "$APP_DIR/BUILD_INFO"
+
 # ── 8. Script di avvio ────────────────────────────────────────────────────────
 step "8/9 · Script di avvio e servizio di sistema"
 

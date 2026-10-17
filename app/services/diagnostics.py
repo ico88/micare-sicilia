@@ -8,7 +8,6 @@ from __future__ import annotations
 
 import io
 import json
-import subprocess
 from datetime import datetime
 from pathlib import Path
 
@@ -313,12 +312,9 @@ def _round(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def _git_commit() -> str:
-    try:
-        root = Path(__file__).resolve().parents[2]
-        return subprocess.run(["git", "rev-parse", "--short", "HEAD"], cwd=root, capture_output=True,
-                              text=True, timeout=5).stdout.strip() or "commit sconosciuto"
-    except (OSError, subprocess.SubprocessError):
-        return "commit sconosciuto"
+    from app import build_info
+
+    return build_info().get("commit") or "commit sconosciuto"
 
 
 def _write(sheets: dict[str, pd.DataFrame]) -> bytes:
