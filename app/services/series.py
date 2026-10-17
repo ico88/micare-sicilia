@@ -23,6 +23,7 @@ import pandas as pd
 from micare_sicilia.config import START_DATE
 
 from .dataset_store import first_isolate_mask, load_ast_results, load_isolates
+from .reference import ICU_WARD_CODES
 
 MIN_ISOLATES_PER_PERIOD = 30  # CLSI M39 minimum for a reportable percentage
 KEYS = ["popolazione", "laboratorio", "microorganismo", "antibiotic"]
@@ -81,7 +82,8 @@ def build_series(folder: str | Path, freq: str = "Q", split_by: str | None = Non
     """One row per laboratory x pathogen x antibiotic x period ("Q" or "M").
 
     split_by="paziente_ricoverato" splits each laboratory by patient type
-    ("IT168 · ricoverati"): the strata add up to the same regional figures.
+    ("IT168 · ricoverati"), "terapia_intensiva" by intensive care or other wards:
+    the strata add up to the same regional figures.
 
     Columns per reading r in (reported, harmonized):
       n_<r>         first isolates with a usable result
@@ -94,10 +96,14 @@ def build_series(folder: str | Path, freq: str = "Q", split_by: str | None = Non
     if isolates.empty:
         return pd.DataFrame()
     isolates = isolates[first_isolate_mask(isolates, freq, by=["popolazione"])]
+    # after the first-isolate rule, so the strata add up to the regional series
     if split_by == "paziente_ricoverato" and split_by in isolates:
-        # after the first-isolate rule, so the strata add up to the regional series
         setting = isolates[split_by].astype(str).str.strip().map(SETTING_LABELS).fillna("tipo non indicato")
         isolates = isolates.assign(laboratorio=isolates["laboratorio"] + " · " + setting)
+    elif split_by == "terapia_intensiva" and "reparto_di_ricovero" in isolates:
+        ward = isolates["reparto_di_ricovero"].astype(str).str.strip().str.lstrip("0")
+        icu = ward.isin(ICU_WARD_CODES)
+        isolates = isolates.assign(laboratorio=isolates["laboratorio"] + np.where(icu, " · terapia intensiva", " · altri reparti"))
     ast = load_ast_results(folder, with_isolate_columns=False)
     ast = ast.merge(isolates[["upload_id", "isolate_id", "popolazione", "laboratorio", "microorganismo", "data_prelievo"]],
                     on=["upload_id", "isolate_id"], how="inner")

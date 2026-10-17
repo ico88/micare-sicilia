@@ -261,6 +261,65 @@ def gbm_predictions(combos: list[Combination], holdout_origin: str = "2024Q4", p
 
 
 # ---------------------------------------------------------------------------
+# Antibiotics that move together: a trend shared by the antibiotics of one group
+# ---------------------------------------------------------------------------
+
+# Groups by resistance mechanism, for borrowing a trend (not the configuration's class map,
+# which lacks cefotaxime, carbapenems and fluoroquinolones)
+ANTIBIOTIC_GROUPS = {
+    "cefalosporine di 3a-4a generazione": {"CTX", "CRO", "CAZ", "FEP"},
+    "carbapenemi": {"MEM", "IPM", "ETP"},
+    "fluorochinoloni": {"CIP", "LVX"},
+    "aminoglicosidi": {"AMK", "GEN", "TOB"},
+    "penicilline con inibitore": {"AMC", "TZP"},
+}
+CLASS_NAME = "classe di antibiotici · trend comune alla classe + laboratorio verso la regione"
+
+
+def class_trend_predictions(combos: list[Combination], holdout_origin: str = "2024Q4"):
+    """{(combination index, origin): labs x horizons}. The level is the laboratory pulled
+    toward the region; the change over the horizon is the damped trend of all the
+    antibiotics of its group for the same pathogen (a fall of resistance to several
+    beta-lactams at once is seen sooner pooled). Without a group: the level alone."""
+    from .forecasting import Context
+
+    hold = pd.Period(holdout_origin, freq="Q")
+    base_model = lab_shrunk(4, 3.0)
+    members: dict[tuple[str, str], list[int]] = {}
+    for i, c in enumerate(combos):
+        group = next((g for g, codes in ANTIBIOTIC_GROUPS.items() if c.antibiotic in codes), None)
+        if group:
+            members.setdefault((c.pathogen, group), []).append(i)
+    group_of = {i: key for key, idx in members.items() if len(idx) > 1 for i in idx}
+    out = {}
+    for i, c in enumerate(combos):
+        periods = [pd.Period(p, freq="Q") for p in c.periods]
+        pooled = None
+        if i in group_of:
+            idx = members[group_of[i]]
+            n = sum(combos[k].n.sum(axis=0) for k in idx)
+            r = sum(combos[k].r.sum(axis=0) for k in idx)
+            pooled = Context(n, r, n[None, :], r[None, :])
+        for origin in range(MIN_HISTORY - 1, len(periods) - 1):
+            if periods[origin] > hold:
+                break
+            base = base_model(c.n, c.r, origin)
+            if pooled is None:
+                out[(i, origin)] = base
+                continue
+            lo = max(0, origin - 3)
+            level = pooled.r[lo:origin + 1].sum() / max(pooled.n[lo:origin + 1].sum(), EPS)
+            preds = trend(pooled, origin, list(HORIZONS))
+            if not preds or not 0 < level < 1:
+                out[(i, origin)] = base
+                continue
+            logit = lambda q: np.log(np.clip(q, 1e-4, 1 - 1e-4) / (1 - np.clip(q, 1e-4, 1 - 1e-4)))
+            delta = np.array([logit(preds[h][0]) - logit(level) if h in preds else 0.0 for h in HORIZONS])
+            out[(i, origin)] = _expit(logit(base) + delta[None, :])
+    return out
+
+
+# ---------------------------------------------------------------------------
 # Tests: every candidate, every origin, the three targets
 # ---------------------------------------------------------------------------
 
@@ -274,13 +333,28 @@ def period_of(test_target: pd.Period, origin: pd.Period, holdout_origin: pd.Peri
     return None
 
 
+TARGETS = ("regionale", "regionale_12m", "pannello", "laboratorio")
+LAST_QUARTER = " · pesi dell'ultimo trimestre"
+
+
 def run_tests(combos: list[Combination], models: dict[str, Forecaster] | None = None,
               holdout_origin: str = "2024Q4", progress=None,
-              precomputed: dict[str, dict] | None = None) -> pd.DataFrame:
-    """One row per candidate x target x combination (x laboratory) x origin x horizon."""
+              precomputed: dict[str, dict] | None = None, targets=TARGETS, suffix: str = "",
+              last_quarter_weights: bool = True) -> pd.DataFrame:
+    """One row per candidate x target x combination (x laboratory) x origin x horizon.
+
+    suffix names the variant (e.g. the same models run on laboratory x ward strata);
+    last_quarter_weights adds, for the regional targets, each model recomposed with the
+    weights of the last quarter instead of the last four (a network that grows changes
+    its mix: the latest quarter may anticipate it better)."""
     models = models or candidates()
     hold = pd.Period(holdout_origin, freq="Q")
     rows = []
+
+    def add(name, target, c, lab, o, t_period, months, which, pred, obs, noise, tested):
+        rows.append((name + suffix, target, c.pathogen, c.antibiotic, lab, str(o), str(t_period), months, which,
+                     100 * pred, 100 * obs, 100 * noise, tested))
+
     for number, c in enumerate(combos, start=1):
         if progress:
             progress(number, len(combos))
@@ -294,11 +368,14 @@ def run_tests(combos: list[Combination], models: dict[str, Forecaster] | None = 
             if share.sum() <= 0:
                 continue
             share = share / share.sum()
+            last = _window(c.n, origin, 1)
+            weightings = [("", share)]
+            if last_quarter_weights and last.sum() > 0:
+                weightings.append((LAST_QUARTER, last / last.sum()))
             forecasts = {name: m(c.n, c.r, origin) for name, m in models.items()}
             for name, table in (precomputed or {}).items():
                 if (number - 1, origin) in table:
                     forecasts[name] = table[(number - 1, origin)]
-            # regional and constant-panel targets, per horizon
             for j, h in enumerate(HORIZONS):
                 t = origin + h
                 if t >= T:
@@ -309,17 +386,18 @@ def run_tests(combos: list[Combination], models: dict[str, Forecaster] | None = 
                 n_t, r_t = c.n[:, t], c.r[:, t]
                 present = n_t > 0
                 # regional as published: pooled counts
-                if n_t.sum() >= MIN_ISOLATES_PER_PERIOD:
+                if "regionale" in targets and n_t.sum() >= MIN_ISOLATES_PER_PERIOD:
                     obs = r_t.sum() / n_t.sum()
                     noise = NOISE_MAE * np.sqrt(max(obs * (1 - obs), EPS) / n_t.sum())
                     for name, f in forecasts.items():
-                        pred = _weighted(f[:, j], share)
-                        if np.isfinite(pred):
-                            rows.append((name, "regionale", c.pathogen, c.antibiotic, "", str(o), str(periods[t]),
-                                         3 * h, which, 100 * pred, 100 * obs, 100 * noise, n_t.sum()))
+                        for tag, w in weightings:
+                            pred = _weighted(f[:, j], w)
+                            if np.isfinite(pred):
+                                add(name + tag, "regionale", c, "", o, periods[t], 3 * h, which, pred, obs, noise,
+                                    n_t.sum())
                 # constant panel: weights of the four quarters before the forecast
                 w = share * present
-                if n_t[present & (share > 0)].sum() >= MIN_ISOLATES_PER_PERIOD and w.sum() > 0:
+                if "pannello" in targets and n_t[present & (share > 0)].sum() >= MIN_ISOLATES_PER_PERIOD and w.sum() > 0:
                     w = w / w.sum()
                     p_lab = np.where(present, r_t / np.maximum(n_t, EPS), 0)
                     obs = float(w @ p_lab)
@@ -328,23 +406,34 @@ def run_tests(combos: list[Combination], models: dict[str, Forecaster] | None = 
                     for name, f in forecasts.items():
                         pred = _weighted(f[:, j], w)
                         if np.isfinite(pred):
-                            rows.append((name, "pannello", c.pathogen, c.antibiotic, "", str(o), str(periods[t]),
-                                         3 * h, which, 100 * pred, 100 * obs, 100 * NOISE_MAE * np.sqrt(var),
-                                         n_t[present].sum()))
+                            add(name, "pannello", c, "", o, periods[t], 3 * h, which, pred, obs,
+                                NOISE_MAE * np.sqrt(var), n_t[present].sum())
+            if origin + 4 >= T:
+                continue
+            which = period_of(periods[origin + 4], o, hold)
+            if which is None:
+                continue
+            n12, r12 = c.n[:, origin + 1:origin + 5].sum(axis=1), c.r[:, origin + 1:origin + 5].sum(axis=1)
+            # regional, next 12 months pooled: the yearly antibiogram to expect
+            if "regionale_12m" in targets and n12.sum() >= MIN_ISOLATES_PER_PERIOD:
+                obs = r12.sum() / n12.sum()
+                noise = NOISE_MAE * np.sqrt(max(obs * (1 - obs), EPS) / n12.sum())
+                for name, f in forecasts.items():
+                    for tag, w in weightings:
+                        per_h = [_weighted(f[:, j], w) for j in range(len(HORIZONS))]
+                        if all(np.isfinite(per_h)):
+                            add(name + tag, "regionale_12m", c, "", o, periods[origin + 4], 12, which,
+                                float(np.mean(per_h)), obs, noise, n12.sum())
             # laboratory, next 12 months pooled
-            if origin + 4 < T:
-                which = period_of(periods[origin + 4], o, hold)
-                if which is not None:
-                    n12, r12 = c.n[:, origin + 1:origin + 5].sum(axis=1), c.r[:, origin + 1:origin + 5].sum(axis=1)
-                    for li in np.flatnonzero(n12 >= MIN_ISOLATES_PER_PERIOD):
-                        obs = r12[li] / n12[li]
-                        noise = NOISE_MAE * np.sqrt(max(obs * (1 - obs), EPS) / n12[li])
-                        for name, f in forecasts.items():
-                            pred = np.nanmean(f[li]) if np.isfinite(f[li]).any() else np.nan
-                            if np.isfinite(pred):
-                                rows.append((name, "laboratorio", c.pathogen, c.antibiotic, c.labs[li], str(o),
-                                             str(periods[origin + 4]), 12, which, 100 * pred, 100 * obs,
-                                             100 * noise, n12[li]))
+            if "laboratorio" in targets:
+                for li in np.flatnonzero(n12 >= MIN_ISOLATES_PER_PERIOD):
+                    obs = r12[li] / n12[li]
+                    noise = NOISE_MAE * np.sqrt(max(obs * (1 - obs), EPS) / n12[li])
+                    for name, f in forecasts.items():
+                        pred = np.nanmean(f[li]) if np.isfinite(f[li]).any() else np.nan
+                        if np.isfinite(pred):
+                            add(name, "laboratorio", c, c.labs[li], o, periods[origin + 4], 12, which, pred, obs,
+                                noise, n12[li])
     return pd.DataFrame(rows, columns=["modello", "obiettivo", "microorganismo", "antibiotico", "laboratorio",
                                        "origine", "bersaglio", "orizzonte_mesi", "periodo", "previsto",
                                        "osservato", "rumore", "testati"])
@@ -390,7 +479,8 @@ def leaderboard(tests: pd.DataFrame, reference: str = REFERENCE) -> pd.DataFrame
 
 
 # The baseline each target must beat: for a laboratory, its own last 12 months
-TARGET_REFERENCE = {"regionale": REFERENCE, "pannello": REFERENCE, "laboratorio": "laboratorio · ultimi 12 mesi"}
+TARGET_REFERENCE = {"regionale": REFERENCE, "regionale_12m": REFERENCE, "pannello": REFERENCE,
+                    "laboratorio": "laboratorio · ultimi 12 mesi"}
 
 
 def choose(board: pd.DataFrame, min_gain: float = 0.05) -> pd.DataFrame:
@@ -414,6 +504,14 @@ def choose(board: pd.DataFrame, min_gain: float = 0.05) -> pd.DataFrame:
 # Whole search on an archive, and its workbook
 # ---------------------------------------------------------------------------
 
+# Models rerun on strata (laboratory x ward or patient type) for the regional targets:
+# the laboratory-level ones, whose regional figure is recomposed from the strata
+STRATA_MODELS = ("laboratorio · ultimi 12 mesi", "laboratorio · ultimi 12 mesi, verso la regione ×3",
+                 "laboratorio · trend (emivita 6, smorzamento 0.85)")
+STRATA = {"terapia_intensiva": " · strati laboratorio × terapia intensiva",
+          "paziente_ricoverato": " · strati laboratorio × tipo di paziente"}
+
+
 def run_search(dataset_folder, population: str = "invasivi", reading: str = "harmonized",
                holdout_origin: str = "2024Q4", progress=None) -> dict:
     from datetime import datetime
@@ -428,15 +526,27 @@ def run_search(dataset_folder, population: str = "invasivi", reading: str = "har
     say(f"{len(combos)} combinazioni con storia sufficiente; addestramento del gradient boosting")
     gbm = gbm_predictions(combos, holdout_origin,
                           progress=lambda i, n: say(f"Gradient boosting: data {i} di {n}") if i % 5 == 0 else None)
+    say("Trend comune alle classi di antibiotici")
+    by_class = class_trend_predictions(combos, holdout_origin)
     models = candidates()
-    say(f"Prove di {len(models) + 1} configurazioni")
-    tests = run_tests(combos, models, holdout_origin, precomputed={GBM_NAME: gbm},
-                      progress=lambda i, n: say(f"Prove: combinazione {i} di {n}") if i % 10 == 0 else None)
+    say(f"Prove di {len(models) + 2} configurazioni")
+    parts = [run_tests(combos, models, holdout_origin, precomputed={GBM_NAME: gbm, CLASS_NAME: by_class},
+                       progress=lambda i, n: say(f"Prove: combinazione {i} di {n}") if i % 10 == 0 else None)]
+    keep = {(c.pathogen, c.antibiotic) for c in combos}
+    all_models = candidates()
+    for split, suffix in STRATA.items():
+        say(f"Strati: {suffix.strip(' ·')}")
+        strata = build_series(dataset_folder, "Q", split_by=split)
+        strata = strata[strata["popolazione"] == population]
+        strata_combos = [c for c in combinations(strata, reading) if (c.pathogen, c.antibiotic) in keep]
+        parts.append(run_tests(strata_combos, {m: all_models[m] for m in STRATA_MODELS}, holdout_origin,
+                               targets=("regionale", "regionale_12m"), suffix=suffix))
+    tests = pd.concat(parts, ignore_index=True)
     board = leaderboard(tests)
     return {
         "calcolato_il": datetime.now().strftime("%d/%m/%Y %H:%M"),
         "popolazione": population, "lettura": reading, "taglio": holdout_origin,
-        "combinazioni": len(combos), "configurazioni": len(models) + 1,
+        "combinazioni": len(combos), "configurazioni": int(tests["modello"].nunique()),
         "prove": tests, "classifica": board, "scelti": choose(board),
     }
 

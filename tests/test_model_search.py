@@ -48,7 +48,10 @@ def test_tests_and_leaderboard():
               "laboratorio · ultimi 12 mesi": ms.lab_persistence(4),
               "laboratorio · ultimi 12 mesi, verso la regione ×1": ms.lab_shrunk(4)}
     tests = ms.run_tests(combos, models)
-    assert set(tests["obiettivo"]) == {"regionale", "pannello", "laboratorio"}
+    assert set(tests["obiettivo"]) == {"regionale", "regionale_12m", "pannello", "laboratorio"}
+    # the regional targets also carry every model recomposed with the last quarter's weights
+    assert "laboratorio · ultimi 12 mesi" + ms.LAST_QUARTER in set(tests[tests["obiettivo"] == "regionale_12m"]["modello"])
+    assert "laboratorio · ultimi 12 mesi" + ms.LAST_QUARTER not in set(tests[tests["obiettivo"] == "laboratorio"]["modello"])
     assert set(tests["periodo"]) == {"scelta", "verifica", "conferma"}
     assert tests[tests["periodo"] == "conferma"]["origine"].eq("2024Q4").all()
     # laboratory C (8 a quarter, 32 a year) is a laboratory target; with 4 quarters pooled it reaches 30
@@ -60,7 +63,7 @@ def test_tests_and_leaderboard():
     # laboratories truly differ (20%, 50%, 30%): their own figure beats the regional one
     assert lab.loc["laboratorio · ultimi 12 mesi", "errore_verifica"] < lab.loc[ms.REFERENCE, "errore_verifica"]
     chosen = ms.choose(board)
-    assert set(chosen["obiettivo"]) == {"regionale", "pannello", "laboratorio"}
+    assert set(chosen["obiettivo"]) == {"regionale", "regionale_12m", "pannello", "laboratorio"}
 
 
 def test_gradient_boosting_learns_only_from_the_past():
@@ -107,3 +110,17 @@ def test_search_page_and_job(tmp_path, monkeypatch):
     with app.app_context():
         db.session.remove()
         db.engine.dispose()
+
+
+def test_class_trend_uses_only_the_past_and_falls_back_to_the_level():
+    a, b, single = _combo(seed=1), _combo(seed=2), _combo(seed=3)
+    b.antibiotic, single.antibiotic = "IPM", "COL"  # MEM and IPM: carbapenems; COL alone
+    table = ms.class_trend_predictions([a, b, single])
+    base = ms.lab_shrunk(4, 3.0)
+    assert np.allclose(table[(2, 15)], base(single.n, single.r, 15))  # no group: the level alone
+    changed = ms.Combination(b.pathogen, b.antibiotic, b.periods, b.labs, b.n,
+                             np.where(np.arange(b.n.shape[1]) > 15, b.n, b.r))
+    again = ms.class_trend_predictions([a, changed, single])
+    for key, value in table.items():
+        if key[1] <= 15:
+            assert np.allclose(value, again[key], equal_nan=True), key
