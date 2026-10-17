@@ -12,15 +12,22 @@ from app.services import explore, jobs
 
 bp = Blueprint("explore", __name__)
 
-FILTER_KEYS = explore.DIMENSIONS + ["antibiotico", "da", "a", "lettura"]
-
 
 def _folders() -> tuple[str, str]:
     return current_app.config["DATASET_FOLDER"], current_app.config["EXPLORE_FOLDER"]
 
 
 def _filters() -> dict:
-    return {key: request.args.get(key, "").strip() for key in FILTER_KEYS}
+    filters = {key: request.args.get(key, "").strip() for key in explore.SINGLE + ["lettura"]}
+    filters.update({key: [v for v in request.args.getlist(key) if v] for key in explore.MULTI})
+    return filters
+
+
+def _answer() -> dict:
+    dataset, cube = _folders()
+    results, counted = explore.load_cube(dataset, cube)
+    forecasts, stale = explore.stored_forecasts(current_app.config["FORECAST_FOLDER"], dataset)
+    return explore.query(results, counted, _filters(), forecasts, stale)
 
 
 def _prepare(app, progress) -> dict:
@@ -34,14 +41,15 @@ def _prepare(app, progress) -> dict:
 @bp.get("/consultazione")
 def dashboard():
     dataset, cube = _folders()
-    has_data = bool(explore.archive_signature(dataset).count("upload_"))
+    has_data = explore.has_data(dataset)
     ready = has_data and explore.cube_ready(dataset, cube)
     busy = None
     if has_data and not ready:
         app = current_app._get_current_object()
         busy = jobs.start("consultazione", app, lambda progress: _prepare(app, progress))
     return render_template("explore.html", has_data=has_data, ready=ready, busy=busy,
-                           labels=explore.FILTER_LABELS, readings=explore.READING_LABELS)
+                           labels=explore.FILTER_LABELS, readings=explore.READING_LABELS,
+                           single=explore.SINGLE, multi=explore.MULTI)
 
 
 @bp.get("/consultazione/dati")
@@ -49,15 +57,14 @@ def data():
     dataset, cube = _folders()
     if not explore.cube_ready(dataset, cube):
         return jsonify({"vuoto": True, "in_preparazione": True})
-    results, counted = explore.load_cube(dataset, cube)
-    return jsonify(explore.query(results, counted, _filters()))
+    return jsonify(_answer())
 
 
 @bp.get("/consultazione/dati.xlsx")
 def download():
-    dataset, cube = _folders()
-    results, counted = explore.load_cube(dataset, cube)
-    answer = explore.query(results, counted, _filters())
+    if not explore.cube_ready(*_folders()):
+        return jsonify({"vuoto": True, "in_preparazione": True}), 404
+    answer = _answer()
     if answer.get("vuoto"):
         return jsonify(answer), 404
     buffer = io.BytesIO()

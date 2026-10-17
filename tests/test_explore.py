@@ -57,11 +57,65 @@ def test_query_answers_every_view_of_one_selection(tmp_path):
     heat = {(c["antibiotic"], c["microorganismo"]): c["testati"] for c in answer["antibiogramma"]["celle"]}
     assert heat == {("MEM", "KLEPNE"): 3, ("AMK", "KLEPNE"): 1, ("MEM", "ESCCOL"): 1}
 
-    one_lab = explore.query(results, counted, {"laboratorio": "IT1", "eta": "18-64 anni", "lettura": "reported"})
+    one_lab = explore.query(results, counted, {"laboratorio": ["IT1"], "eta": ["18-64 anni"], "lettura": "reported"})
     assert one_lab["numeri"]["combinazione"]["testati"] == 1
-    later = explore.query(results, counted, {"da": "2023Q2"})
+    # the comparison keeps every laboratory, the selection is only highlighted
+    assert len(explore.query(results, counted, {"laboratorio": ["IT1"]})["laboratori"]) == 2
+    later = explore.query(results, counted, {"trimestre_anno": ["2"]})
     assert [r["trimestre"] for r in later["andamento"]] == ["2023Q2"]
     assert later["numeri"]["combinazione"]["resistenti"] == 0  # harmonised reading by default
+    both = explore.query(results, counted, {"laboratorio": ["IT1", "IT2"]})
+    assert both["numeri"]["laboratori"] == 2
+
+
+def test_list_boxes_show_selected_possible_and_excluded_values(tmp_path):
+    results, counted = explore.build_cube(_store(tmp_path / "dataset"))
+    answer = explore.query(results, counted, {"laboratorio": ["IT1"]})
+    states = {box: {i["valore"]: i["stato"] for i in items} for box, items in answer["liste"].items()}
+    assert states["laboratorio"] == {"IT1": "selezionato", "IT2": "possibile"}  # own selection does not exclude
+    assert states["eta"]["65-79 anni"] == "possibile" and states["eta"]["80 anni e oltre"] == "escluso"
+    assert states["microorganismo"] == {"KLEPNE": "selezionato", "ESCCOL": "escluso"}  # E. coli only in IT2
+    assert states["antibiotico"]["MEM"] == "selezionato"
+    assert states["trimestre_anno"] == {"1": "possibile", "2": "escluso"}
+    counts = {i["valore"]: i["conteggio"] for i in answer["liste"]["laboratorio"]}
+    assert counts == {"IT1": 2, "IT2": 1}  # first isolates of the selected pathogen
+
+
+def _forecasts():
+    lab_rows = {"laboratori": [{"codice": "IT1", "nome": "Lab 1", "n_ultimi_12_mesi": 40, "pct": 61.0, "low": 50.0,
+                                "high": 70.0, "semaforo": "verde"}], "verifica": {"errore": 5.0}}
+    return {"meta": {"available": True, "calcolato_il": "01/01/2026 10:00", "dati_fino_al": "31/12/2025",
+                     "ultimo_trimestre": "4° trimestre 2025"},
+            "combinations": [{"microorganismo": "KLEPNE", "antibiotico": "MEM",
+                              "previsioni": [{"periodo": "2026Q1", "trimestre": "1° trimestre 2026", "pct": 60.0,
+                                              "low": 55.0, "high": 65.0, "semaforo": "giallo", "errore_tipico": 3.1}],
+                              "prossimi_12_mesi": {"pct": 59.0, "low": 55.0, "high": 63.0, "semaforo": "verde",
+                                                   "verifica": {"errore": 2.5}},
+                              "previsioni_laboratori": lab_rows}]}
+
+
+def test_forecasts_answer_the_regional_or_one_laboratory_selection(tmp_path):
+    results, counted = explore.build_cube(_store(tmp_path / "dataset"))
+    regional = explore.query(results, counted, {}, _forecasts())["previsione"]
+    assert regional["disponibile"] and regional["ambito"] == "regione"
+    assert regional["dodici_mesi"]["pct"] == 59.0 and regional["trimestrali"][0]["periodo"] == "2026Q1"
+    assert regional["periodi"] == ["2026Q1", "2026Q2", "2026Q3", "2026Q4"]
+    assert [c["antibiotic"] for c in regional["celle"]] == ["MEM"]
+    assert regional["laboratori"][0]["laboratorio"] == "IT1"
+
+    lab = explore.query(results, counted, {"laboratorio": ["IT1"]}, _forecasts())["previsione"]
+    assert lab["ambito"] == "laboratorio" and lab["dodici_mesi"]["pct"] == 61.0 and lab["trimestrali"] == []
+    assert lab["dodici_mesi"]["errore"] == 5.0
+
+    for filters in ({"laboratorio": ["IT1", "IT2"]}, {"eta": ["18-64 anni"]}, {"lettura": "reported"},
+                    {"popolazione": "invasivi non ricoverati"}):
+        view = explore.query(results, counted, filters, _forecasts())["previsione"]
+        assert not view["disponibile"] and view["motivi"]
+    assert not explore.query(results, counted, {})["previsione"]["disponibile"]  # not computed yet
+
+    sheet = explore.export_frames(explore.query(results, counted, {}, _forecasts()))["Previsione"]
+    assert sheet["periodo"].tolist() == ["1° trimestre 2026", "prossimi 12 mesi"]
+    assert sheet["affidabilita"].tolist() == ["indicativa", "affidabile"]
 
 
 def test_dashboard_pages(tmp_path):
@@ -74,9 +128,10 @@ def test_dashboard_pages(tmp_path):
     _store(tmp_path / "dataset")
     explore.load_cube(app.config["DATASET_FOLDER"], app.config["EXPLORE_FOLDER"])
     page = client.get("/consultazione").get_data(as_text=True)
-    assert 'id="filters"' in page
-    data = client.get("/consultazione/dati?microorganismo=ESCCOL").get_json()
+    assert 'id="listBoxes"' in page
+    data = client.get("/consultazione/dati?microorganismo=ESCCOL&laboratorio=IT2&laboratorio=IT1").get_json()
     assert data["nomi"]["microorganismo"] == "Escherichia coli" and data["numeri"]["isolati"] == 1
+    assert data["selezione"]["laboratorio"] == ["IT2", "IT1"]
     sheet = client.get("/consultazione/dati.xlsx")
     assert sheet.status_code == 200
     frames = pd.read_excel(io.BytesIO(sheet.data), sheet_name=None)
