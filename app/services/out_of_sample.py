@@ -103,6 +103,7 @@ def compute_validation(dataset_folder: str | Path) -> dict:
         "righe": rows,
         "analisi": _analysis(dataset_folder, rows, cutoff) if rows else {},
         "laboratori": _laboratory_check(then, labs, pd.period_range(cutoff + 1, last, freq="Q")),
+        "prossimi_12_mesi": _year_check(then, regional, pd.period_range(cutoff + 1, last, freq="Q")),
     }
 
 
@@ -111,6 +112,36 @@ def _analysis(dataset_folder, rows: list[dict], cutoff: pd.Period) -> dict:
     another kind of patient (e.g. non-hospitalised) shows up as a new stratum, i.e. as mix."""
     strata = build_series(dataset_folder, "Q", split_by="paziente_ricoverato")
     return analyse(rows, strata[strata["popolazione"] == POPULATION], cutoff, ANALYSED, READING)
+
+
+def _year_check(then: dict, regional: pd.DataFrame, quarters) -> dict:
+    """Regional forecast of the next 12 months made at the cutoff against the year observed."""
+    if len(quarters) < 4:
+        return {}
+    window = {str(q) for q in quarters[:4]}
+    year = regional[regional["period"].isin(window)].groupby(["microorganismo", "antibiotic"])[
+        [f"n_{READING}", f"r_{READING}"]].sum()
+    rows = []
+    for combo in then["combinations"]:
+        f = combo.get("prossimi_12_mesi")
+        key = (combo["microorganismo"], combo["antibiotico"])
+        if not f or f["semaforo"] == "grigio" or key not in year.index:
+            continue
+        n, r = year.loc[key]
+        if n < MIN_ISOLATES_PER_PERIOD:
+            continue
+        pct = 100 * r / n
+        rows.append({"microorganismo": key[0], "antibiotico": key[1], "semaforo": f["semaforo"], "n": int(n),
+                     "previsto": f["pct"], "basso": f["low"], "alto": f["high"], "osservato": pct,
+                     "errore": abs(f["pct"] - pct), "dentro": bool(f["low"] <= pct <= f["high"])})
+    if not rows:
+        return {}
+    t = pd.DataFrame(rows)
+    return {"righe": rows, "sintesi": {
+        "prove": len(t), "errore": float(t["errore"].mean()), "dentro": int(t["dentro"].sum()),
+        "copertura": float(100 * t["dentro"].mean()),
+        "copertura_compatibile": bool(coverage_compatible(int(t["dentro"].sum()), len(t))),
+        "per_semaforo": {k: float(g["errore"].mean()) for k, g in t.groupby("semaforo")}}}
 
 
 def _laboratory_check(then: dict, labs: pd.DataFrame, quarters) -> dict:

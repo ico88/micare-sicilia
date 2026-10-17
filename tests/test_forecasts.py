@@ -109,6 +109,9 @@ def test_pages_before_and_after_computing(client, tmp_path):
     detail = http.get("/previsioni/ESCCOL/CTX").get_data(as_text=True)
     assert "Ultimi 12 mesi" in detail and "Per laboratorio" in detail and "4° trimestre 2025" in detail
     assert "Previsto, prossimi 12 mesi" in detail  # per-laboratory forecasts
+    assert "Prossimi 12 mesi" in detail and "Resistenza attesa nell'anno" in detail  # regional, next 12 months
+    year = load_forecasts(app.config["FORECAST_FOLDER"])["combinations"]
+    assert any(c.get("prossimi_12_mesi") for c in year)
     assert http.get("/previsioni/KLEPNE/MEM").status_code == 200
     assert http.get("/previsioni/XXX/YYY").status_code == 404
     assert "sono cambiati" not in html

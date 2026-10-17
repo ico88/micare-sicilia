@@ -31,6 +31,23 @@
         <p class="text-muted mb-0">{{ combo.motivo_assenza }}</p>
       {% else %}
         {% if model_words %}<p class="small text-muted">{{ model_words }}</p>{% endif %}
+        {% set y = combo.prossimi_12_mesi %}
+        {% if y %}
+          <div class="border rounded p-2 mb-3 border-primary">
+            <div class="d-flex justify-content-between align-items-center mb-1">
+              <strong>Prossimi 12 mesi</strong>
+              <span class="badge text-bg-{{ traffic[y.semaforo].badge }}">{{ traffic[y.semaforo].label }}</span>
+            </div>
+            {% if y.semaforo != 'grigio' %}
+              <div>Resistenza attesa nell'anno: <strong>{{ "%.0f"|format(y.pct) }}%</strong> (probabilmente fra {{ "%.0f"|format(y.low) }}% e {{ "%.0f"|format(y.high) }}%)</div>
+              <div class="small text-muted mt-1">È il numero più affidabile per la terapia empirica: sull'anno intero gli isolati sono quattro volte quelli di un trimestre e il caso pesa meno.
+                {% if y.verifica.errore is not none %}Negli ultimi due anni ha sbagliato in media di {{ "%.1f"|format(y.verifica.errore)|replace(".", ",") }} punti.{% endif %}</div>
+            {% else %}
+              <div class="text-muted">Nessuna previsione affidabile per l'anno: fare riferimento al dato degli ultimi 12 mesi.</div>
+            {% endif %}
+          </div>
+          <div class="small fw-semibold mb-1">Per trimestre</div>
+        {% endif %}
         {% for f in forecasts %}
           <div class="border rounded p-2 mb-2">
             <div class="d-flex justify-content-between align-items-center mb-1">

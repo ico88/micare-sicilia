@@ -19,7 +19,7 @@ import pandas as pd
 from .benchmark import HORIZONS, INTERVAL_Z, choose_and_verify, contexts, run_bench
 from .breakpoints import BREAKPOINTS_VERSION
 from .dataset_store import covered_period, load_isolates
-from .lab_forecasts import forecast_laboratories
+from .lab_forecasts import forecast_laboratories, forecast_region_12_months
 from .forecasting import FORECASTERS
 from .reference import laboratory_names
 from .series import MIN_ISOLATES_PER_PERIOD, build_series, regional_series, wilson_interval
@@ -59,7 +59,8 @@ def quarter_label(period: str | pd.Period) -> str:
 # results stored with an older method are then shown as out of date, like after new data.
 # 2: invasive isolates of non-hospitalised patients ("altro") outside the regional series
 # 3: per-laboratory forecasts of the next 12 months (partial pooling toward the region)
-METHOD_VERSION = 3
+# 4: regional forecast of the next 12 months
+METHOD_VERSION = 4
 
 
 def stale_reason(stored: dict | None, dataset_folder: str | Path) -> str | None:
@@ -113,6 +114,7 @@ def compute_forecasts(dataset_folder: str | Path, until: str | None = None, quar
     verdict_index = verdicts.set_index(["microorganismo", "antibiotic", "orizzonte_mesi"]) if not verdicts.empty else None
     contexts_by_key = {(p, a): (periods, ctx) for p, a, periods, ctx in contexts(labs_eligible, READING)}
     by_laboratory = forecast_laboratories(labs_eligible, READING, eligible) if not labs_eligible.empty else {}
+    next_year = forecast_region_12_months(labs_eligible, READING, eligible) if not labs_eligible.empty else {}
 
     combos = []
     for (pathogen, antibiotic), hist in regional.groupby(["microorganismo", "antibiotic"]):
@@ -121,6 +123,7 @@ def compute_forecasts(dataset_folder: str | Path, until: str | None = None, quar
         entry["laboratori"] = _laboratory_last_year(labs, pathogen, antibiotic, last_period)
         entry["tendenza_rete_costante"] = _constant_panel_trend(labs, pathogen, antibiotic, last_period)
         entry["previsioni_laboratori"] = by_laboratory.get((pathogen, antibiotic))
+        entry["prossimi_12_mesi"] = next_year.get((pathogen, antibiotic))
         if (pathogen, antibiotic) in eligible and verdict_index is not None:
             periods, ctx = contexts_by_key[(pathogen, antibiotic)]
             entry["previsioni"] = _forecasts(ctx, periods, verdict_index, pathogen, antibiotic)
