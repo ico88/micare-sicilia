@@ -5,7 +5,9 @@ The cube is built once from the archive and kept as Parquet next to it:
 - first isolate per laboratory x patient x pathogen x quarter x population (CLSI M39),
   as in the series behind the forecasts
 - isolates outside the period the data really cover are left out (covered_period)
-- intrinsic resistances left out; both readings kept (reported, harmonised EUCAST)
+- intrinsic resistances left out; both readings kept (reported, harmonised EUCAST), each
+  with its S, I and R counts; in the harmonised reading a censored MIC can leave only
+  "not R" (NR: S or I), counted as tested but neither S nor I
 It holds counts only, never a patient: one row per population x laboratory x patient
 type x ward x sex x age band x pathogen x antibiotic x quarter.
 A percentage is reportable with at least 30 isolates tested (MIN_ISOLATES_PER_PERIOD).
@@ -28,7 +30,7 @@ from .series import (
     _series_isolates, wilson_interval,
 )
 
-CUBE_VERSION = 2
+CUBE_VERSION = 3
 CUBE_FILE = "cubo.parquet"
 ISOLATES_FILE = "isolati.parquet"
 SIGNATURE_FILE = "firma.json"
@@ -112,8 +114,10 @@ def build_cube(dataset_folder: str | Path) -> tuple[pd.DataFrame, pd.DataFrame]:
     ast = ast.merge(ids, on=["upload_id", "isolate_id"], how="inner")
     parts = []
     for reading, col in READINGS.items():
-        usable = ast.loc[ast[col].notna(), keys + ["antibiotic"]].assign(r=ast[col].eq("R").astype(int))
-        grouped = usable.groupby(keys + ["antibiotic"], observed=True).agg(n=("r", "size"), r=("r", "sum"))
+        usable = ast.loc[ast[col].notna(), keys + ["antibiotic"]].assign(
+            r=ast[col].eq("R").astype(int), s=ast[col].eq("S").astype(int), i=ast[col].eq("I").astype(int))
+        grouped = usable.groupby(keys + ["antibiotic"], observed=True).agg(
+            n=("r", "size"), r=("r", "sum"), s=("s", "sum"), i=("i", "sum"))
         parts.append(grouped.add_suffix(f"_{reading}"))
     results = pd.concat(parts, axis=1).fillna(0).astype("int32").reset_index()
     return _compact(results), _compact(counted)
@@ -185,10 +189,15 @@ def _select(frame: pd.DataFrame, filters: dict, skip: tuple[str, ...] = ()) -> p
 
 
 def _rates(frame: pd.DataFrame, reading: str) -> pd.DataFrame:
+    """%R with its 95% interval, and the S / I / R composition of the tested isolates."""
     n, r = frame[f"n_{reading}"].astype(int), frame[f"r_{reading}"].astype(int)
+    s, i = frame[f"s_{reading}"].astype(int), frame[f"i_{reading}"].astype(int)
     low, high = wilson_interval(r, n)
-    return pd.DataFrame({"testati": n, "resistenti": r, "pct": (100 * r / n.where(n > 0)).round(1),
+    share = lambda k: (100 * k / n.where(n > 0)).round(1)  # noqa: E731
+    return pd.DataFrame({"testati": n, "resistenti": r, "pct": share(r),
                          "basso": low.round(1), "alto": high.round(1),
+                         "sensibili": s, "intermedi": i, "non_resistenti": n - r - s - i,
+                         "pct_s": share(s), "pct_i": share(i), "pct_nr": share(n - r - s - i),
                          "riportabile": n >= MIN_ISOLATES_PER_PERIOD}, index=frame.index)
 
 
@@ -242,7 +251,7 @@ def query(results: pd.DataFrame, counted: pd.DataFrame, filters: dict, forecasts
     filters = {**{d: [] for d in MULTI}, **{k: v for k, v in filters.items() if v}}
     filters["popolazione"] = filters.get("popolazione") or "invasivi"
     lab_names = laboratory_names()
-    counts = [f"n_{reading}", f"r_{reading}"]
+    counts = [f"n_{reading}", f"r_{reading}", f"s_{reading}", f"i_{reading}"]
     in_population = counted[counted["popolazione"] == filters["popolazione"]]
 
     # Pathogen and antibiotic: always one; the most frequent of the selection when none
@@ -427,7 +436,8 @@ def export_frames(answer: dict) -> dict[str, pd.DataFrame]:
     selection = pd.DataFrame([{"filtro": FILTER_LABELS[k], "valore": shown(k, v)} for k, v in chosen.items()] + [
         {"filtro": "Regole", "valore": f"primo isolato per trimestre; percentuale riportabile con almeno "
                                        f"{answer['soglia']} isolati testati"}])
-    rename = {"pct": "% R", "basso": "IC95 basso", "alto": "IC95 alto"}
+    rename = {"pct": "% R", "basso": "IC95 basso", "alto": "IC95 alto", "pct_s": "% S", "pct_i": "% I",
+              "non_resistenti": "non R (S o I, MIC censurata)", "pct_nr": "% non R (S o I)"}
     trend = pd.DataFrame(answer["andamento"]).rename(columns=rename)
     labs = pd.DataFrame(answer["laboratori"]).rename(columns=rename)
     cells = pd.DataFrame(answer["antibiogramma"]["celle"])

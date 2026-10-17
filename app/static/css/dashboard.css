@@ -4,6 +4,8 @@
   --surface-1: #fcfcfb; --ink-1: #0b0b0b; --ink-2: #52514e; --ink-muted: #898781;
   --grid: #e1e0d9; --axis: #c3c2b7; --series-1: #2a78d6; --series-1-wash: rgba(42,120,214,.10);
   --forecast-wash: rgba(42,120,214,.16); --muted-mark: #c3c2b7;
+  /* S / I / R composition: categorical slots 1-4 of the reference palette, validated in this stacking order */
+  --sir-r: #eb6834; --sir-i: #1baf7a; --sir-s: #2a78d6; --sir-nr: #eda100;
   --seq-1: #b7d3f6; --seq-2: #86b6ef; --seq-3: #5598e7; --seq-4: #2a78d6; --seq-5: #1c5cab; --seq-6: #104281;
   /* selection states of the list boxes, as in Qlik */
   --sel-selected: #00873d; --sel-possible: #ffffff; --sel-excluded: #e4e4e1; --sel-excluded-ink: #8a8984;
@@ -114,3 +116,4 @@ button.fc-card:hover { background: var(--bg-app); }
 .pick-table tbody tr.selected td { background: #e6f4ec; }
 .pick-table tbody tr.selected td:first-child { box-shadow: inset 3px 0 0 var(--sel-selected); }
 .pick-table .num { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.chart-legend i.swatch { width: 12px; height: 10px; border: 0; border-radius: 2px; vertical-align: -1px; }

@@ -65,11 +65,12 @@
             <div class="text-muted small mb-1" id="trendNote"></div>
             <div class="chart-legend" id="trendLegend"></div>
             <div class="chart-frame" style="height:260px"><canvas id="trendChart" aria-label="Andamento della percentuale di resistenti per trimestre"></canvas></div>
-            <div class="text-muted small mt-2 mb-1">Isolati testati per trimestre</div>
-            <div class="chart-frame" style="height:110px;min-height:0"><canvas id="testedChart" aria-label="Isolati testati per trimestre"></canvas></div>
+            <div class="text-muted small mt-2 mb-1">Isolati testati per trimestre: resistenti, intermedi e sensibili</div>
+            <div class="chart-legend" id="sirLegend"></div>
+            <div class="chart-frame" style="height:130px;min-height:0"><canvas id="testedChart" aria-label="Isolati testati per trimestre, divisi in resistenti, intermedi e sensibili"></canvas></div>
             <details class="mt-2"><summary class="small">Mostra la tabella</summary>
               <div class="table-responsive mt-2"><table class="table table-sm small num-table" id="trendTable">
-                <thead><tr><th>Trimestre</th><th>Testati</th><th>Resistenti</th><th>% R</th><th>Intervallo</th><th></th></tr></thead><tbody></tbody>
+                <thead><tr><th>Trimestre</th><th>Testati</th><th>% R</th><th>Intervallo</th><th>% I</th><th>% S</th><th>% non R (S o I)</th><th></th></tr></thead><tbody></tbody>
               </table></div>
             </details>
           </section>
@@ -90,7 +91,13 @@
             <h2 class="h6 mb-0" id="heatTitle">Antibiogramma cumulativo</h2>
             <div class="text-muted small" id="heatNote"></div>
           </div>
-          <div class="heat-legend" id="heatLegend" aria-label="Legenda dei colori"></div>
+          <div class="d-flex flex-column align-items-end gap-1">
+            <div class="segmented" role="group" aria-label="Misura dell'antibiogramma" id="measureSwitch">
+              <button type="button" data-key="misura" data-value="R">% resistenti</button>
+              <button type="button" data-key="misura" data-value="S">% sensibili</button>
+            </div>
+            <div class="heat-legend" id="heatLegend" aria-label="Legenda dei colori"></div>
+          </div>
         </div>
         <div class="table-responsive mt-2"><table class="heat-table" id="heatTable"></table></div>
       </section>
@@ -114,7 +121,8 @@
   const forecastOn = () => forecastMode() && answer.previsione.disponibile;
   const rateLines = c => c.testati ? [
     `${fmt(c.pct, 1)}% resistenti (IC 95% ${fmt(c.basso, 1)}–${fmt(c.alto, 1)}%)`,
-    `${fmt(c.resistenti)} resistenti su ${fmt(c.testati)} testati`,
+    `${fmt(c.resistenti)} resistenti su ${fmt(c.testati)} testati`, B.sirLine(c),
+    ...(c.non_resistenti ? ['«non R»: MIC che dice solo «non resistente» (S o I) con i breakpoint EUCAST attuali'] : []),
     ...(c.riportabile ? [] : [`Meno di ${answer.soglia} testati: valore non riportabile`])] : ['Nessun isolato testato'];
 
   function render(response, board) {
@@ -162,6 +170,8 @@
       B.tile(`Resistenti a ${n.antibiotico}`, c && c.testati ? `${fmt(c.pct, 1)}%` : '–',
              !c || !c.testati ? 'nessun isolato testato' : c.riportabile ? `IC 95% ${fmt(c.basso, 1)}–${fmt(c.alto, 1)}%` : `meno di ${answer.soglia} testati: non riportabile`,
              !forecastOn()),
+      B.tile(`Sensibili a ${n.antibiotico}`, c && c.testati ? `${fmt(c.pct_s, 1)}%` : '–',
+             c && c.testati ? `intermedi ${fmt(c.pct_i, 1)}%` + (c.non_resistenti ? ` · non R (S o I) ${fmt(c.pct_nr, 1)}%` : '') : ''),
     ];
     if (forecastOn()) {
       const y = answer.previsione.dodici_mesi;
@@ -194,14 +204,15 @@
       legend.append(a, b);
     }
     const labels = B.drawTrend('trendChart', {rows, ahead, observedLines: rateLines});
-    B.drawTested('testedChart', labels, rows);
+    B.sirLegend(document.getElementById('sirLegend'), B.drawComposition('testedChart', labels, rows));
     const shown = f => f.semaforo !== 'grigio';
     const cells = values => { const tr = el('tr'); values.forEach(v => tr.append(el('td', '', v))); return tr; };
     document.querySelector('#trendTable tbody').replaceChildren(
-      ...answer.andamento.map(r => cells([r.trimestre, fmt(r.testati), fmt(r.resistenti),
-        r.testati ? `${fmt(r.pct, 1)}%${r.riportabile ? '' : ' *'}` : '–', r.testati ? `IC 95% ${fmt(r.basso, 1)}–${fmt(r.alto, 1)}%` : '–', ''])),
+      ...answer.andamento.map(r => cells([r.trimestre, fmt(r.testati),
+        r.testati ? `${fmt(r.pct, 1)}%${r.riportabile ? '' : ' *'}` : '–', r.testati ? `IC 95% ${fmt(r.basso, 1)}–${fmt(r.alto, 1)}%` : '–',
+        r.testati ? `${fmt(r.pct_i, 1)}%` : '–', r.testati ? `${fmt(r.pct_s, 1)}%` : '–', r.testati ? `${fmt(r.pct_nr, 1)}%` : '–', ''])),
       ...(ahead.length && ahead[0].dodici ? ahead.slice(0, 1).map(f => ({...f, label: 'prossimi 12 mesi'})) : ahead).map(f =>
-        cells([f.label, '', '', shown(f) ? `${fmt(f.pct, 1)}%` : '–', shown(f) ? `80% ${fmt(f.basso, 1)}–${fmt(f.alto, 1)}%` : '',
+        cells([f.label, '', shown(f) ? `${fmt(f.pct, 1)}%` : '–', shown(f) ? `80% ${fmt(f.basso, 1)}–${fmt(f.alto, 1)}%` : '', '', '', '',
                `previsione ${B.TRAFFIC[f.semaforo]}`])));
   }
 
@@ -247,13 +258,20 @@
 
   function renderHeat() {
     const heat = answer.antibiogramma, s = answer.selezione, p = answer.previsione, predicted = forecastMode();
+    // % sensibili: in the harmonised reading a censored MIC can leave S or I open, so the
+    // value is a lower bound ("≥") whenever some results are only "not R"
+    const susceptible = !predicted && state.misura === 'S';
+    document.getElementById('measureSwitch').hidden = predicted;
     const cells = new Map((predicted ? (p.disponibile ? p.celle : []) : heat.celle).map(c => [`${c.antibiotic}|${c.microorganismo}`, c]));
     document.getElementById('heatTitle').textContent = predicted
-      ? `Antibiogramma previsto per i prossimi 12 mesi${p.ambito === 'laboratorio' && p.laboratorio ? ` · ${p.laboratorio}` : ''}` : 'Antibiogramma cumulativo';
+      ? `Antibiogramma previsto per i prossimi 12 mesi${p.ambito === 'laboratorio' && p.laboratorio ? ` · ${p.laboratorio}` : ''}`
+      : `Antibiogramma cumulativo · % ${susceptible ? 'sensibili' : 'resistenti'}`;
     document.getElementById('heatNote').textContent = predicted
       ? (p.disponibile ? '% di resistenti previsti. «≈»: previsione indicativa; in grigio: non affidabile. Clic su una cella per vederne l\'andamento.'
                        : 'Non disponibile con questi filtri (vedi sopra).')
-      : '% di resistenti per microrganismo e antibiotico nel periodo e nei filtri scelti. Clic su una cella per vederne l\'andamento.';
+      : `% di ${susceptible ? 'sensibili' : 'resistenti'} per microrganismo e antibiotico nel periodo e nei filtri scelti.`
+        + (susceptible && s.lettura === 'harmonized' ? ' «≥»: parte delle MIC dice solo «non resistente» (S o I), il valore vero è fra questo e la somma con quella parte.' : '')
+        + ' Clic su una cella per vederne l\'andamento.';
     // forecasts: only the pathogens and antibiotics that have one
     const has = (a, c) => cells.has(`${a}|${c}`);
     const columns = predicted ? heat.colonne.filter(c => heat.righe.some(a => has(a.valore, c.valore))) : heat.colonne;
@@ -261,7 +279,8 @@
     B.drawHeat(document.getElementById('heatTable'), {
       columns, rows, cell: (a, c) => cells.get(`${a}|${c}`),
       good: c => predicted ? c.semaforo !== 'grigio' : c.riportabile,
-      text: c => predicted ? B.forecastText(c) : `${fmt(c.pct, 0)}%`,
+      value: c => susceptible ? c.pct_s : c.pct,
+      text: c => predicted ? B.forecastText(c) : susceptible ? `${c.non_resistenti ? '≥' : ''}${fmt(c.pct_s, 0)}%` : `${fmt(c.pct, 0)}%`,
       lines: c => predicted ? B.forecastLines(c) : rateLines(c),
       selected: (a, c) => c === s.microorganismo && a === s.antibiotico,
       onPick: (a, c) => B.set({microorganismo: c, antibiotico: a}),
@@ -272,7 +291,7 @@
   createBoard({
     single: {{ single|tojson }}, multi: MULTI, labels: {{ labels|tojson }},
     boxes: ['popolazione', 'microorganismo', 'antibiotico', ...MULTI], codeNames: ['laboratorio', 'antibiotico'],
-    extras: {vista: 'osservato', lettura: 'harmonized'},
+    extras: {vista: 'osservato', lettura: 'harmonized', misura: 'R'},
     dataUrl: "{{ url_for('explore.data') }}", downloadUrl: "{{ url_for('explore.download') }}", onData: render,
   });
 })();

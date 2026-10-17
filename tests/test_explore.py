@@ -22,7 +22,7 @@ def _store(folder):
     iso["materiale"] = "1"
     ast = pd.DataFrame([
         (0, "MEM", "R", "R"), (1, "MEM", "S", "S"), (2, "MEM", "S", "S"), (3, "MEM", "R", "S"),
-        (0, "AMK", "S", "S"), (4, "MEM", "S", "S"), (5, "MEM", "S", "S"),
+        (0, "AMK", "S", "S"), (4, "AMK", "I", "NR"), (4, "MEM", "S", "S"), (5, "MEM", "S", "S"),
         (0, "VAN", "R", "R"),  # intrinsic: never counted
     ], columns=["isolate_id", "antibiotic", "result", "result_harmonized"])
     ast["intrinsic"] = ast["antibiotic"].eq("VAN")
@@ -55,7 +55,16 @@ def test_query_answers_every_view_of_one_selection(tmp_path):
     assert [r["trimestre"] for r in answer["andamento"]] == ["2023Q1", "2023Q2"]
     assert [lab["laboratorio"] for lab in answer["laboratori"]] == ["IT2", "IT1"]  # highest %R first
     heat = {(c["antibiotic"], c["microorganismo"]): c["testati"] for c in answer["antibiogramma"]["celle"]}
-    assert heat == {("MEM", "KLEPNE"): 3, ("AMK", "KLEPNE"): 1, ("MEM", "ESCCOL"): 1}
+    assert heat == {("MEM", "KLEPNE"): 3, ("AMK", "KLEPNE"): 1, ("MEM", "ESCCOL"): 1, ("AMK", "ESCCOL"): 1}
+    assert (combo["sensibili"], combo["intermedi"], combo["non_resistenti"]) == (1, 0, 0)
+    assert round(combo["pct_s"], 1) == 33.3
+
+    # S / I / R: reported as the laboratory wrote it; harmonised, a censored MIC can leave only "not R"
+    amk = {r: explore.query(results, counted, {"microorganismo": "ESCCOL", "antibiotico": "AMK", "lettura": r})["numeri"]["combinazione"]
+           for r in ("reported", "harmonized")}
+    assert (amk["reported"]["sensibili"], amk["reported"]["intermedi"], amk["reported"]["non_resistenti"]) == (0, 1, 0)
+    assert (amk["harmonized"]["sensibili"], amk["harmonized"]["intermedi"], amk["harmonized"]["non_resistenti"]) == (0, 0, 1)
+    assert amk["harmonized"]["pct_nr"] == 100.0
 
     one_lab = explore.query(results, counted, {"laboratorio": ["IT1"], "eta": ["18-64 anni"], "lettura": "reported"})
     assert one_lab["numeri"]["combinazione"]["testati"] == 1

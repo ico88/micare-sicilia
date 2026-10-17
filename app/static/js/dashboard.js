@@ -336,8 +336,49 @@
                                callback: v => v >= 1000 ? `${fmt(v / 1000)}K` : v}}}},
       });
     }
+    // Isolates tested per quarter split into R / I / S (and "not R" when the MIC cannot
+    // tell S from I), stacked from the baseline, same labels as the trend above
+    const SIR = [['resistenti', 'R', '--sir-r'], ['intermedi', 'I', '--sir-i'], ['sensibili', 'S', '--sir-s'],
+                 ['non_resistenti', 'non R (S o I)', '--sir-nr']];
+    function drawComposition(canvasId, labels, rows) {
+      const at = Object.fromEntries(rows.map(r => [r.label, r]));
+      const parts = SIR.filter(([key]) => rows.some(r => r[key]));
+      const data = {labels, datasets: parts.map(([key, name, color], i) => ({
+        label: name, data: labels.map(l => at[l] ? at[l][key] : null), backgroundColor: token(color),
+        borderColor: token('--surface-1'), borderWidth: {top: i < parts.length - 1 ? 2 : 0}, borderSkipped: 'bottom',
+        borderRadius: i === parts.length - 1 ? {topLeft: 4, topRight: 4} : 0, maxBarThickness: 24, stack: 'sir'}))};
+      const tip = {...tooltipStyle(), filter: item => item.raw !== null && item.datasetIndex === 0,
+        callbacks: {title: items => items[0].label, label: item => {
+          const r = at[item.label];
+          return [`${fmt(r.testati)} testati${r.riportabile ? '' : ' (meno di 30: non riportabile)'}`,
+                  ...parts.map(([key, name]) => `${name}: ${fmt(r[key])} (${fmt(r.testati ? 100 * r[key] / r.testati : null, 1)}%)`)];
+        }}};
+      const chart = charts[canvasId];
+      if (chart) { chart.data = data; chart.options.plugins.tooltip = tip; chart.update(); return parts; }
+      charts[canvasId] = new Chart(document.getElementById(canvasId), {
+        type: 'bar', data,
+        options: {maintainAspectRatio: false, animation: false, interaction: {mode: 'index', intersect: false},
+                  plugins: {legend: {display: false}, tooltip: tip},
+                  scales: {x: {...axisStyle(), stacked: true, ticks: {display: false}, grid: {display: false}},
+                           y: {...axisStyle(), stacked: true, beginAtZero: true, ticks: {...axisStyle().ticks, maxTicksLimit: 3,
+                               callback: v => v >= 1000 ? `${fmt(v / 1000)}K` : v}}}},
+      });
+      return parts;
+    }
+    // Legend of the S / I / R parts actually drawn
+    function sirLegend(node, parts) {
+      node.replaceChildren(...parts.map(([, name, color]) => {
+        const span = el('span'), sw = el('i', 'swatch'); sw.style.background = token(color);
+        span.append(sw, document.createTextNode(name));
+        return span;
+      }));
+    }
+    // S / I / R of a count row, in words
+    const sirLine = c => c.testati ? `S ${fmt(c.pct_s, 1)}% · I ${fmt(c.pct_i, 1)}% · R ${fmt(c.pct, 1)}%`
+      + (c.non_resistenti ? ` · non R (S o I) ${fmt(c.pct_nr, 1)}%` : '') : '';
+
     // Antibiogram heat table: rows antibiotics, columns pathogens; cell {pct, ...} or none
-    function drawHeat(table, {columns, rows, cell, good, text, lines, selected, onPick}) {
+    function drawHeat(table, {columns, rows, cell, good, text, lines, selected, onPick, value = c => c.pct}) {
       const head = el('thead'), hr = el('tr');
       if (columns.length) hr.append(el('th'));
       columns.forEach(c => { const th = el('th', '', c.nome); th.scope = 'col'; hr.append(th); });
@@ -349,7 +390,7 @@
           const td = el('td'), c = cell(a.valore, col.valore);
           if (!c) { td.className = 'empty'; tr.append(td); return; }
           td.textContent = text(c); td.tabIndex = 0;
-          if (good(c)) { const color = cellColor(c.pct); td.style.background = color.bg; td.style.color = color.fg; }
+          if (good(c)) { const color = cellColor(value(c)); td.style.background = color.bg; td.style.color = color.fg; }
           if (selected(a.valore, col.valore)) td.classList.add('selected');
           hover(td, `${col.nome} e ${a.nome}`, lines(c));
           const choose = () => onPick(a.valore, col.valore);
@@ -376,7 +417,7 @@
       if (pane) pane.open = false;
     }
     Object.assign(api, {set, load, el, fmt, token, hover, trafficBadge, forecastLines, forecastText, cellColor, heatLegend,
-                        niceMax, barRow, barAxis, drawTrend, drawTested, drawHeat, tile, TRAFFIC});
+                        niceMax, barRow, barAxis, drawTrend, drawTested, drawComposition, sirLegend, sirLine, drawHeat, tile, TRAFFIC});
     load();
     return api;
   };
