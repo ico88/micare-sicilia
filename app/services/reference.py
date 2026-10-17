@@ -18,6 +18,25 @@ ADMISSION_LABELS = {
 }
 ICU_WARD_CODES = {"49", "72", "73"}  # terapia intensiva, intensiva pediatrica, intensiva neonatale
 
+ANTIBIOTIC_LABELS = {
+    "AMK": "Amikacina", "AMC": "Amoxicillina-clavulanato", "AMP": "Ampicillina", "FEP": "Cefepime",
+    "FDC": "Cefiderocol", "CTX": "Cefotaxime", "FOX": "Cefoxitina", "CPT": "Ceftarolina",
+    "CAZ": "Ceftazidime", "CZA": "Ceftazidime-avibactam", "CZT": "Ceftolozano-tazobactam",
+    "CRO": "Ceftriaxone", "CIP": "Ciprofloxacina", "CLI": "Clindamicina", "COL": "Colistina",
+    "SXT": "Cotrimossazolo", "DAP": "Daptomicina", "DOR": "Doripenem", "ERY": "Eritromicina",
+    "ETP": "Ertapenem", "FOS": "Fosfomicina", "GEN": "Gentamicina", "GEH": "Gentamicina (alto livello)",
+    "IPM": "Imipenem", "IMR": "Imipenem-relebactam", "LVX": "Levofloxacina", "LNZ": "Linezolid",
+    "MEM": "Meropenem", "MEV": "Meropenem-vaborbactam", "NIT": "Nitrofurantoina", "ORI": "Oritavancina",
+    "OXA": "Oxacillina", "PEN": "Penicillina", "TZP": "Piperacillina-tazobactam", "RIF": "Rifampicina",
+    "STH": "Streptomicina (alto livello)", "TEC": "Teicoplanina", "TCY": "Tetraciclina",
+    "TGC": "Tigeciclina", "TOB": "Tobramicina", "VAN": "Vancomicina",
+}
+PATHOGEN_LABELS = {
+    "ACISPP": "Acinetobacter spp.", "ENTFAE": "Enterococcus faecalis", "ENTFCM": "Enterococcus faecium",
+    "ESCCOL": "Escherichia coli", "KLEPNE": "Klebsiella pneumoniae", "PSEAER": "Pseudomonas aeruginosa",
+    "STAAUR": "Staphylococcus aureus", "STRPNE": "Streptococcus pneumoniae", "NEIGON": "Neisseria gonorrhoeae",
+}
+
 
 @lru_cache(maxsize=1)
 def laboratory_names() -> dict[str, str]:

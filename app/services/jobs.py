@@ -19,6 +19,7 @@ LABELS = {
     "previsioni": "Calcolo delle previsioni",
     "verifica": "Verifica sui dati nuovi",
     "ricerca": "Ricerca dei modelli",
+    "consultazione": "Preparazione dei dati per la consultazione",
 }
 SHOW_FINISHED_FOR = timedelta(minutes=30)
 

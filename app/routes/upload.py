@@ -120,6 +120,7 @@ def reset_db():
     db.session.commit()
     shutil.rmtree(current_app.config["DATASET_FOLDER"], ignore_errors=True)
     Path(current_app.config["DATASET_FOLDER"]).mkdir(parents=True, exist_ok=True)
+    shutil.rmtree(current_app.config["EXPLORE_FOLDER"], ignore_errors=True)
     folder = Path(current_app.config["FORECAST_FOLDER"])
     for name in (RESULT_FILE, VALIDATION_FILE, model_search.SUMMARY_FILE, model_search.WORKBOOK_FILE):
         (folder / name).unlink(missing_ok=True)

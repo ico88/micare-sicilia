@@ -21,7 +21,7 @@ from .breakpoints import BREAKPOINTS_VERSION
 from .dataset_store import covered_period, load_isolates
 from .lab_forecasts import forecast_laboratories, forecast_region_12_months
 from .forecasting import FORECASTERS
-from .reference import laboratory_names
+from .reference import ANTIBIOTIC_LABELS, PATHOGEN_LABELS, laboratory_names
 from .series import MIN_ISOLATES_PER_PERIOD, build_series, regional_series, wilson_interval
 
 POPULATION = "invasivi"
@@ -29,25 +29,6 @@ READING = "harmonized"
 MIN_REPORTABLE_REGIONAL_QUARTERS = 20
 RESULT_FILE = "previsioni.json"
 QUARTER_NAMES = {1: "1° trimestre", 2: "2° trimestre", 3: "3° trimestre", 4: "4° trimestre"}
-
-ANTIBIOTIC_LABELS = {
-    "AMK": "Amikacina", "AMC": "Amoxicillina-clavulanato", "AMP": "Ampicillina", "FEP": "Cefepime",
-    "FDC": "Cefiderocol", "CTX": "Cefotaxime", "FOX": "Cefoxitina", "CPT": "Ceftarolina",
-    "CAZ": "Ceftazidime", "CZA": "Ceftazidime-avibactam", "CZT": "Ceftolozano-tazobactam",
-    "CRO": "Ceftriaxone", "CIP": "Ciprofloxacina", "CLI": "Clindamicina", "COL": "Colistina",
-    "SXT": "Cotrimossazolo", "DAP": "Daptomicina", "DOR": "Doripenem", "ERY": "Eritromicina",
-    "ETP": "Ertapenem", "FOS": "Fosfomicina", "GEN": "Gentamicina", "GEH": "Gentamicina (alto livello)",
-    "IPM": "Imipenem", "IMR": "Imipenem-relebactam", "LVX": "Levofloxacina", "LNZ": "Linezolid",
-    "MEM": "Meropenem", "MEV": "Meropenem-vaborbactam", "NIT": "Nitrofurantoina", "ORI": "Oritavancina",
-    "OXA": "Oxacillina", "PEN": "Penicillina", "TZP": "Piperacillina-tazobactam", "RIF": "Rifampicina",
-    "STH": "Streptomicina (alto livello)", "TEC": "Teicoplanina", "TCY": "Tetraciclina",
-    "TGC": "Tigeciclina", "TOB": "Tobramicina", "VAN": "Vancomicina",
-}
-PATHOGEN_LABELS = {
-    "ACISPP": "Acinetobacter spp.", "ENTFAE": "Enterococcus faecalis", "ENTFCM": "Enterococcus faecium",
-    "ESCCOL": "Escherichia coli", "KLEPNE": "Klebsiella pneumoniae", "PSEAER": "Pseudomonas aeruginosa",
-    "STAAUR": "Staphylococcus aureus", "STRPNE": "Streptococcus pneumoniae", "NEIGON": "Neisseria gonorrhoeae",
-}
 
 
 def quarter_label(period: str | pd.Period) -> str:

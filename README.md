@@ -13,6 +13,8 @@ MIC RES Sicilia forecasts antimicrobial resistance for the Sicilian Rete MIC.
 
 **Guided path (home page).** Four steps in a fixed order: upload the Rete MIC export, read the data check, compute the forecasts, read them. The step to do now is highlighted; its state is derived from the validation reports and the stored forecasts (`app/services/workflow.py`).
 
+**Consultation dashboard (page "Consultazione dati").** The archive sliced like the regional Qlik dashboard, with the rules of the forecasts: first isolate per patient and quarter, intrinsic resistances left out, harmonised EUCAST reading (or as reported), a percentage reportable only with at least 30 isolates tested. Filters in one row (period, population, pathogen, antibiotic, laboratory, patient type, intensive care, sex, age band) scope four views: key figures, %R per quarter with its 95% interval and the isolates tested, laboratories compared with the regional figure, and the cumulative antibiogram pathogen × antibiotic; a click on a laboratory or a cell selects it, as in Qlik. It reads a cube of counts built once per archive version (`app/services/explore.py`, `instance/consultazione/`): no patient-level record reaches the page. **Scarica la vista (Excel)** exports the tables of the current selection.
+
 **Validated forecasts (page "Previsioni di resistenza").** Regional invasive isolates (blood and CSF) of hospitalised, emergency, day-hospital and long-term-care patients; invasive isolates of non-hospitalised patients (`PAZIENTE_RICOVERATO` = 5, "altro") are a population of their own, outside the forecasts (in 2025 one laboratory started sending them by the thousand, which looked like a fall of resistance; without them the 2025 out-of-sample error fell from 4.1 to 3.2 points and the bias from −2.1 to −0.3), the next four quarters after the last complete quarter of data. For each pathogen × antibiotic one forecaster is chosen on the 2020-22 rolling-origin tests and judged on 2023-24 only (`app/services/benchmark.py`). The operator sees the value in words, an 80% interval, the last 12 months, the typical past error and a traffic light (affidabile / indicativa / non affidabile) that never improves with the horizon. Forecasts are computed with "Calcola previsioni" and stored in `instance/previsioni/previsioni.json` (`app/services/forecast_run.py`); laboratory figures are shown as observed, indicative values.
 
 **Out-of-sample check (page "Verifica sui dati nuovi").** Once the archive holds complete quarters after 2024, the forecasts are recomputed with data cut at 31/12/2024 and scored against what was observed, next to "as the last 12 months" and Prophet (`app/services/out_of_sample.py`). Prophet, the model of the original project, is a candidate in the test bench like the others.
@@ -25,7 +27,7 @@ MIC RES Sicilia forecasts antimicrobial resistance for the Sicilian Rete MIC.
 
 **Model search (page "Ricerca dei modelli", `python scripts/ricerca_modelli.py`).** 86 configurations (recent levels over 6-24 months, pooling toward the region at several strengths, trends with a level per laboratory, blends, gradient boosting across all combinations) on four targets: regional %R per quarter and over 12 months, regional %R at constant panel, laboratory %R over 12 months; each model also with the last quarter's weights, rerun on laboratory × intensive care and laboratory × patient type strata, and a trend shared by antibiotics of the same mechanism group. Ranked on targets up to 2022, confirmed on 2023-2024; the forecasts made at the end of 2024 for 2025 are shown beside, never used to choose (`app/services/model_search.py`). Result: nothing beats "as the last 12 months" for the regional figure by the required 5% (the class trend did better on 2025 but worse on 2023-2024, so it is not used); pooling toward the region wins for laboratories; forecasting 12 months instead of a quarter cuts the error by about a quarter.
 
-**Background jobs.** Downloading from the dashboard, computing the forecasts and the out-of-sample check run on the server (`app/services/jobs.py`, one at a time): the browser can be closed, every page shows the progress and the outcome.
+**Background jobs.** Downloading from the dashboard, computing the forecasts, the out-of-sample check, the model search and preparing the consultation data run on the server (`app/services/jobs.py`, one at a time): the browser can be closed, every page shows the progress and the outcome.
 
 ---
 
@@ -137,11 +139,12 @@ ast = load_ast_results("instance/dataset", first_isolate_only=True)     # isolat
 
 ```
 app/
-  routes/               guide (home), upload (data), forecasts (forecasts, check, model search)
+  routes/               guide (home), upload (data), explore (consultation), forecasts (forecasts, check, model search)
   services/
     qlik_source.py      download from the regional dashboard
     dataset_store.py    validation and Parquet archive of the isolates
     series.py           quarterly series per laboratory, populations, strata
+    explore.py          aggregated cube and queries of the consultation dashboard
     benchmark.py        rolling-origin test bench, model choice, traffic light
     forecasting.py      candidate forecasters
     forecast_run.py     forecasts shown to the operator

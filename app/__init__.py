@@ -61,6 +61,7 @@ def create_app(test_config: dict | None = None) -> Flask:
         UPLOAD_FOLDER=str(base_dir / "data"),
         DATASET_FOLDER=str(instance_dir / "dataset"),
         FORECAST_FOLDER=str(instance_dir / "previsioni"),
+        EXPLORE_FOLDER=str(instance_dir / "consultazione"),
         MAX_CONTENT_LENGTH=128 * 1024 * 1024,
         # Public Rete MIC dashboard (Qualità Sicilia SSR) the export is taken from
         FONTE_DATI_URL=DASHBOARD_URL,
@@ -81,12 +82,14 @@ def create_app(test_config: dict | None = None) -> Flask:
                 "background_job": jobs.shown(), "now": datetime.now}
 
     from . import models  # noqa: F401
+    from .routes.explore import bp as explore_bp
     from .routes.forecasts import bp as forecasts_bp
     from .routes.guide import bp as guide_bp
     from .routes.upload import bp as upload_bp
 
     app.register_blueprint(guide_bp)
     app.register_blueprint(forecasts_bp)
+    app.register_blueprint(explore_bp)
     app.register_blueprint(upload_bp)
 
     with app.app_context():

@@ -71,6 +71,7 @@
             {% if d.last_excluded %}{{ "{:,}".format(d.last_excluded).replace(",", ".") }} righe escluse.{% else %}Nessuna riga esclusa.{% endif %}
             {% if d.warnings %}{{ d.warnings }} {{ "avviso" if d.warnings == 1 else "avvisi" }} da leggere: di solito non bloccano il calcolo.{% endif %}</p>
           <a class="btn btn-outline-secondary btn-sm" href="{{ url_for('upload.validation_report', upload_id=d.last_upload_id) }}">Apri l'esito del controllo</a>
+          <a class="btn btn-outline-secondary btn-sm" href="{{ url_for('explore.dashboard') }}">Consulta i dati</a>
         {% endif %}
       </div>
     </section>

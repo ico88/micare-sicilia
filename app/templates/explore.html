@@ -1,0 +1,433 @@
+{% extends "base.html" %}
+{% block title %}Consultazione dati - MIC RES Sicilia{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-3">
+  <div>
+    <h1 class="page-heading mb-1">Consultazione dei dati</h1>
+    <div class="text-muted small">Primo isolato per paziente e trimestre · resistenze intrinseche escluse ·
+      percentuale riportabile con almeno 30 isolati testati. Solo dati aggregati.</div>
+  </div>
+  {% if ready %}<a class="btn btn-sm btn-outline-secondary" id="downloadLink" href="{{ url_for('explore.download') }}">Scarica la vista (Excel)</a>{% endif %}
+</div>
+
+{% if not has_data %}
+  <section class="panel"><p class="mb-0">L'archivio è vuoto: scarica i dati dal cruscotto o carica l'export della Rete MIC in
+    <a href="{{ url_for('upload.upload') }}">Gestione dati</a>.</p></section>
+{% elif not ready %}
+  <section class="panel">
+    {% if busy %}
+      <p class="mb-0">È in corso un altro lavoro ({{ busy.label|lower }}). I dati per la consultazione si preparano appena finisce:
+        ricarica la pagina tra qualche minuto.</p>
+    {% else %}
+      <p class="mb-0">Preparo i dati per la consultazione (succede una volta dopo ogni aggiornamento dell'archivio). La pagina si aggiorna da sola.</p>
+    {% endif %}
+  </section>
+{% else %}
+<div class="viz-root">
+  <form class="filter-row" id="filters" aria-label="Filtri">
+    <label class="filter">Dal trimestre<select name="da" class="form-select form-select-sm"></select></label>
+    <label class="filter">Al trimestre<select name="a" class="form-select form-select-sm"></select></label>
+    <div class="filter presets" role="group" aria-label="Periodo">
+      <span>Periodo</span>
+      <div class="btn-group btn-group-sm">
+        <button type="button" class="btn btn-outline-secondary" data-preset="4">Ultimo anno</button>
+        <button type="button" class="btn btn-outline-secondary" data-preset="8">Ultimi 2 anni</button>
+        <button type="button" class="btn btn-outline-secondary" data-preset="0">Tutto</button>
+      </div>
+    </div>
+    <label class="filter">{{ labels.popolazione }}<select name="popolazione" class="form-select form-select-sm"></select></label>
+    <label class="filter">{{ labels.microorganismo }}<select name="microorganismo" class="form-select form-select-sm"></select></label>
+    <label class="filter">{{ labels.antibiotico }}<select name="antibiotico" class="form-select form-select-sm"></select></label>
+    <label class="filter wide">{{ labels.laboratorio }}<select name="laboratorio" class="form-select form-select-sm" data-all="Tutti"></select></label>
+    <label class="filter">{{ labels.tipo_paziente }}<select name="tipo_paziente" class="form-select form-select-sm" data-all="Tutti"></select></label>
+    <label class="filter">{{ labels.reparto }}<select name="reparto" class="form-select form-select-sm" data-all="Tutti"></select></label>
+    <label class="filter">{{ labels.sesso }}<select name="sesso" class="form-select form-select-sm" data-all="Tutti"></select></label>
+    <label class="filter">{{ labels.eta }}<select name="eta" class="form-select form-select-sm" data-all="Tutte"></select></label>
+    <label class="filter">{{ labels.lettura }}<select name="lettura" class="form-select form-select-sm">
+      {% for value, text in readings.items() %}<option value="{{ value }}">{{ text }}</option>{% endfor %}
+    </select></label>
+  </form>
+  <div class="selections" id="selections" aria-live="polite"></div>
+
+  <div id="board">
+    <div class="kpi-row">
+      <div class="kpi"><div class="kpi-label" id="kpiIsolatesLabel">Isolati</div><div class="kpi-value" id="kpiIsolates">–</div><div class="kpi-note" id="kpiIsolatesNote"></div></div>
+      <div class="kpi"><div class="kpi-label">Laboratori con isolati</div><div class="kpi-value" id="kpiLabs">–</div><div class="kpi-note" id="kpiLabsNote"></div></div>
+      <div class="kpi"><div class="kpi-label" id="kpiTestedLabel">Testati</div><div class="kpi-value" id="kpiTested">–</div><div class="kpi-note" id="kpiTestedNote"></div></div>
+      <div class="kpi kpi-hero"><div class="kpi-label" id="kpiPctLabel">Resistenti</div><div class="kpi-value" id="kpiPct">–</div><div class="kpi-note" id="kpiPctNote"></div></div>
+    </div>
+
+    <div class="row g-3">
+      <div class="col-xl-7">
+        <section class="panel h-100">
+          <h2 class="h6 mb-0" id="trendTitle">Andamento per trimestre</h2>
+          <div class="text-muted small mb-2">% di resistenti con intervallo di confidenza al 95%; punti vuoti: meno di 30 testati, valore non riportabile.</div>
+          <div class="chart-frame" style="height:260px"><canvas id="trendChart" aria-label="Andamento della percentuale di resistenti per trimestre"></canvas></div>
+          <div class="text-muted small mt-2 mb-1">Isolati testati per trimestre</div>
+          <div class="chart-frame" style="height:110px;min-height:0"><canvas id="testedChart" aria-label="Isolati testati per trimestre"></canvas></div>
+          <details class="mt-2"><summary class="small">Mostra la tabella</summary>
+            <div class="table-responsive mt-2"><table class="table table-sm small num-table" id="trendTable">
+              <thead><tr><th>Trimestre</th><th>Testati</th><th>Resistenti</th><th>% R</th><th>IC 95%</th></tr></thead><tbody></tbody>
+            </table></div>
+          </details>
+        </section>
+      </div>
+      <div class="col-xl-5">
+        <section class="panel h-100">
+          <h2 class="h6 mb-0" id="labsTitle">Confronto fra laboratori</h2>
+          <div class="text-muted small mb-2">Nel periodo scelto, con intervallo al 95%; la linea verticale è il dato regionale della selezione.
+            Clic su un laboratorio per selezionarlo.</div>
+          <div class="lab-bars" id="labBars"></div>
+          <div class="lab-axis" id="labAxis"></div>
+        </section>
+      </div>
+    </div>
+
+    <section class="panel mt-3">
+      <div class="d-flex justify-content-between align-items-start flex-wrap gap-2">
+        <div>
+          <h2 class="h6 mb-0">Antibiogramma cumulativo</h2>
+          <div class="text-muted small">% di resistenti per microrganismo e antibiotico nel periodo e nei filtri scelti. Clic su una cella per vederne l'andamento.</div>
+        </div>
+        <div class="heat-legend" id="heatLegend" aria-label="Legenda dei colori"></div>
+      </div>
+      <div class="table-responsive mt-2"><table class="heat-table" id="heatTable"></table></div>
+    </section>
+  </div>
+  <div class="viz-tooltip" id="vizTooltip" role="tooltip" hidden></div>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+{% if ready %}
+<style>
+  .viz-root {
+    --surface-1: #fcfcfb; --ink-1: #0b0b0b; --ink-2: #52514e; --ink-muted: #898781;
+    --grid: #e1e0d9; --axis: #c3c2b7; --series-1: #2a78d6; --series-1-wash: rgba(42,120,214,.10);
+    --muted-mark: #c3c2b7;
+    --seq-1: #b7d3f6; --seq-2: #86b6ef; --seq-3: #5598e7; --seq-4: #2a78d6; --seq-5: #1c5cab; --seq-6: #104281;
+  }
+  .filter-row { display: flex; flex-wrap: wrap; gap: .5rem .75rem; align-items: flex-end; margin-bottom: .5rem; }
+  .filter { display: flex; flex-direction: column; font-size: .75rem; color: var(--ink-2); gap: 2px; min-width: 130px; flex: 0 1 160px; }
+  .filter.wide { flex-basis: 240px; }
+  .filter.presets { flex: 0 0 auto; }
+  .selections { display: flex; flex-wrap: wrap; gap: .35rem; min-height: 1.6rem; margin-bottom: .75rem; align-items: center; }
+  .chip { display: inline-flex; align-items: center; gap: .3rem; background: var(--accent-bg); border: 1px solid #cde2fb;
+          border-radius: 999px; padding: .1rem .3rem .1rem .6rem; font-size: .78rem; color: var(--ink-1); }
+  .chip button { border: 0; background: none; color: var(--ink-2); padding: 0 .25rem; line-height: 1; font-size: 1rem; }
+  .chip-clear { font-size: .78rem; }
+  #board { transition: opacity .15s; }
+  #board.loading { opacity: .5; }
+  .kpi-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: .75rem; margin-bottom: 1rem; }
+  .kpi { background: var(--bg-surface); border: 1px solid var(--border); border-radius: var(--radius); padding: .75rem 1rem; box-shadow: var(--shadow); }
+  .kpi-label { font-size: .78rem; color: var(--ink-2); }
+  .kpi-value { font-size: 1.6rem; font-weight: 600; color: var(--ink-1); line-height: 1.2; }
+  .kpi-hero .kpi-value { font-size: 2.2rem; }
+  .kpi-note { font-size: .75rem; color: var(--ink-muted); }
+  .num-table td, .num-table th { font-variant-numeric: tabular-nums; }
+  .lab-bars { display: flex; flex-direction: column; gap: 2px; position: relative; }
+  .lab-row { display: grid; grid-template-columns: minmax(0, 11rem) 1fr 3.2rem; gap: .5rem; align-items: center;
+             padding: 3px 4px; border-radius: 6px; cursor: pointer; font-size: .78rem; border: 0; background: none; text-align: left; width: 100%; }
+  .lab-row:hover, .lab-row:focus-visible { background: var(--bg-app); outline: none; }
+  .lab-row.selected { background: var(--accent-bg); }
+  .lab-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--ink-1); }
+  .lab-track { position: relative; height: 16px; }
+  .lab-bar { position: absolute; left: 0; top: 2px; height: 12px; background: var(--series-1); border-radius: 0 4px 4px 0; }
+  .lab-bar.thin { background: var(--muted-mark); }
+  .lab-ci { position: absolute; top: 7px; height: 2px; background: var(--ink-1); opacity: .55; }
+  .lab-ref { position: absolute; top: -2px; bottom: -2px; width: 1px; background: var(--ink-2); }
+  .lab-value { text-align: right; color: var(--ink-1); font-variant-numeric: tabular-nums; }
+  .lab-value.thin { color: var(--ink-muted); }
+  .lab-axis { display: grid; grid-template-columns: minmax(0, 11rem) 1fr 3.2rem; gap: .5rem; padding: 0 4px; font-size: .7rem; color: var(--ink-muted); }
+  .lab-axis .ticks { position: relative; height: 1rem; border-top: 1px solid var(--axis); }
+  .lab-axis .ticks span { position: absolute; transform: translateX(-50%); top: 2px; font-variant-numeric: tabular-nums; }
+  .heat-table { border-collapse: separate; border-spacing: 2px; font-size: .78rem; }
+  .heat-table th { font-weight: 500; color: var(--ink-2); padding: 2px 6px; white-space: nowrap; }
+  .heat-table thead th { font-style: italic; text-align: center; vertical-align: bottom; }
+  .heat-table tbody th { text-align: left; }
+  .heat-table td { min-width: 4.2rem; text-align: center; padding: 4px 6px; border-radius: 4px; cursor: pointer;
+                   font-variant-numeric: tabular-nums; background: var(--bg-app); color: var(--ink-muted); }
+  .heat-table td.empty { cursor: default; background: none; }
+  .heat-table td:not(.empty):hover, .heat-table td:focus-visible { outline: 2px solid var(--ink-1); outline-offset: -2px; }
+  .heat-table td.selected { outline: 2px solid var(--ink-1); outline-offset: -2px; }
+  .heat-legend { display: flex; flex-wrap: wrap; gap: .5rem; font-size: .72rem; color: var(--ink-2); align-items: center; }
+  .heat-legend i { display: inline-block; width: 14px; height: 10px; border-radius: 2px; margin-right: 3px; vertical-align: -1px; }
+  .viz-tooltip { position: fixed; z-index: 1000; pointer-events: none; background: var(--bg-surface); border: 1px solid var(--border-med);
+                 border-radius: 8px; box-shadow: var(--shadow-md); padding: .4rem .6rem; font-size: .78rem; max-width: 280px; color: var(--ink-2); }
+  .viz-tooltip strong { color: var(--ink-1); font-size: .9rem; display: block; }
+</style>
+<script>
+(() => {
+  const DATA_URL = "{{ url_for('explore.data') }}";
+  const DOWNLOAD_URL = "{{ url_for('explore.download') }}";
+  const FILTERS = ['da', 'a', 'popolazione', 'microorganismo', 'antibiotico', 'laboratorio', 'tipo_paziente', 'reparto', 'sesso', 'eta', 'lettura'];
+  const CHIP_LABELS = {{ labels|tojson }};
+  const CLEARABLE = ['laboratorio', 'tipo_paziente', 'reparto', 'sesso', 'eta', 'da', 'a'];
+  const css = getComputedStyle(document.querySelector('.viz-root'));
+  const token = name => css.getPropertyValue(name).trim();
+  const SEQ = [0, 5, 10, 25, 50, 75];  // class lower bounds, as the ECDC maps
+  const form = document.getElementById('filters');
+  const board = document.getElementById('board');
+  const tooltip = document.getElementById('vizTooltip');
+  const fmt = (v, d = 0) => v === null || v === undefined ? '–' : Number(v).toLocaleString('it-IT', {minimumFractionDigits: d, maximumFractionDigits: d});
+  let state = Object.fromEntries(FILTERS.map(k => [k, new URLSearchParams(location.search).get(k) || '']));
+  let answer = null, trendChart = null, testedChart = null, request = 0;
+
+  // --- tooltip shared by the HTML marks ---------------------------------
+  function showTip(event, title, lines) {
+    tooltip.replaceChildren();
+    const strong = document.createElement('strong'); strong.textContent = title; tooltip.append(strong);
+    lines.forEach(l => { const d = document.createElement('div'); d.textContent = l; tooltip.append(d); });
+    tooltip.hidden = false;
+    const rect = event.target.getBoundingClientRect ? event.target.getBoundingClientRect() : {left: 0, top: 0};
+    const x = event.clientX || rect.left + 12, y = event.clientY || rect.top;
+    tooltip.style.left = Math.min(x + 14, window.innerWidth - tooltip.offsetWidth - 8) + 'px';
+    tooltip.style.top = Math.max(8, y - tooltip.offsetHeight - 10) + 'px';
+  }
+  const hideTip = () => { tooltip.hidden = true; };
+  function hover(el, title, lines) {
+    el.addEventListener('pointermove', e => showTip(e, title, lines));
+    el.addEventListener('pointerleave', hideTip);
+    el.addEventListener('focus', e => showTip(e, title, lines));
+    el.addEventListener('blur', hideTip);
+  }
+  const rateLines = c => c.testati ? [
+    `${fmt(c.pct, 1)}% resistenti (IC 95% ${fmt(c.basso, 1)}–${fmt(c.alto, 1)}%)`,
+    `${fmt(c.resistenti)} resistenti su ${fmt(c.testati)} testati`,
+    ...(c.riportabile ? [] : [`Meno di ${answer.soglia} testati: valore non riportabile`])] : ['Nessun isolato testato'];
+
+  // --- filters ------------------------------------------------------------
+  function fill(select, options, value, allText) {
+    select.replaceChildren();
+    if (allText) select.append(new Option(allText, ''));
+    options.forEach(o => {
+      const opt = typeof o === 'string' ? new Option(o, o) : new Option(o.valore === o.nome ? o.nome : `${o.valore} · ${o.nome}`, o.valore);
+      select.append(opt);
+    });
+    select.value = value;
+  }
+  function syncFilters() {
+    const o = answer.opzioni, s = answer.selezione;
+    fill(form.da, o.trimestri, s.da || o.trimestri[0]);
+    fill(form.a, o.trimestri, s.a || o.trimestri[o.trimestri.length - 1]);
+    ['popolazione', 'microorganismo', 'antibiotico'].forEach(k => fill(form[k], o[k], s[k]));
+    ['laboratorio', 'tipo_paziente', 'reparto', 'sesso', 'eta'].forEach(k => fill(form[k], o[k], s[k], form[k].dataset.all));
+    form.lettura.value = s.lettura;
+  }
+  function chips() {
+    const box = document.getElementById('selections');
+    box.replaceChildren();
+    const active = CLEARABLE.filter(k => state[k]);
+    active.forEach(k => {
+      const chip = document.createElement('span'); chip.className = 'chip';
+      const opt = form[k].selectedOptions[0];
+      chip.append(document.createTextNode(`${CHIP_LABELS[k]}: ${opt ? opt.textContent : state[k]}`));
+      const x = document.createElement('button'); x.type = 'button'; x.setAttribute('aria-label', `Togli ${CHIP_LABELS[k]}`); x.textContent = '×';
+      x.addEventListener('click', () => set({[k]: ''}));
+      chip.append(x); box.append(chip);
+    });
+    if (active.length > 1) {
+      const all = document.createElement('button'); all.type = 'button'; all.className = 'btn btn-link btn-sm chip-clear p-0';
+      all.textContent = 'Togli tutte le selezioni';
+      all.addEventListener('click', () => set(Object.fromEntries(CLEARABLE.map(k => [k, '']))));
+      box.append(all);
+    }
+  }
+  function set(changes) {
+    Object.assign(state, changes);
+    load();
+  }
+  form.addEventListener('change', e => {
+    const changes = {[e.target.name]: e.target.value};
+    if (e.target.name === 'microorganismo') changes.antibiotico = '';  // the most tested of the new pathogen
+    if (e.target.name === 'popolazione') Object.assign(changes, {microorganismo: '', antibiotico: ''});
+    set(changes);
+  });
+  form.querySelectorAll('[data-preset]').forEach(b => b.addEventListener('click', () => {
+    const q = answer.opzioni.trimestri, n = Number(b.dataset.preset);
+    set({da: n ? q[Math.max(0, q.length - n)] : '', a: ''});
+  }));
+
+  // --- data ---------------------------------------------------------------
+  async function load() {
+    const id = ++request;
+    board.classList.add('loading');
+    const query = new URLSearchParams(Object.entries(state).filter(([, v]) => v));
+    history.replaceState(null, '', query.toString() ? `?${query}` : location.pathname);
+    document.getElementById('downloadLink').href = `${DOWNLOAD_URL}?${query}`;
+    try {
+      const response = await (await fetch(`${DATA_URL}?${query}`)).json();
+      if (id !== request) return;
+      if (response.vuoto) { location.reload(); return; }
+      answer = response;
+      Object.assign(state, {microorganismo: answer.selezione.microorganismo, antibiotico: answer.selezione.antibiotico});
+      syncFilters(); chips(); render();
+    } finally {
+      if (id === request) board.classList.remove('loading');
+    }
+  }
+
+  // --- views --------------------------------------------------------------
+  function render() {
+    const n = answer.nomi, k = answer.numeri, c = k.combinazione;
+    document.getElementById('kpiIsolatesLabel').textContent = `Isolati di ${n.microorganismo}`;
+    document.getElementById('kpiIsolates').textContent = fmt(k.isolati);
+    document.getElementById('kpiIsolatesNote').textContent = `primi isolati, ${k.trimestri} trimestri con dati`;
+    document.getElementById('kpiLabs').textContent = fmt(k.laboratori);
+    document.getElementById('kpiLabsNote').textContent = state.laboratorio ? 'laboratorio selezionato' : 'della rete, nel periodo';
+    document.getElementById('kpiTestedLabel').textContent = `Testati per ${n.antibiotico}`;
+    document.getElementById('kpiTested').textContent = c ? fmt(c.testati) : '–';
+    document.getElementById('kpiTestedNote').textContent = c && k.isolati ? `${fmt(100 * c.testati / k.isolati)}% degli isolati` : '';
+    document.getElementById('kpiPctLabel').textContent = `Resistenti a ${n.antibiotico}`;
+    document.getElementById('kpiPct').textContent = c && c.testati ? `${fmt(c.pct, 1)}%` : '–';
+    document.getElementById('kpiPctNote').textContent = !c || !c.testati ? 'nessun isolato testato' :
+      (c.riportabile ? `IC 95% ${fmt(c.basso, 1)}–${fmt(c.alto, 1)}%` : `meno di ${answer.soglia} testati: non riportabile`);
+    document.getElementById('trendTitle').textContent = `${n.microorganismo} e ${n.antibiotico}: andamento per trimestre`;
+    document.getElementById('labsTitle').textContent = `${n.antibiotico}: confronto fra laboratori`;
+    renderTrend(); renderLabs(); renderHeat();
+  }
+
+  const crosshair = {
+    id: 'crosshair',
+    afterDatasetsDraw(chart) {
+      const active = chart.tooltip && chart.tooltip.getActiveElements();
+      if (!active || !active.length) return;
+      const x = active[0].element.x, {top, bottom} = chart.chartArea, ctx = chart.ctx;
+      ctx.save(); ctx.strokeStyle = token('--axis'); ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(x, top); ctx.lineTo(x, bottom); ctx.stroke(); ctx.restore();
+    },
+  };
+  function axisStyle() {
+    return {grid: {color: token('--grid'), drawTicks: false}, border: {color: token('--axis')},
+            ticks: {color: token('--ink-muted'), padding: 6, font: {size: 11}}};
+  }
+  function renderTrend() {
+    const rows = answer.andamento, labels = rows.map(r => r.trimestre);
+    const pct = rows.map(r => r.testati ? r.pct : null);
+    const blue = token('--series-1'), muted = token('--muted-mark'), surface = token('--surface-1');
+    const pointFill = rows.map(r => r.riportabile ? blue : surface);
+    const pointLine = rows.map(r => r.riportabile ? blue : muted);
+    const tip = {
+      mode: 'index', intersect: false, backgroundColor: '#fff', borderColor: token('--axis'), borderWidth: 1,
+      titleColor: token('--ink-1'), bodyColor: token('--ink-2'), padding: 8, displayColors: false,
+      filter: item => item.datasetIndex === 2,
+      callbacks: {title: items => items[0].label, label: item => rateLines(rows[item.dataIndex])},
+    };
+    const data = {labels, datasets: [
+      {data: rows.map(r => r.testati ? r.alto : null), borderWidth: 0, pointRadius: 0, pointHoverRadius: 0, fill: false},
+      {data: rows.map(r => r.testati ? r.basso : null), borderWidth: 0, pointRadius: 0, pointHoverRadius: 0, fill: '-1', backgroundColor: token('--series-1-wash')},
+      {data: pct, borderColor: blue, borderWidth: 2, pointRadius: 4, pointHoverRadius: 5, pointBorderWidth: 2,
+       pointBackgroundColor: pointFill, pointBorderColor: pointLine, spanGaps: false, tension: 0},
+    ]};
+    if (trendChart) { trendChart.data = data; trendChart.options.plugins.tooltip = tip; trendChart.update(); }
+    else trendChart = new Chart(document.getElementById('trendChart'), {
+      type: 'line', data, plugins: [crosshair],
+      options: {maintainAspectRatio: false, animation: false, interaction: {mode: 'index', intersect: false},
+                plugins: {legend: {display: false}, tooltip: tip},
+                scales: {x: axisStyle(), y: {...axisStyle(), beginAtZero: true, suggestedMax: 10,
+                         ticks: {...axisStyle().ticks, callback: v => `${v}%`}}}},
+    });
+    const tested = {labels, datasets: [{data: rows.map(r => r.testati), maxBarThickness: 24, borderRadius: {topLeft: 4, topRight: 4},
+                    borderSkipped: 'bottom', backgroundColor: rows.map(r => r.riportabile ? blue : muted)}]};
+    const testedTip = {...tip, filter: () => true, callbacks: {title: items => items[0].label,
+                       label: item => `${fmt(item.raw)} testati${rows[item.dataIndex].riportabile ? '' : ' (non riportabile)'}`}};
+    if (testedChart) { testedChart.data = tested; testedChart.options.plugins.tooltip = testedTip; testedChart.update(); }
+    else testedChart = new Chart(document.getElementById('testedChart'), {
+      type: 'bar', data: tested,
+      options: {maintainAspectRatio: false, animation: false, interaction: {mode: 'index', intersect: false},
+                plugins: {legend: {display: false}, tooltip: testedTip},
+                scales: {x: {...axisStyle(), ticks: {display: false}, grid: {display: false}},
+                         y: {...axisStyle(), beginAtZero: true, ticks: {...axisStyle().ticks, maxTicksLimit: 3,
+                             callback: v => v >= 1000 ? `${fmt(v / 1000)}K` : v}}}},
+    });
+    const body = document.querySelector('#trendTable tbody');
+    body.replaceChildren(...rows.map(r => {
+      const tr = document.createElement('tr');
+      [r.trimestre, fmt(r.testati), fmt(r.resistenti), r.testati ? `${fmt(r.pct, 1)}%${r.riportabile ? '' : ' *'}` : '–',
+       r.testati ? `${fmt(r.basso, 1)}–${fmt(r.alto, 1)}%` : '–'].forEach(v => {
+        const td = document.createElement('td'); td.textContent = v; tr.append(td);
+      });
+      return tr;
+    }));
+  }
+
+  function niceMax(v) {
+    return [10, 20, 40, 60, 80, 100].find(m => m >= v) || 100;  // halves stay whole numbers
+  }
+  function renderLabs() {
+    const box = document.getElementById('labBars'), axis = document.getElementById('labAxis');
+    const labs = answer.laboratori, c = answer.numeri.combinazione;
+    box.replaceChildren(); axis.replaceChildren();
+    if (!labs.length) { const p = document.createElement('p'); p.className = 'text-muted small'; p.textContent = 'Nessun isolato testato.'; box.append(p); return; }
+    const max = niceMax(Math.max(...labs.map(l => l.alto || 0), c ? c.alto || 0 : 0));
+    const at = v => `${Math.min(100, 100 * v / max)}%`;
+    labs.forEach(l => {
+      const row = document.createElement('button'); row.type = 'button';
+      row.className = 'lab-row' + (state.laboratorio === l.laboratorio ? ' selected' : '');
+      const name = document.createElement('span'); name.className = 'lab-name'; name.textContent = `${l.laboratorio} · ${l.nome}`;
+      const track = document.createElement('span'); track.className = 'lab-track';
+      const bar = document.createElement('span'); bar.className = 'lab-bar' + (l.riportabile ? '' : ' thin'); bar.style.width = at(l.pct);
+      const ci = document.createElement('span'); ci.className = 'lab-ci'; ci.style.left = at(l.basso); ci.style.width = `calc(${at(l.alto)} - ${at(l.basso)})`;
+      track.append(bar, ci);
+      if (c && c.testati && !state.laboratorio) { const ref = document.createElement('span'); ref.className = 'lab-ref'; ref.style.left = at(c.pct); track.append(ref); }
+      const value = document.createElement('span'); value.className = 'lab-value' + (l.riportabile ? '' : ' thin'); value.textContent = `${fmt(l.pct, 0)}%`;
+      row.append(name, track, value);
+      hover(row, `${l.laboratorio} · ${l.nome}`, rateLines(l));
+      row.addEventListener('click', () => set({laboratorio: state.laboratorio === l.laboratorio ? '' : l.laboratorio}));
+      box.append(row);
+    });
+    const spacer = () => document.createElement('span');
+    const ticks = document.createElement('span'); ticks.className = 'ticks';
+    [0, max / 2, max].forEach(v => { const t = document.createElement('span'); t.style.left = at(v); t.textContent = `${fmt(v)}%`; ticks.append(t); });
+    axis.append(spacer(), ticks, spacer());
+  }
+
+  function cellColor(pct) {
+    let i = SEQ.length - 1; while (i > 0 && pct < SEQ[i]) i--;
+    return {bg: token(`--seq-${i + 1}`), fg: i >= 3 ? '#ffffff' : token('--ink-1')};
+  }
+  function renderHeat() {
+    const table = document.getElementById('heatTable'), heat = answer.antibiogramma, s = answer.selezione;
+    const cells = new Map(heat.celle.map(c => [`${c.antibiotic}|${c.microorganismo}`, c]));
+    const head = document.createElement('thead'), hr = document.createElement('tr');
+    hr.append(document.createElement('th'));
+    heat.colonne.forEach(p => { const th = document.createElement('th'); th.scope = 'col'; th.textContent = p.nome; hr.append(th); });
+    head.append(hr);
+    const body = document.createElement('tbody');
+    heat.righe.forEach(a => {
+      const tr = document.createElement('tr');
+      const th = document.createElement('th'); th.scope = 'row'; th.textContent = `${a.valore} · ${a.nome}`; tr.append(th);
+      heat.colonne.forEach(p => {
+        const td = document.createElement('td'), c = cells.get(`${a.valore}|${p.valore}`);
+        if (!c) { td.className = 'empty'; tr.append(td); return; }
+        td.textContent = `${fmt(c.pct, 0)}%`; td.tabIndex = 0;
+        if (c.riportabile) { const col = cellColor(c.pct); td.style.background = col.bg; td.style.color = col.fg; }
+        if (p.valore === s.microorganismo && a.valore === s.antibiotico) td.classList.add('selected');
+        hover(td, `${p.nome} e ${a.nome}`, rateLines(c));
+        const pick = () => set({microorganismo: p.valore, antibiotico: a.valore});
+        td.addEventListener('click', pick);
+        td.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); pick(); } });
+        tr.append(td);
+      });
+      body.append(tr);
+    });
+    table.replaceChildren(head, body);
+    const legend = document.getElementById('heatLegend');
+    legend.replaceChildren(...SEQ.map((low, i) => {
+      const span = document.createElement('span'), sw = document.createElement('i');
+      sw.style.background = token(`--seq-${i + 1}`);
+      span.append(sw, document.createTextNode(i === SEQ.length - 1 ? `≥${low}%` : `${low}–${SEQ[i + 1]}%`));
+      return span;
+    }));
+    const thin = document.createElement('span'), sw = document.createElement('i');
+    sw.style.background = getComputedStyle(document.documentElement).getPropertyValue('--bg-app');
+    thin.append(sw, document.createTextNode(`meno di ${answer.soglia} testati`));
+    legend.append(thin);
+  }
+
+  load();
+})();
+</script>
+{% endif %}
+{% endblock %}
