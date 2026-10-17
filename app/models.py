@@ -148,14 +148,3 @@ class CombinationForecast(db.Model):
     resistant_upper = db.Column(db.Float, nullable=True)
     pipeline_run_id = db.Column(db.Integer, db.ForeignKey("pipeline_runs.id"), nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
-
-
-class Breakpoint(db.Model):
-    __tablename__ = "breakpoints"
-
-    id = db.Column(db.Integer, primary_key=True)
-    pathogen = db.Column(db.String(120), nullable=False, index=True)
-    antibiotic = db.Column(db.String(80), nullable=False, index=True)
-    mic_value = db.Column(db.String(40), nullable=True)
-    interpretation = db.Column(db.String(1), nullable=False)
-    source = db.Column(db.String(120), nullable=True)

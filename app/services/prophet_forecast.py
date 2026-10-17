@@ -8,14 +8,6 @@ from .training import TARGETS
 MIN_PROPHET_MONTHS = 12
 
 
-def prophet_available() -> bool:
-    try:
-        import prophet  # noqa: F401
-    except Exception:
-        return False
-    return True
-
-
 def forecast_sir_with_prophet(history: pd.DataFrame, prediction_month: str) -> dict[str, float] | None:
     if history.empty or len(history) < MIN_PROPHET_MONTHS:
         return None

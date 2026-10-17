@@ -9,7 +9,7 @@ import json
 import logging
 import threading
 import traceback
-from datetime import datetime, timedelta
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 
@@ -18,7 +18,7 @@ from flask import Flask
 
 from app import db
 from app.models import AggregatedObservation, CombinationForecast, PipelineRun, ValidationMetric
-from app.services.prophet_training_adapter import db_to_model_format, prophet_output_dir
+from app.services.prophet_training_adapter import db_to_model_format
 from micare_sicilia.model import train_forecasts, load_forecasts
 
 logger = logging.getLogger(__name__)
@@ -75,15 +75,6 @@ def start_pipeline(app: Flask, model_folder: str | Path) -> tuple[int, bool]:
         t.start()
 
     return run_id, True
-
-
-def get_pipeline_status(app: Flask) -> dict[str, Any]:
-    """Return current pipeline status from DB."""
-    with app.app_context():
-        run = PipelineRun.query.order_by(PipelineRun.id.desc()).first()
-        if run is None:
-            return {"status": "never_run", "current_step": 0}
-        return _run_to_dict(run)
 
 
 def stop_pipeline(run_id: int, app: Flask) -> None:

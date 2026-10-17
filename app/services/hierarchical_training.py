@@ -50,7 +50,6 @@ def train_hierarchical_models(aggregated: pd.DataFrame, model_dir: str | Path, p
             criteria = {column: _clean_value(row[column]) for column in columns}
             candidates.append((scope, columns, criteria, int(row["samples"]), int(row["months"]), int(row["rows"])))
 
-    total = max(len(candidates), 1)
     work_total = max(len(candidates) * len(TARGETS), 1)
     work_completed = 0
     for index, (scope, columns, criteria, samples, months, rows) in enumerate(candidates, start=1):

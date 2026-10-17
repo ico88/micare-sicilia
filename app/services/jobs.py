@@ -52,12 +52,6 @@ def get(kind: str) -> dict[str, Any] | None:
         return dict(_jobs[kind]) if kind in _jobs else None
 
 
-def running() -> dict[str, Any] | None:
-    with _lock:
-        job = _running_unlocked()
-        return dict(job) if job else None
-
-
 def shown() -> dict[str, Any] | None:
     """The running job, else the last one finished in the last SHOW_FINISHED_FOR."""
     with _lock:

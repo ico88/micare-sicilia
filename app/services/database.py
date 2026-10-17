@@ -48,28 +48,10 @@ def _positional_insert_sql(table, columns: list[str]) -> str:
     return f"INSERT INTO {table.name} ({', '.join(columns)}) VALUES ({placeholders})"
 
 
-def observations_from_db() -> pd.DataFrame:
-    table = Observation.__table__
-    query = sa.select(
-        table.c.observed_at.label("date"),
-        table.c.pathogen,
-        table.c.antibiotic,
-        table.c.laboratory,
-        sa.func.coalesce(table.c.ward, "").label("ward"),
-        table.c.result,
-        table.c.samples,
-        table.c.sensitive_count,
-        table.c.intermediate_count,
-        table.c.resistant_count,
-    ).order_by(table.c.observed_at)
-    return pd.read_sql(query, db.session.connection())
-
-
 def observation_month_totals_from_db() -> pd.DataFrame:
     """Observations pre-summed per month in SQL, in the shape aggregate_observations expects.
 
-    Equivalent to aggregating observations_from_db() but avoids loading
-    millions of isolate-level rows into memory.
+    Summed in SQL to avoid loading millions of isolate-level rows into memory.
     """
     table = Observation.__table__
     month = sa.func.strftime("%Y-%m-01", table.c.observed_at)

@@ -3,7 +3,6 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-import numpy as np
 import pandas as pd
 
 from .hierarchical_training import MIN_MONTHS, MIN_ROWS, MIN_SAMPLES

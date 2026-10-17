@@ -7,7 +7,7 @@ from flask import Blueprint, current_app, jsonify, redirect, render_template, re
 
 from app import db
 from app.models import AggregatedObservation, CombinationForecast, PipelineRun
-from app.services.pipeline_runner import get_pipeline_status, start_pipeline, stop_pipeline
+from app.services.pipeline_runner import start_pipeline, stop_pipeline
 
 bp = Blueprint("pipeline", __name__)
 
@@ -18,7 +18,6 @@ bp = Blueprint("pipeline", __name__)
 
 def _run_to_dict(run: PipelineRun) -> dict:
     import json
-    from datetime import timezone
     summary: dict = {}
     try:
         summary = json.loads(run.summary_json or "{}")
