@@ -141,8 +141,7 @@ html, body {
   opacity: .6;
 }
 
-.sidebar-link.active svg,
-.sidebar-link:hover svg {
+.sidebar-link.active svg, .sidebar-link:hover svg {
   opacity: 1;
 }
 
@@ -246,28 +245,6 @@ html, body {
 }
 
 /* ============================================================
-   Dashboard header
-   ============================================================ */
-.dashboard-header {
-  align-items: flex-start;
-  display: flex;
-  gap: 1rem;
-  justify-content: space-between;
-}
-.dashboard-header form { flex: 0 0 auto; }
-
-.panel-titlebar {
-  align-items: center;
-  display: flex;
-  gap: 0.75rem;
-  justify-content: space-between;
-}
-.panel-titlebar > * { min-width: 0; }
-.panel-titlebar .btn,
-.panel-titlebar .badge,
-.panel-titlebar .small { flex: 0 0 auto; }
-
-/* ============================================================
    Charts
    ============================================================ */
 .chart-frame {
@@ -276,68 +253,9 @@ html, body {
   position: relative;
   width: 100%;
 }
-.chart-frame-lg { height: 360px; }
 .chart-frame canvas {
   height: 100% !important;
   width: 100% !important;
-}
-
-/* ============================================================
-   Preview table
-   ============================================================ */
-.preview-table { max-height: 420px; }
-
-/* ============================================================
-   S/I/R metric tiles
-   ============================================================ */
-.metric {
-  border-radius: var(--radius);
-  color: #fff;
-  font-size: 1.65rem;
-  font-weight: 700;
-  min-width: 0;
-  overflow: hidden;
-  padding: 0.85rem;
-  text-align: center;
-}
-.metric span {
-  display: block;
-  font-size: 0.85rem;
-  font-weight: 600;
-  margin-top: 0.25rem;
-}
-.metric.s { background: var(--green); }
-.metric.i { background: var(--yellow); }
-.metric.r { background: var(--red); }
-
-.ci-band {
-  display: block;
-  font-size: 0.7rem;
-  font-weight: 400;
-  opacity: 0.82;
-  margin-top: 0.2rem;
-  letter-spacing: 0.01em;
-}
-
-/* ============================================================
-   Pipeline
-   ============================================================ */
-.step-card {
-  display: flex;
-  align-items: flex-start;
-  gap: 1rem;
-  padding: 1rem 1.1rem;
-  background: var(--bg-surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  box-shadow: var(--shadow);
-  margin-bottom: 0.75rem;
-  transition: border-color .2s;
-}
-
-.step-card.step-running {
-  border-color: var(--accent);
-  box-shadow: 0 0 0 3px rgba(59,130,246,.1);
 }
 
 .step-num {
@@ -355,207 +273,17 @@ html, body {
   color: var(--text-secondary);
   transition: background .2s, color .2s;
 }
-.step-num.pending  { background: var(--border); color: var(--text-secondary); }
-.step-num.running  { background: var(--accent); color: #fff; }
-.step-num.done     { background: #dcfce7; color: var(--green); }
-.step-num.error    { background: #fee2e2; color: var(--red); }
-.step-num.skipped  { background: var(--border); color: var(--text-muted); }
+.step-num.running { background: var(--accent); color: #fff; }
+.step-num.error { background: #fee2e2; color: var(--red); }
+.step-num.skipped { background: var(--border); color: var(--text-muted); }
 
 .step-body { flex: 1; min-width: 0; }
 .step-title { font-weight: 600; font-size: 0.92rem; margin-bottom: 0.25rem; }
-.step-desc  { color: var(--text-secondary); font-size: 0.82rem; line-height: 1.5; }
-.step-status-msg { font-size: 0.82rem; margin-top: 0.35rem; }
-
-.pipeline-timing {
-  display: flex;
-  gap: 1.25rem;
-  font-size: 0.8rem;
-  color: var(--text-secondary);
-  padding: 0.6rem 0.9rem;
-  background: var(--bg-app);
-  border-radius: 7px;
-  margin-bottom: 0.75rem;
-}
-.pipeline-timing strong { color: var(--text-primary); }
-
-.training-progress { height: 1.5rem; }
-.training-status pre {
-  max-height: 320px;
-  overflow: auto;
-  white-space: pre-wrap;
-}
-
-/* ============================================================
-   Summary tiles
-   ============================================================ */
-.summary-tile {
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: 0.75rem;
-  background: var(--bg-app);
-}
-.summary-tile span,
-.summary-tile small { display: block; color: var(--text-secondary); font-size: 0.8rem; }
-.summary-tile strong { display: block; color: var(--text-primary); font-size: 1.25rem; line-height: 1.25; }
-
-/* ============================================================
-   Filter bar (Explore)
-   ============================================================ */
-.bi-filterbar {
-  background: var(--bg-surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: 0.75rem;
-}
-.bi-filter-grid {
-  align-items: end;
-  display: grid;
-  gap: 0.75rem;
-  grid-template-columns: repeat(6, minmax(128px, 1fr)) minmax(150px, auto);
-}
-.bi-filter-grid > div { min-width: 0; }
-.bi-filter-grid .form-label {
-  color: var(--text-secondary);
-  font-size: 0.78rem;
-  font-weight: 600;
-  margin-bottom: 0.25rem;
-  white-space: nowrap;
-}
-.bi-filter-actions {
-  display: grid;
-  gap: 0.4rem;
-  grid-template-columns: 1fr 1fr;
-}
-.bi-filter-actions .btn { min-height: 31px; white-space: nowrap; }
-
-.selection-strip { display: flex; flex-wrap: wrap; gap: 0.5rem; }
-.selection-strip span {
-  background: var(--accent-bg);
-  border: 1px solid #bfdbfe;
-  border-radius: 8px;
-  color: var(--accent-dark);
-  font-size: 0.85rem;
-  padding: 0.35rem 0.6rem;
-}
-
-/* ============================================================
-   KPI grid
-   ============================================================ */
-.kpi-grid {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(160px, 1fr));
-  gap: 0.75rem;
-}
-.kpi-tile {
-  background: var(--bg-surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  min-height: 88px;
-  min-width: 0;
-  overflow: hidden;
-  padding: 0.85rem;
-  box-shadow: var(--shadow);
-}
-.kpi-tile span,
-.kpi-tile small { color: var(--text-secondary); display: block; font-size: 0.8rem; }
-.kpi-tile strong { color: var(--text-primary); display: block; font-size: 1.28rem; line-height: 1.2; overflow-wrap: anywhere; }
-
-/* ============================================================
-   Tabs
-   ============================================================ */
-.bi-tabs .nav-link { color: var(--text-secondary); font-weight: 600; }
-.bi-tabcontent {
-  background: var(--bg-surface);
-  border: 1px solid var(--border-med);
-  border-top: 0;
-  padding: 1rem;
-}
-
-/* ============================================================
-   Forecast layout
-   ============================================================ */
-.forecast-layout {
-  align-items: stretch;
-  display: grid;
-  gap: 1rem;
-  grid-template-columns: minmax(280px, 0.9fr) minmax(320px, 1.1fr);
-}
-.forecast-layout > * { min-width: 0; }
-
-.forecast-metrics {
-  display: grid;
-  gap: 0.75rem;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-}
-
-/* ============================================================
-   Decision tile
-   ============================================================ */
-.decision-tile {
-  background: var(--bg-app);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: 0.85rem;
-}
-.decision-tile span,
-.decision-tile small { color: var(--text-secondary); display: block; font-size: 0.8rem; }
-.decision-tile strong { color: var(--text-primary); display: block; font-size: 2rem; line-height: 1.1; }
-
-/* ============================================================
-   Annual summary
-   ============================================================ */
-.annual-summary-grid {
-  display: grid;
-  gap: 0.75rem;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-}
-
-/* ============================================================
-   Training time grid
-   ============================================================ */
-.training-time-grid {
-  display: grid;
-  gap: 0.75rem;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-}
-
-/* ============================================================
-   Responsive
-   ============================================================ */
-@media (max-width: 1200px) {
-  .bi-filter-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-  .kpi-grid,
-  .forecast-layout { grid-template-columns: 1fr 1fr; }
-  .bi-filter-actions {
-    grid-column: span 3;
-    grid-template-columns: repeat(2, minmax(140px, 180px));
-    justify-content: end;
-  }
-}
-
-@media (max-width: 992px) {
-  .annual-summary-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-}
+.step-desc { color: var(--text-secondary); font-size: 0.82rem; line-height: 1.5; }
 
 @media (max-width: 768px) {
   .main-content { padding: 1rem; }
-  .dashboard-header,
-  .panel-titlebar { align-items: stretch; flex-direction: column; }
-  .dashboard-header form,
-  .dashboard-header .btn,
-  .panel-titlebar .btn { width: 100%; }
-  .bi-filter-grid,
-  .kpi-grid,
-  .forecast-layout,
-  .forecast-metrics { grid-template-columns: 1fr; }
-  .bi-filter-actions { grid-column: auto; grid-template-columns: 1fr; }
-  .chart-frame,
-  .chart-frame-lg { height: 300px; }
-}
-
-@media (max-width: 576px) {
-  .annual-summary-grid,
-  .training-time-grid { grid-template-columns: 1fr; }
+  .chart-frame { height: 300px; }
 }
 
 /* ============================================================
@@ -569,7 +297,7 @@ html, body {
   padding: 0.9rem 1.1rem;
 }
 .now-label { font-size: 0.72rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--accent-dark); }
-.now-text  { font-size: 1.05rem; font-weight: 600; margin-top: 0.15rem; }
+.now-text { font-size: 1.05rem; font-weight: 600; margin-top: 0.15rem; }
 
 .guide-step {
   display: flex;
@@ -582,13 +310,13 @@ html, body {
   box-shadow: var(--shadow);
   margin-bottom: 0.75rem;
 }
-.guide-step.ora   { border: 2px solid var(--accent); box-shadow: 0 0 0 4px rgba(59,130,246,.12); }
-.guide-step.dopo  { opacity: .6; }
+.guide-step.ora { border: 2px solid var(--accent); box-shadow: 0 0 0 4px rgba(59,130,246,.12); }
+.guide-step.dopo { opacity: .6; }
 .guide-step .step-desc { font-size: 0.88rem; }
-.step-num.ora        { background: var(--accent); color: #fff; }
-.step-num.fatto      { background: #dcfce7; color: var(--green); }
+.step-num.ora { background: var(--accent); color: #fff; }
+.step-num.fatto { background: #dcfce7; color: var(--green); }
 .step-num.attenzione { background: #fef9c3; color: var(--yellow); }
-.step-num.dopo       { background: var(--border); color: var(--text-muted); }
+.step-num.dopo { background: var(--border); color: var(--text-muted); }
 
 .steps-bar {
   display: flex;
@@ -618,9 +346,9 @@ html, body {
   font-size: 0.75rem; font-weight: 700;
   background: var(--border); color: var(--text-secondary);
 }
-.steps-bar-item.fatto .steps-bar-num      { background: #dcfce7; color: var(--green); }
+.steps-bar-item.fatto .steps-bar-num { background: #dcfce7; color: var(--green); }
 .steps-bar-item.attenzione .steps-bar-num { background: #fef9c3; color: var(--yellow); }
-.steps-bar-item.ora .steps-bar-num        { background: var(--accent); color: #fff; }
+.steps-bar-item.ora .steps-bar-num { background: var(--accent); color: #fff; }
 .steps-bar-sep { flex: 0 0 18px; height: 1px; background: var(--border-med); }
 
 .next-step {

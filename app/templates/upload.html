@@ -73,7 +73,7 @@
             <tr>
               <th>File</th>
               <th>Stato</th>
-              <th>Righe importate</th>
+              <th>Isolati validi</th>
               <th>Note</th>
             </tr>
           </thead>
@@ -83,10 +83,10 @@
                 <td>{{ file.original_name }}</td>
                 <td>
                   <span class="badge text-bg-{{ 'success' if file.status == 'imported' else 'danger' if file.status == 'error' else 'warning' if file.status == 'skipped' else 'secondary' }}">
-                    {{ 'Importato' if file.status == 'imported' else 'Errore' if file.status == 'error' else 'Già presente' if file.status == 'skipped' else file.status }}
+                    {{ 'Importato' if file.status == 'imported' else 'Errore' if file.status == 'error' else 'Già presente' if file.status == 'skipped' else 'Sostituito' if file.status == 'replaced' else file.status }}
                   </span>
                 </td>
-                <td>{{ file.row_count if file.row_count else '—' }}</td>
+                <td>{{ "{:,}".format(file.row_count).replace(",", ".") if file.row_count else '—' }}</td>
                 <td class="text-muted small">
                   {{ file.message }}
                   {% if file.id in validated_ids %}
