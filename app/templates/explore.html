@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% block title %}Consultazione dati - MIC RES Sicilia{% endblock %}
+{% block head %}<link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard.css') }}">{% endblock %}
 {% block content %}
 <div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-2">
   <div>
@@ -36,16 +37,16 @@
     <div class="sel-chips" id="selections" aria-live="polite"></div>
     <div class="sel-switches">
       <div class="segmented" role="group" aria-label="Vista">
-        <button type="button" data-vista="osservato">Dati osservati</button>
-        <button type="button" data-vista="previsioni">Previsioni</button>
+        <button type="button" data-key="vista" data-value="osservato">Dati osservati</button>
+        <button type="button" data-key="vista" data-value="previsioni">Previsioni</button>
       </div>
       <div class="segmented" role="group" aria-label="{{ labels.lettura }}">
-        {% for value, text in readings.items() %}<button type="button" data-lettura="{{ value }}" title="Lettura {{ text }}">{{ 'Armonizzata' if value == 'harmonized' else 'Come refertata' }}</button>{% endfor %}
+        {% for value, text in readings.items() %}<button type="button" data-key="lettura" data-value="{{ value }}" title="Lettura {{ text }}">{{ 'Armonizzata' if value == 'harmonized' else 'Come refertata' }}</button>{% endfor %}
       </div>
     </div>
   </div>
 
-  <div class="explore-layout">
+  <div class="board-layout">
     <aside class="filter-pane" aria-label="Filtri">
       <details id="paneToggle" open>
         <summary class="pane-summary">Filtri <span id="paneCount"></span></summary>
@@ -102,306 +103,25 @@
 
 {% block scripts %}
 {% if ready %}
-<style>
-  .viz-root {
-    --surface-1: #fcfcfb; --ink-1: #0b0b0b; --ink-2: #52514e; --ink-muted: #898781;
-    --grid: #e1e0d9; --axis: #c3c2b7; --series-1: #2a78d6; --series-1-wash: rgba(42,120,214,.10);
-    --forecast-wash: rgba(42,120,214,.16); --muted-mark: #c3c2b7;
-    --seq-1: #b7d3f6; --seq-2: #86b6ef; --seq-3: #5598e7; --seq-4: #2a78d6; --seq-5: #1c5cab; --seq-6: #104281;
-    /* selection states of the list boxes, as in Qlik */
-    --sel-selected: #00873d; --sel-possible: #ffffff; --sel-excluded: #e4e4e1; --sel-excluded-ink: #8a8984;
-  }
-  .selection-bar { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem .75rem; background: var(--bg-surface);
-                   border: 1px solid var(--border); border-radius: var(--radius); padding: .4rem .5rem; margin-bottom: .75rem; box-shadow: var(--shadow); }
-  .sel-tools { display: flex; gap: 2px; }
-  .sel-tool { border: 0; background: none; color: var(--ink-2); width: 30px; height: 30px; border-radius: 6px; display: grid; place-items: center; }
-  .sel-tool:hover:not(:disabled) { background: var(--bg-app); color: var(--ink-1); }
-  .sel-tool:disabled { opacity: .35; }
-  .sel-chips { display: flex; flex-wrap: wrap; gap: .35rem; flex: 1 1 260px; min-height: 30px; align-items: center; }
-  .sel-chips .empty { color: var(--ink-muted); font-size: .8rem; }
-  .chip { display: inline-flex; align-items: stretch; border-radius: 6px; overflow: hidden; border: 1px solid var(--border-med); font-size: .78rem; background: #fff; max-width: 100%; }
-  .chip-body { padding: .15rem .5rem; border-left: 4px solid var(--sel-selected); min-width: 0; }
-  .chip-field { display: block; font-size: .68rem; color: var(--ink-muted); line-height: 1.1; }
-  .chip-values { display: block; color: var(--ink-1); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 16rem; }
-  .chip button { border: 0; border-left: 1px solid var(--border); background: none; color: var(--ink-2); padding: 0 .45rem; }
-  .chip button:hover { background: var(--bg-app); }
-  .sel-switches { display: flex; flex-wrap: wrap; gap: .5rem; }
-  .segmented { display: inline-flex; border: 1px solid var(--border-med); border-radius: 6px; overflow: hidden; }
-  .segmented button { border: 0; background: #fff; font-size: .78rem; padding: .3rem .65rem; color: var(--ink-2); }
-  .segmented button + button { border-left: 1px solid var(--border-med); }
-  .segmented button.active { background: var(--ink-1); color: #fff; }
-  .explore-layout { display: grid; grid-template-columns: 250px minmax(0, 1fr); gap: 1rem; align-items: start; }
-  @media (max-width: 991.98px) { .explore-layout { grid-template-columns: minmax(0, 1fr); } }
-  .pane-summary { font-size: .85rem; font-weight: 600; padding: .25rem 0; display: none; }
-  @media (max-width: 991.98px) { .pane-summary { display: list-item; } }
-  .listbox { background: var(--bg-surface); border: 1px solid var(--border); border-radius: 8px; margin-bottom: .5rem; overflow: hidden; }
-  .lb-head { display: flex; align-items: center; justify-content: space-between; gap: .25rem; padding: .3rem .3rem .3rem .6rem;
-             border-bottom: 1px solid var(--border); font-size: .78rem; font-weight: 600; color: var(--ink-1); }
-  .lb-head .lb-kind { font-weight: 400; color: var(--ink-muted); font-size: .7rem; margin-left: .3rem; }
-  .lb-head button { border: 0; background: none; color: var(--ink-2); padding: 2px 4px; border-radius: 4px; display: grid; place-items: center; }
-  .lb-head button:hover { background: var(--bg-app); }
-  .lb-search { width: 100%; border: 0; border-bottom: 1px solid var(--border); padding: .3rem .6rem; font-size: .78rem; outline: none; }
-  .lb-list { list-style: none; margin: 0; padding: 0; max-height: 11.5rem; overflow-y: auto; }
-  .lb-item { display: flex; justify-content: space-between; gap: .5rem; padding: .22rem .6rem; font-size: .78rem; cursor: pointer;
-             border-bottom: 1px solid #f1f1ee; background: var(--sel-possible); color: var(--ink-1); user-select: none; }
-  .lb-item:focus-visible { outline: 2px solid var(--ink-1); outline-offset: -2px; }
-  .lb-item:hover { filter: brightness(.96); }
-  .lb-item.selezionato { background: var(--sel-selected); color: #fff; font-weight: 600; }
-  .lb-item.escluso { background: var(--sel-excluded); color: var(--sel-excluded-ink); }
-  .lb-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .lb-count { font-variant-numeric: tabular-nums; opacity: .75; flex: 0 0 auto; }
-  #board { transition: opacity .15s; min-width: 0; }
-  #board.loading { opacity: .5; }
-  .forecast-note { background: var(--accent-bg); border: 1px solid #bfdbfe; border-radius: var(--radius); padding: .6rem .8rem; font-size: .82rem; margin-bottom: .75rem; }
-  .forecast-note.warn { background: #fff8e6; border-color: #f5d68a; }
-  .kpi-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: .75rem; margin-bottom: 1rem; }
-  .kpi { background: var(--bg-surface); border: 1px solid var(--border); border-radius: var(--radius); padding: .75rem 1rem; box-shadow: var(--shadow); }
-  .kpi-label { font-size: .78rem; color: var(--ink-2); }
-  .kpi-value { font-size: 1.6rem; font-weight: 600; color: var(--ink-1); line-height: 1.2; }
-  .kpi-hero .kpi-value { font-size: 2.2rem; }
-  .kpi-note { font-size: .75rem; color: var(--ink-muted); }
-  .traffic { display: inline-flex; align-items: center; gap: .25rem; font-size: .72rem; font-weight: 600; color: var(--ink-2); }
-  .traffic i { width: 9px; height: 9px; border-radius: 50%; display: inline-block; }
-  .traffic.verde i { background: #0ca30c; } .traffic.giallo i { background: #fab219; } .traffic.grigio i { background: #b4b2ab; }
-  .chart-legend { display: flex; flex-wrap: wrap; gap: .25rem 1rem; font-size: .75rem; color: var(--ink-2); margin-bottom: .25rem; min-height: 1rem; }
-  .chart-legend i { display: inline-block; width: 16px; height: 0; border-top: 2px solid var(--series-1); vertical-align: middle; margin-right: 4px; }
-  .chart-legend i.dashed { border-top-style: dashed; }
-  .num-table td, .num-table th { font-variant-numeric: tabular-nums; }
-  .lab-bars { display: flex; flex-direction: column; gap: 2px; }
-  .lab-row { display: grid; grid-template-columns: minmax(0, 11rem) 1fr 3.4rem; gap: .5rem; align-items: center;
-             padding: 3px 4px; border-radius: 6px; cursor: pointer; font-size: .78rem; border: 0; background: none; text-align: left; width: 100%; }
-  .lab-row:hover, .lab-row:focus-visible { background: var(--bg-app); outline: none; }
-  .lab-row.selected { background: #e6f4ec; box-shadow: inset 3px 0 0 var(--sel-selected); }
-  .lab-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--ink-1); }
-  .lab-track { position: relative; height: 16px; }
-  .lab-bar { position: absolute; left: 0; top: 2px; height: 12px; background: var(--series-1); border-radius: 0 4px 4px 0; }
-  .lab-bar.thin { background: var(--muted-mark); }
-  .lab-ci { position: absolute; top: 7px; height: 2px; background: var(--ink-1); opacity: .55; }
-  .lab-ref { position: absolute; top: -2px; bottom: -2px; width: 1px; background: var(--ink-2); }
-  .lab-value { text-align: right; color: var(--ink-1); font-variant-numeric: tabular-nums; }
-  .lab-value.thin { color: var(--ink-muted); }
-  .lab-axis { display: grid; grid-template-columns: minmax(0, 11rem) 1fr 3.4rem; gap: .5rem; padding: 0 4px; font-size: .7rem; color: var(--ink-muted); }
-  .lab-axis .ticks { position: relative; height: 1rem; border-top: 1px solid var(--axis); }
-  .lab-axis .ticks span { position: absolute; transform: translateX(-50%); top: 2px; font-variant-numeric: tabular-nums; }
-  .panel-empty { font-size: .82rem; color: var(--ink-2); background: var(--bg-app); border-radius: 8px; padding: .75rem; }
-  .heat-table { border-collapse: separate; border-spacing: 2px; font-size: .78rem; }
-  .heat-table th { font-weight: 500; color: var(--ink-2); padding: 2px 6px; white-space: nowrap; }
-  .heat-table thead th { font-style: italic; text-align: center; vertical-align: bottom; }
-  .heat-table tbody th { text-align: left; }
-  .heat-table td { min-width: 4.2rem; text-align: center; padding: 4px 6px; border-radius: 4px; cursor: pointer;
-                   font-variant-numeric: tabular-nums; background: var(--bg-app); color: var(--ink-muted); }
-  .heat-table td.empty { cursor: default; background: none; }
-  .heat-table td:not(.empty):hover, .heat-table td:focus-visible, .heat-table td.selected { outline: 2px solid var(--ink-1); outline-offset: -2px; }
-  .heat-legend { display: flex; flex-wrap: wrap; gap: .5rem; font-size: .72rem; color: var(--ink-2); align-items: center; }
-  .heat-legend i { display: inline-block; width: 14px; height: 10px; border-radius: 2px; margin-right: 3px; vertical-align: -1px; }
-  .viz-tooltip { position: fixed; z-index: 1000; pointer-events: none; background: var(--bg-surface); border: 1px solid var(--border-med);
-                 border-radius: 8px; box-shadow: var(--shadow-md); padding: .4rem .6rem; font-size: .78rem; max-width: 300px; color: var(--ink-2); }
-  .viz-tooltip strong { color: var(--ink-1); font-size: .9rem; display: block; }
-</style>
+<script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>
 <script>
 (() => {
-  const DATA_URL = "{{ url_for('explore.data') }}";
-  const DOWNLOAD_URL = "{{ url_for('explore.download') }}";
-  const SINGLE = {{ single|tojson }}, MULTI = {{ multi|tojson }};
-  const LABELS = {{ labels|tojson }};
-  const BOXES = ['popolazione', 'microorganismo', 'antibiotico', ...MULTI];
+  const MULTI = {{ multi|tojson }};
   const FORECAST_FREE = ['tipo_paziente', 'reparto', 'sesso', 'eta'];
-  const TRAFFIC = {verde: 'affidabile', giallo: 'indicativa', grigio: 'non affidabile'};
-  const css = getComputedStyle(document.querySelector('.viz-root'));
-  const token = name => css.getPropertyValue(name).trim();
-  const SEQ = [0, 5, 10, 25, 50, 75];  // class lower bounds, as the ECDC maps
-  const board = document.getElementById('board');
-  const tooltip = document.getElementById('vizTooltip');
-  const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text !== undefined) e.textContent = text; return e; };
-  const fmt = (v, d = 0) => v === null || v === undefined ? '–' : Number(v).toLocaleString('it-IT', {minimumFractionDigits: d, maximumFractionDigits: d});
-
-  // --- state: selections in the URL, with a history like Qlik's back / forward ----
-  function fromUrl() {
-    const q = new URLSearchParams(location.search);
-    const s = {vista: q.get('vista') === 'previsioni' ? 'previsioni' : 'osservato', lettura: q.get('lettura') || 'harmonized'};
-    SINGLE.forEach(k => { s[k] = q.get(k) || ''; });
-    MULTI.forEach(k => { s[k] = q.getAll(k); });
-    return s;
-  }
-  function toQuery(s) {
-    const q = new URLSearchParams();
-    SINGLE.forEach(k => { if (s[k]) q.append(k, s[k]); });
-    MULTI.forEach(k => s[k].forEach(v => q.append(k, v)));
-    if (s.lettura !== 'harmonized') q.append('lettura', s.lettura);
-    if (s.vista === 'previsioni') q.append('vista', 'previsioni');
-    return q;
-  }
-  const copy = s => JSON.parse(JSON.stringify(s));
-  let state = fromUrl(), past = [], future = [], answer = null, trendChart = null, testedChart = null, request = 0;
-  const openSearch = new Set();
-
-  function set(changes) {
-    past.push(copy(state)); future = [];
-    Object.assign(state, changes);
-    load();
-  }
-  document.getElementById('backButton').addEventListener('click', () => { future.push(copy(state)); state = past.pop(); load(); });
-  document.getElementById('forwardButton').addEventListener('click', () => { past.push(copy(state)); state = future.pop(); load(); });
-  document.getElementById('clearButton').addEventListener('click', () => set(Object.fromEntries(MULTI.map(k => [k, []]))));
-  document.querySelectorAll('[data-vista]').forEach(b => b.addEventListener('click', () => set({vista: b.dataset.vista})));
-  document.querySelectorAll('[data-lettura]').forEach(b => b.addEventListener('click', () => set({lettura: b.dataset.lettura})));
-
-  // --- tooltip shared by the HTML marks ---------------------------------
-  function showTip(event, title, lines) {
-    tooltip.replaceChildren(el('strong', '', title), ...lines.map(l => el('div', '', l)));
-    tooltip.hidden = false;
-    const rect = event.currentTarget.getBoundingClientRect();
-    const x = event.clientX || rect.right, y = event.clientY || rect.top;
-    tooltip.style.left = Math.max(8, Math.min(x + 14, window.innerWidth - tooltip.offsetWidth - 8)) + 'px';
-    tooltip.style.top = Math.max(8, y - tooltip.offsetHeight - 10) + 'px';
-  }
-  const hideTip = () => { tooltip.hidden = true; };
-  function hover(node, title, lines) {
-    node.addEventListener('pointermove', e => showTip(e, title, lines));
-    node.addEventListener('pointerleave', hideTip);
-    node.addEventListener('focus', e => showTip(e, title, lines));
-    node.addEventListener('blur', hideTip);
-  }
+  let B, answer, state;
+  const el = (...a) => B.el(...a), fmt = (...a) => B.fmt(...a);
+  const forecastMode = () => state.vista === 'previsioni';
+  const forecastOn = () => forecastMode() && answer.previsione.disponibile;
   const rateLines = c => c.testati ? [
     `${fmt(c.pct, 1)}% resistenti (IC 95% ${fmt(c.basso, 1)}–${fmt(c.alto, 1)}%)`,
     `${fmt(c.resistenti)} resistenti su ${fmt(c.testati)} testati`,
     ...(c.riportabile ? [] : [`Meno di ${answer.soglia} testati: valore non riportabile`])] : ['Nessun isolato testato'];
-  const forecastLines = f => f.semaforo === 'grigio'
-    ? ['Previsione non affidabile: nelle prove sul passato l\'intervallo non conteneva abbastanza spesso il valore reale']
-    : [`${fmt(f.pct, 1)}% resistenti previsti (intervallo 80% ${fmt(f.basso, 1)}–${fmt(f.alto, 1)}%)`,
-       `Previsione ${TRAFFIC[f.semaforo]}${f.errore != null ? `, errore tipico ${fmt(f.errore, 1)} punti` : ''}`];
-  function trafficBadge(semaforo) {
-    const b = el('span', `traffic ${semaforo}`); b.append(el('i'), document.createTextNode(TRAFFIC[semaforo])); return b;
-  }
 
-  // --- list boxes ---------------------------------------------------------
-  function pick(dim, item) {
-    if (SINGLE.includes(dim)) {
-      if (state[dim] === item.valore) return;
-      const changes = {[dim]: item.valore};
-      // a value excluded by the other selections clears them, as in Qlik
-      if (item.stato === 'escluso') MULTI.forEach(k => { changes[k] = []; });
-      set(changes);
-      return;
-    }
-    const chosen = state[dim];
-    if (item.stato === 'escluso') {
-      set({...Object.fromEntries(MULTI.map(k => [k, []])), [dim]: [item.valore]});
-    } else {
-      set({[dim]: chosen.includes(item.valore) ? chosen.filter(v => v !== item.valore) : [...chosen, item.valore]});
-    }
-  }
-  function renderBoxes() {
-    const host = document.getElementById('listBoxes');
-    const scroll = Object.fromEntries([...host.querySelectorAll('.lb-list')].map(l => [l.dataset.dim, l.scrollTop]));
-    const typed = Object.fromEntries([...host.querySelectorAll('.lb-search')].map(i => [i.dataset.dim, i.value]));
-    host.replaceChildren(...BOXES.map(dim => {
-      const items = answer.liste[dim] || [];
-      const box = el('section', 'listbox');
-      const head = el('div', 'lb-head');
-      const title = el('span', '', LABELS[dim]);
-      if (SINGLE.includes(dim)) title.append(el('span', 'lb-kind', 'uno solo'));
-      const actions = el('span', 'd-flex');
-      const search = el('button'); search.type = 'button'; search.setAttribute('aria-label', `Cerca in ${LABELS[dim]}`); search.title = 'Cerca';
-      search.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>';
-      actions.append(search);
-      if (MULTI.includes(dim) && state[dim].length) {
-        const clear = el('button'); clear.type = 'button'; clear.setAttribute('aria-label', `Togli la selezione di ${LABELS[dim]}`); clear.title = 'Togli la selezione';
-        clear.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg>';
-        clear.addEventListener('click', () => set({[dim]: []}));
-        actions.append(clear);
-      }
-      head.append(title, actions);
-      const input = el('input', 'lb-search'); input.type = 'search'; input.placeholder = 'Cerca…'; input.dataset.dim = dim;
-      input.value = typed[dim] || ''; input.hidden = !openSearch.has(dim);
-      const list = el('ul', 'lb-list'); list.dataset.dim = dim; list.setAttribute('role', 'listbox');
-      list.setAttribute('aria-label', LABELS[dim]);
-      if (MULTI.includes(dim)) list.setAttribute('aria-multiselectable', 'true');
-      items.forEach(item => {
-        const li = el('li', `lb-item ${item.stato}`); li.tabIndex = 0; li.setAttribute('role', 'option');
-        li.setAttribute('aria-selected', item.stato === 'selezionato');
-        li.dataset.search = `${item.valore} ${item.nome}`.toLowerCase();
-        const name = dim === 'laboratorio' ? `${item.valore} · ${item.nome}` : dim === 'antibiotico' ? `${item.valore} · ${item.nome}` : item.nome;
-        const label = el('span', 'lb-name', name); label.title = name;
-        li.append(label, el('span', 'lb-count', fmt(item.conteggio)));
-        li.addEventListener('click', () => pick(dim, item));
-        li.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); pick(dim, item); } });
-        list.append(li);
-      });
-      const filterList = () => {
-        const text = input.value.trim().toLowerCase();
-        list.querySelectorAll('.lb-item').forEach(li => { li.hidden = text && !li.dataset.search.includes(text); });
-      };
-      input.addEventListener('input', filterList);
-      input.addEventListener('keydown', e => {  // Enter selects the values found, as in Qlik
-        if (e.key !== 'Enter') return;
-        e.preventDefault();
-        const found = items.filter((item, i) => !list.children[i].hidden && item.stato !== 'escluso');
-        if (!found.length) return;
-        if (SINGLE.includes(dim)) pick(dim, found[0]); else set({[dim]: [...new Set([...state[dim], ...found.map(f => f.valore)])]});
-      });
-      search.addEventListener('click', () => {
-        if (openSearch.has(dim)) { openSearch.delete(dim); input.value = ''; input.hidden = true; filterList(); }
-        else { openSearch.add(dim); input.hidden = false; input.focus(); }
-      });
-      box.append(head, input, list);
-      filterList();
-      requestAnimationFrame(() => { list.scrollTop = scroll[dim] || 0; });
-      return box;
-    }));
-  }
-  function renderSelections() {
-    const box = document.getElementById('selections');
-    const chips = [...SINGLE, ...MULTI].filter(k => SINGLE.includes(k) ? answer.selezione[k] : state[k].length).map(k => {
-      const values = SINGLE.includes(k) ? [answer.selezione[k]] : state[k];
-      const names = values.map(v => ((answer.liste[k] || []).find(i => i.valore === v) || {nome: v}).nome);
-      const chip = el('span', 'chip');
-      const body = el('span', 'chip-body');
-      body.append(el('span', 'chip-field', LABELS[k]), el('span', 'chip-values', names.length > 3 ? `${names.length} di ${(answer.liste[k] || []).length}` : names.join(', ')));
-      body.title = names.join(', ');
-      chip.append(body);
-      if (MULTI.includes(k)) {
-        const x = el('button', '', '×'); x.type = 'button'; x.setAttribute('aria-label', `Togli ${LABELS[k]}`);
-        x.addEventListener('click', () => set({[k]: []}));
-        chip.append(x);
-      }
-      return chip;
-    });
-    box.replaceChildren(...chips);
-    const count = MULTI.filter(k => state[k].length).length;
-    document.getElementById('paneCount').textContent = count ? `(${count} attive)` : '';
-    document.getElementById('backButton').disabled = !past.length;
-    document.getElementById('forwardButton').disabled = !future.length;
-    document.getElementById('clearButton').disabled = !count;
-    document.querySelectorAll('[data-vista]').forEach(b => b.classList.toggle('active', b.dataset.vista === state.vista));
-    document.querySelectorAll('[data-lettura]').forEach(b => b.classList.toggle('active', b.dataset.lettura === answer.selezione.lettura));
-  }
-
-  // --- data ---------------------------------------------------------------
-  async function load() {
-    const id = ++request;
-    board.classList.add('loading');
-    const query = toQuery(state);
-    history.replaceState(null, '', query.toString() ? `?${query}` : location.pathname);
-    document.getElementById('downloadLink').href = `${DOWNLOAD_URL}?${query}`;
-    try {
-      const response = await (await fetch(`${DATA_URL}?${query}`)).json();
-      if (id !== request) return;
-      if (response.vuoto) { location.reload(); return; }
-      answer = response;
-      SINGLE.forEach(k => { state[k] = answer.selezione[k]; });
-      renderSelections(); renderBoxes(); render();
-    } finally {
-      if (id === request) board.classList.remove('loading');
-    }
-  }
-
-  // --- views --------------------------------------------------------------
-  const forecastMode = () => state.vista === 'previsioni';
-  const forecastOn = () => forecastMode() && answer.previsione.disponibile;
-  function render() {
+  function render(response, board) {
+    B = board; answer = response; state = board.state;
     renderNote(); renderKpis(); renderTrend(); renderLabs(); renderHeat();
   }
+
   function renderNote() {
     const note = document.getElementById('forecastNote'), p = answer.previsione;
     note.hidden = !forecastMode();
@@ -414,7 +134,7 @@
       if (p.calcolate_il) {
         const fix = el('button', 'btn btn-sm btn-outline-secondary ms-1', 'Mostra le previsioni');
         fix.type = 'button';
-        fix.addEventListener('click', () => set({popolazione: 'invasivi', lettura: 'harmonized',
+        fix.addEventListener('click', () => B.set({popolazione: 'invasivi', lettura: 'harmonized',
           ...Object.fromEntries(FORECAST_FREE.map(k => [k, []])), laboratorio: state.laboratorio.length > 1 ? [] : state.laboratorio}));
         note.append(fix);
       }
@@ -423,70 +143,46 @@
     const scope = p.ambito === 'laboratorio' ? `del laboratorio ${p.laboratorio}: prossimi 12 mesi, avvicinati al dato regionale quanto meno isolati ha`
                                               : 'regionali: i quattro trimestri successivi e i prossimi 12 mesi';
     note.append(el('strong', '', 'Previsioni '), document.createTextNode(`${scope}. Calcolate il ${p.calcolate_il} sui dati fino al ${p.dati_fino_al}; intervallo all'80%. `));
+    const more = el('a', '', 'Dettagli e affidabilità nella pagina delle previsioni');
+    more.href = `{{ url_for('forecasts.overview') }}?microorganismo=${encodeURIComponent(answer.selezione.microorganismo)}&antibiotico=${encodeURIComponent(answer.selezione.antibiotico)}`
+      + (p.laboratorio ? `&laboratorio=${encodeURIComponent(p.laboratorio)}` : '');
+    note.append(more, document.createTextNode('. '));
     if (p.da_ricalcolare) {
       note.classList.add('warn');
       note.append(el('strong', '', `${p.da_ricalcolare}: ricalcolale dal Percorso guidato (passo 3).`));
     }
   }
-  function tile(label, value, note, hero, extra) {
-    const t = el('div', 'kpi' + (hero ? ' kpi-hero' : ''));
-    t.append(el('div', 'kpi-label', label), el('div', 'kpi-value', value));
-    const n = el('div', 'kpi-note', note); if (extra) { n.append(' '); n.append(extra); }
-    t.append(n);
-    return t;
-  }
+
   function renderKpis() {
-    const n = answer.nomi, k = answer.numeri, c = k.combinazione, row = document.getElementById('kpiRow');
+    const n = answer.nomi, k = answer.numeri, c = k.combinazione;
     const tiles = [
-      tile(`Isolati di ${n.microorganismo}`, fmt(k.isolati), `primi isolati, ${k.trimestri} trimestri con dati`),
-      tile('Laboratori con isolati', fmt(k.laboratori), state.laboratorio.length ? 'fra quelli selezionati' : 'della rete, nel periodo'),
-      tile(`Testati per ${n.antibiotico}`, c ? fmt(c.testati) : '–', c && k.isolati ? `${fmt(100 * c.testati / k.isolati)}% degli isolati` : ''),
-      tile(`Resistenti a ${n.antibiotico}`, c && c.testati ? `${fmt(c.pct, 1)}%` : '–',
-           !c || !c.testati ? 'nessun isolato testato' : c.riportabile ? `IC 95% ${fmt(c.basso, 1)}–${fmt(c.alto, 1)}%` : `meno di ${answer.soglia} testati: non riportabile`,
-           !forecastOn()),
+      B.tile(`Isolati di ${n.microorganismo}`, fmt(k.isolati), `primi isolati, ${k.trimestri} trimestri con dati`),
+      B.tile('Laboratori con isolati', fmt(k.laboratori), state.laboratorio.length ? 'fra quelli selezionati' : 'della rete, nel periodo'),
+      B.tile(`Testati per ${n.antibiotico}`, c ? fmt(c.testati) : '–', c && k.isolati ? `${fmt(100 * c.testati / k.isolati)}% degli isolati` : ''),
+      B.tile(`Resistenti a ${n.antibiotico}`, c && c.testati ? `${fmt(c.pct, 1)}%` : '–',
+             !c || !c.testati ? 'nessun isolato testato' : c.riportabile ? `IC 95% ${fmt(c.basso, 1)}–${fmt(c.alto, 1)}%` : `meno di ${answer.soglia} testati: non riportabile`,
+             !forecastOn()),
     ];
     if (forecastOn()) {
       const y = answer.previsione.dodici_mesi;
-      if (!y) tiles.push(tile('Previsti nei prossimi 12 mesi', '–', answer.previsione.motivo_assenza || 'nessuna previsione', true));
-      else if (y.semaforo === 'grigio') tiles.push(tile('Previsti nei prossimi 12 mesi', '–', 'nessuna previsione affidabile:', true, trafficBadge('grigio')));
-      else tiles.push(tile('Previsti nei prossimi 12 mesi', `${fmt(y.pct, 0)}%`, `fra ${fmt(y.basso, 0)}% e ${fmt(y.alto, 0)}% ·`, true, trafficBadge(y.semaforo)));
+      if (!y) tiles.push(B.tile('Previsti nei prossimi 12 mesi', '–', answer.previsione.motivo_assenza || 'nessuna previsione', true));
+      else if (y.semaforo === 'grigio') tiles.push(B.tile('Previsti nei prossimi 12 mesi', '–', 'nessuna previsione affidabile:', true, B.trafficBadge('grigio')));
+      else tiles.push(B.tile('Previsti nei prossimi 12 mesi', `${fmt(y.pct, 0)}%`, `fra ${fmt(y.basso, 0)}% e ${fmt(y.alto, 0)}% ·`, true, B.trafficBadge(y.semaforo)));
     }
-    row.replaceChildren(...tiles);
+    document.getElementById('kpiRow').replaceChildren(...tiles);
   }
 
-  const crosshair = {
-    id: 'crosshair',
-    afterDatasetsDraw(chart) {
-      const active = chart.tooltip && chart.tooltip.getActiveElements();
-      if (!active || !active.length) return;
-      const x = active[0].element.x, {top, bottom} = chart.chartArea, ctx = chart.ctx;
-      ctx.save(); ctx.strokeStyle = token('--axis'); ctx.lineWidth = 1;
-      ctx.beginPath(); ctx.moveTo(x, top); ctx.lineTo(x, bottom); ctx.stroke(); ctx.restore();
-    },
-  };
-  function axisStyle() {
-    return {grid: {color: token('--grid'), drawTicks: false}, border: {color: token('--axis')},
-            ticks: {color: token('--ink-muted'), padding: 6, font: {size: 11}}};
-  }
-  function forecastSeries(labels) {
+  function forecastSeries() {
     // quarterly regional forecasts, or the next 12 months spread over the next four quarters
     const p = answer.previsione;
     if (!forecastOn()) return [];
     if (p.trimestrali.length) return p.trimestrali.map(f => ({...f, label: f.periodo}));
     const y = p.dodici_mesi;
-    return y ? p.periodi.map(q => ({...y, label: q, trimestre: q, dodici: true})) : [];
+    return y ? p.periodi.map(q => ({...y, label: q, dodici: true})) : [];
   }
   function renderTrend() {
-    const n = answer.nomi, rows = answer.andamento, ahead = forecastSeries();
-    const labels = [...rows.map(r => r.trimestre), ...ahead.map(f => f.label).filter(l => !rows.some(r => r.trimestre === l))];
-    const at = Object.fromEntries(rows.map(r => [r.trimestre, r]));
-    const fAt = Object.fromEntries(ahead.map(f => [f.label, f]));
-    const blue = token('--series-1'), muted = token('--muted-mark'), surface = token('--surface-1');
-    const shown = f => f && f.semaforo !== 'grigio';
-    // the forecast line starts from the last observed quarter, so the two read as one
-    const lastObserved = [...rows].reverse().find(r => r.testati);
-    const fLine = labels.map(l => shown(fAt[l]) ? fAt[l].pct : (ahead.length && lastObserved && l === lastObserved.trimestre ? lastObserved.pct : null));
-    const obs = l => at[l] && at[l].testati ? at[l] : null;
+    const n = answer.nomi, ahead = forecastSeries();
+    const rows = answer.andamento.map(r => ({...r, label: r.trimestre, pct: r.testati ? r.pct : null}));
     document.getElementById('trendTitle').textContent = `${n.microorganismo} e ${n.antibiotico}: andamento per trimestre${ahead.length ? ' e previsione' : ''}`;
     document.getElementById('trendNote').textContent = '% di resistenti con intervallo di confidenza al 95%; punti vuoti: meno di 30 testati, valore non riportabile.'
       + (ahead.length ? (ahead[0].dodici ? ' Tratteggio: previsione dei prossimi 12 mesi con intervallo all\'80%.' : ' Tratteggio: previsione per trimestre con intervallo all\'80%; i trimestri non affidabili non sono mostrati.') : '');
@@ -497,81 +193,24 @@
       const b = el('span'); b.append(el('i', 'dashed'), document.createTextNode(ahead[0].dodici ? 'previsto, prossimi 12 mesi' : 'previsto'));
       legend.append(a, b);
     }
-    const tip = {
-      mode: 'index', intersect: false, backgroundColor: '#fff', borderColor: token('--axis'), borderWidth: 1,
-      titleColor: token('--ink-1'), bodyColor: token('--ink-2'), padding: 8, displayColors: false,
-      filter: item => item.datasetIndex === 2 || (item.datasetIndex === 5 && fAt[item.label] && !obs(item.label)),
-      callbacks: {
-        title: items => items[0].label,
-        label: item => item.datasetIndex === 2 ? rateLines(at[item.label]) : forecastLines(fAt[item.label]),
-      },
-    };
-    const data = {labels, datasets: [
-      {data: labels.map(l => obs(l) ? obs(l).alto : null), borderWidth: 0, pointRadius: 0, pointHoverRadius: 0, fill: false},
-      {data: labels.map(l => obs(l) ? obs(l).basso : null), borderWidth: 0, pointRadius: 0, pointHoverRadius: 0, fill: '-1', backgroundColor: token('--series-1-wash')},
-      {data: labels.map(l => obs(l) ? obs(l).pct : null), borderColor: blue, borderWidth: 2, pointRadius: 4, pointHoverRadius: 5, pointBorderWidth: 2,
-       pointBackgroundColor: labels.map(l => at[l] && at[l].riportabile ? blue : surface),
-       pointBorderColor: labels.map(l => at[l] && at[l].riportabile ? blue : muted), spanGaps: false, tension: 0},
-      {data: labels.map(l => shown(fAt[l]) ? fAt[l].alto : null), borderWidth: 0, pointRadius: 0, pointHoverRadius: 0, fill: false},
-      {data: labels.map(l => shown(fAt[l]) ? fAt[l].basso : null), borderWidth: 0, pointRadius: 0, pointHoverRadius: 0, fill: '-1', backgroundColor: token('--forecast-wash')},
-      {data: fLine, borderColor: blue, borderWidth: 2, borderDash: [6, 4], pointRadius: labels.map(l => shown(fAt[l]) ? 4 : 0),
-       pointHoverRadius: labels.map(l => fAt[l] ? 5 : 0), pointBackgroundColor: surface, pointBorderColor: blue, pointBorderWidth: 2, spanGaps: false, tension: 0},
-    ]};
-    if (trendChart) { trendChart.data = data; trendChart.options.plugins.tooltip = tip; trendChart.update(); }
-    else trendChart = new Chart(document.getElementById('trendChart'), {
-      type: 'line', data, plugins: [crosshair],
-      options: {maintainAspectRatio: false, animation: false, interaction: {mode: 'index', intersect: false},
-                plugins: {legend: {display: false}, tooltip: tip},
-                scales: {x: axisStyle(), y: {...axisStyle(), beginAtZero: true, suggestedMax: 10,
-                         ticks: {...axisStyle().ticks, callback: v => `${v}%`}}}},
-    });
-    const tested = {labels, datasets: [{data: labels.map(l => at[l] ? at[l].testati : null), maxBarThickness: 24, borderRadius: {topLeft: 4, topRight: 4},
-                    borderSkipped: 'bottom', backgroundColor: labels.map(l => at[l] && at[l].riportabile ? blue : muted)}]};
-    const testedTip = {...tip, filter: item => item.raw !== null, callbacks: {title: items => items[0].label,
-                       label: item => `${fmt(item.raw)} testati${at[item.label].riportabile ? '' : ' (non riportabile)'}`}};
-    if (testedChart) { testedChart.data = tested; testedChart.options.plugins.tooltip = testedTip; testedChart.update(); }
-    else testedChart = new Chart(document.getElementById('testedChart'), {
-      type: 'bar', data: tested,
-      options: {maintainAspectRatio: false, animation: false, interaction: {mode: 'index', intersect: false},
-                plugins: {legend: {display: false}, tooltip: testedTip},
-                scales: {x: {...axisStyle(), ticks: {display: false}, grid: {display: false}},
-                         y: {...axisStyle(), beginAtZero: true, ticks: {...axisStyle().ticks, maxTicksLimit: 3,
-                             callback: v => v >= 1000 ? `${fmt(v / 1000)}K` : v}}}},
-    });
-    const body = document.querySelector('#trendTable tbody');
+    const labels = B.drawTrend('trendChart', {rows, ahead, observedLines: rateLines});
+    B.drawTested('testedChart', labels, rows);
+    const shown = f => f.semaforo !== 'grigio';
     const cells = values => { const tr = el('tr'); values.forEach(v => tr.append(el('td', '', v))); return tr; };
-    body.replaceChildren(
-      ...rows.map(r => cells([r.trimestre, fmt(r.testati), fmt(r.resistenti),
+    document.querySelector('#trendTable tbody').replaceChildren(
+      ...answer.andamento.map(r => cells([r.trimestre, fmt(r.testati), fmt(r.resistenti),
         r.testati ? `${fmt(r.pct, 1)}%${r.riportabile ? '' : ' *'}` : '–', r.testati ? `IC 95% ${fmt(r.basso, 1)}–${fmt(r.alto, 1)}%` : '–', ''])),
-      ...ahead.filter(f => !f.dodici).map(f => cells([f.label, '', '', shown(f) ? `${fmt(f.pct, 1)}%` : '–',
-        shown(f) ? `80% ${fmt(f.basso, 1)}–${fmt(f.alto, 1)}%` : '', `previsione ${TRAFFIC[f.semaforo]}`])),
-      ...(ahead.length && ahead[0].dodici ? [cells(['prossimi 12 mesi', '', '', shown(ahead[0]) ? `${fmt(ahead[0].pct, 1)}%` : '–',
-        shown(ahead[0]) ? `80% ${fmt(ahead[0].basso, 1)}–${fmt(ahead[0].alto, 1)}%` : '', `previsione ${TRAFFIC[ahead[0].semaforo]}`])] : []));
+      ...(ahead.length && ahead[0].dodici ? ahead.slice(0, 1).map(f => ({...f, label: 'prossimi 12 mesi'})) : ahead).map(f =>
+        cells([f.label, '', '', shown(f) ? `${fmt(f.pct, 1)}%` : '–', shown(f) ? `80% ${fmt(f.basso, 1)}–${fmt(f.alto, 1)}%` : '',
+               `previsione ${B.TRAFFIC[f.semaforo]}`])));
   }
 
-  function niceMax(v) {
-    return [10, 20, 40, 60, 80, 100].find(m => m >= v) || 100;  // halves stay whole numbers
-  }
-  function barRow({code, name, pct, low, high, thin, label, lines, ref, max}) {
-    const at = v => `${Math.min(100, 100 * v / max)}%`;
-    const row = el('button', 'lab-row' + (state.laboratorio.includes(code) ? ' selected' : '')); row.type = 'button';
-    const track = el('span', 'lab-track');
-    if (pct !== null) {
-      const bar = el('span', 'lab-bar' + (thin ? ' thin' : '')); bar.style.width = at(pct);
-      const ci = el('span', 'lab-ci'); ci.style.left = at(low); ci.style.width = `calc(${at(high)} - ${at(low)})`;
-      track.append(bar, ci);
-    }
-    if (ref !== null) { const r = el('span', 'lab-ref'); r.style.left = at(ref); track.append(r); }
-    row.append(el('span', 'lab-name', `${code} · ${name}`), track, el('span', 'lab-value' + (thin ? ' thin' : ''), label));
-    hover(row, `${code} · ${name}`, lines);
-    // forecasts exist for one laboratory at a time: in that view a click replaces the selection
-    row.addEventListener('click', () => set({laboratorio: state.laboratorio.includes(code)
-      ? state.laboratorio.filter(v => v !== code) : forecastMode() ? [code] : [...state.laboratorio, code]}));
-    return row;
-  }
   function renderLabs() {
     const box = document.getElementById('labBars'), axis = document.getElementById('labAxis'), n = answer.nomi;
     box.replaceChildren(); axis.replaceChildren();
+    // forecasts exist for one laboratory at a time: in that view a click replaces the selection
+    const toggle = code => () => B.set({laboratorio: state.laboratorio.includes(code)
+      ? state.laboratorio.filter(v => v !== code) : forecastMode() ? [code] : [...state.laboratorio, code]});
     let rows, max;
     if (forecastMode()) {
       document.getElementById('labsTitle').textContent = `${n.antibiotico}: previsione dei prossimi 12 mesi per laboratorio`;
@@ -587,33 +226,27 @@
       // unreliable forecasts are not drawn (as on the forecast pages): listed last, without a bar
       const grey = l => l.semaforo === 'grigio';
       const sorted = [...labs].sort((a, b) => grey(a) - grey(b) || b.pct - a.pct);
-      max = niceMax(Math.max(...sorted.filter(l => !grey(l)).map(l => l.alto), ref || 0));
-      rows = sorted.map(l => barRow({code: l.laboratorio, name: l.nome, pct: grey(l) ? null : l.pct, low: l.basso, high: l.alto, thin: grey(l),
-        label: l.semaforo === 'grigio' ? 'n.a.' : `${l.semaforo === 'giallo' ? '≈' : ''}${fmt(l.pct, 0)}%`,
-        lines: [...forecastLines(l), `${fmt(l.testati_ultimi_12_mesi)} testati negli ultimi 12 mesi`], ref, max}));
+      max = B.niceMax(Math.max(...sorted.filter(l => !grey(l)).map(l => l.alto), ref || 0));
+      rows = sorted.map(l => B.barRow({code: l.laboratorio, name: l.nome, pct: grey(l) ? null : l.pct, low: l.basso, high: l.alto, thin: grey(l),
+        label: B.forecastText(l), lines: [...B.forecastLines(l), `${fmt(l.testati_ultimi_12_mesi)} testati negli ultimi 12 mesi`],
+        ref, max, selected: state.laboratorio.includes(l.laboratorio), onClick: toggle(l.laboratorio)}));
     } else {
       document.getElementById('labsTitle').textContent = `${n.antibiotico}: confronto fra laboratori`;
       document.getElementById('labsNote').textContent = 'Nel periodo scelto, con intervallo al 95%; la linea verticale è il dato dell\'insieme dei laboratori. '
         + 'Clic per selezionare uno o più laboratori.';
       const labs = answer.laboratori, region = answer.regione;
       if (!labs.length) { box.append(el('div', 'panel-empty', 'Nessun isolato testato.')); return; }
-      max = niceMax(Math.max(...labs.map(l => l.alto || 0), region ? region.alto || 0 : 0));
-      rows = labs.map(l => barRow({code: l.laboratorio, name: l.nome, pct: l.pct, low: l.basso, high: l.alto, thin: !l.riportabile,
-        label: `${fmt(l.pct, 0)}%`, lines: rateLines(l), ref: region ? region.pct : null, max}));
+      max = B.niceMax(Math.max(...labs.map(l => l.alto || 0), region ? region.alto || 0 : 0));
+      rows = labs.map(l => B.barRow({code: l.laboratorio, name: l.nome, pct: l.pct, low: l.basso, high: l.alto, thin: !l.riportabile,
+        label: `${fmt(l.pct, 0)}%`, lines: rateLines(l), ref: region ? region.pct : null, max,
+        selected: state.laboratorio.includes(l.laboratorio), onClick: toggle(l.laboratorio)}));
     }
     box.append(...rows);
-    const ticks = el('span', 'ticks');
-    [0, max / 2, max].forEach(v => { const t = el('span', '', `${fmt(v)}%`); t.style.left = `${100 * v / max}%`; ticks.append(t); });
-    axis.append(el('span'), ticks, el('span'));
+    B.barAxis(axis, max);
   }
 
-  function cellColor(pct) {
-    let i = SEQ.length - 1; while (i > 0 && pct < SEQ[i]) i--;
-    return {bg: token(`--seq-${i + 1}`), fg: i >= 3 ? '#ffffff' : token('--ink-1')};
-  }
   function renderHeat() {
-    const table = document.getElementById('heatTable'), heat = answer.antibiogramma, s = answer.selezione, p = answer.previsione;
-    const predicted = forecastMode();
+    const heat = answer.antibiogramma, s = answer.selezione, p = answer.previsione, predicted = forecastMode();
     const cells = new Map((predicted ? (p.disponibile ? p.celle : []) : heat.celle).map(c => [`${c.antibiotic}|${c.microorganismo}`, c]));
     document.getElementById('heatTitle').textContent = predicted
       ? `Antibiogramma previsto per i prossimi 12 mesi${p.ambito === 'laboratorio' && p.laboratorio ? ` · ${p.laboratorio}` : ''}` : 'Antibiogramma cumulativo';
@@ -624,45 +257,24 @@
     // forecasts: only the pathogens and antibiotics that have one
     const has = (a, c) => cells.has(`${a}|${c}`);
     const columns = predicted ? heat.colonne.filter(c => heat.righe.some(a => has(a.valore, c.valore))) : heat.colonne;
-    const rowsShown = predicted ? heat.righe.filter(a => columns.some(c => has(a.valore, c.valore))) : heat.righe;
-    const head = el('thead'), hr = el('tr');
-    if (columns.length) hr.append(el('th'));
-    columns.forEach(c => { const th = el('th', '', c.nome); th.scope = 'col'; hr.append(th); });
-    head.append(hr);
-    const body = el('tbody');
-    rowsShown.forEach(a => {
-      const tr = el('tr'), th = el('th', '', `${a.valore} · ${a.nome}`); th.scope = 'row'; tr.append(th);
-      columns.forEach(col => {
-        const td = el('td'), c = cells.get(`${a.valore}|${col.valore}`);
-        if (!c) { td.className = 'empty'; tr.append(td); return; }
-        const good = predicted ? c.semaforo !== 'grigio' : c.riportabile;
-        td.textContent = predicted ? (good ? `${c.semaforo === 'giallo' ? '≈' : ''}${fmt(c.pct, 0)}%` : 'n.a.') : `${fmt(c.pct, 0)}%`;
-        td.tabIndex = 0;
-        if (good) { const color = cellColor(c.pct); td.style.background = color.bg; td.style.color = color.fg; }
-        if (col.valore === s.microorganismo && a.valore === s.antibiotico) td.classList.add('selected');
-        hover(td, `${col.nome} e ${a.nome}`, predicted ? forecastLines(c) : rateLines(c));
-        const choose = () => set({microorganismo: col.valore, antibiotico: a.valore});
-        td.addEventListener('click', choose);
-        td.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); choose(); } });
-        tr.append(td);
-      });
-      body.append(tr);
+    const rows = predicted ? heat.righe.filter(a => columns.some(c => has(a.valore, c.valore))) : heat.righe;
+    B.drawHeat(document.getElementById('heatTable'), {
+      columns, rows, cell: (a, c) => cells.get(`${a}|${c}`),
+      good: c => predicted ? c.semaforo !== 'grigio' : c.riportabile,
+      text: c => predicted ? B.forecastText(c) : `${fmt(c.pct, 0)}%`,
+      lines: c => predicted ? B.forecastLines(c) : rateLines(c),
+      selected: (a, c) => c === s.microorganismo && a === s.antibiotico,
+      onPick: (a, c) => B.set({microorganismo: c, antibiotico: a}),
     });
-    table.replaceChildren(head, body);
-    const legend = document.getElementById('heatLegend');
-    legend.replaceChildren(...SEQ.map((low, i) => {
-      const span = el('span'), sw = el('i'); sw.style.background = token(`--seq-${i + 1}`);
-      span.append(sw, document.createTextNode(i === SEQ.length - 1 ? `≥${low}%` : `${low}–${SEQ[i + 1]}%`));
-      return span;
-    }));
-    const thin = el('span'), sw = el('i');
-    sw.style.background = getComputedStyle(document.documentElement).getPropertyValue('--bg-app');
-    thin.append(sw, document.createTextNode(predicted ? 'non affidabile' : `meno di ${answer.soglia} testati`));
-    legend.append(thin);
+    B.heatLegend(document.getElementById('heatLegend'), predicted ? 'non affidabile' : `meno di ${answer.soglia} testati`);
   }
 
-  if (window.matchMedia('(max-width: 991.98px)').matches) document.getElementById('paneToggle').open = false;
-  load();
+  createBoard({
+    single: {{ single|tojson }}, multi: MULTI, labels: {{ labels|tojson }},
+    boxes: ['popolazione', 'microorganismo', 'antibiotico', ...MULTI], codeNames: ['laboratorio', 'antibiotico'],
+    extras: {vista: 'osservato', lettura: 'harmonized'},
+    dataUrl: "{{ url_for('explore.data') }}", downloadUrl: "{{ url_for('explore.download') }}", onData: render,
+  });
 })();
 </script>
 {% endif %}

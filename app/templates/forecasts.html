@@ -1,11 +1,15 @@
 {% extends "base.html" %}
 {% block title %}Previsioni - MIC RES Sicilia{% endblock %}
+{% block head %}<link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard.css') }}">{% endblock %}
 {% block content %}
 {% set here = 'leggi' %}{% include "_steps_bar.html" %}
-<div class="mb-3">
-  <h1 class="page-heading mb-1">Previsioni di resistenza</h1>
-  <div class="text-muted small">Isolati invasivi (sangue e liquor), tutti i laboratori della Rete MIC; esclusi i pazienti non ricoverati "altro", contati a parte. Ogni previsione è stata messa alla prova sui dati passati.</div>
-  {% if data %}<div class="small mt-1"><strong>Come si legge:</strong> scegli il microrganismo e il trimestre; per ogni antibiotico guarda la resistenza prevista e il semaforo. "Dettaglio" mostra il grafico, l'errore avuto in passato e i singoli laboratori.</div>{% endif %}
+<div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-2">
+  <div>
+    <h1 class="page-heading mb-1">Previsioni di resistenza</h1>
+    <div class="text-muted small">Isolati invasivi (sangue e liquor), tutti i laboratori della Rete MIC; esclusi i pazienti non ricoverati "altro", contati a parte.
+      Ogni previsione è stata messa alla prova sui dati passati.</div>
+  </div>
+  {% if data %}<a class="btn btn-sm btn-outline-secondary" id="exploreLink" href="{{ url_for('explore.dashboard', vista='previsioni') }}">Apri nella consultazione dati</a>{% endif %}
 </div>
 
 {% if not data %}
@@ -36,94 +40,265 @@
       </form>
     </div>
   {% endif %}
-  <div class="alert alert-info small">
+  <div class="forecast-note">
     <strong>Dati fino al {{ meta.dati_fino_al }}</strong> (ultimo trimestre: {{ meta.ultimo_trimestre }}).
-    Le previsioni riguardano i quattro trimestri successivi: {{ meta.trimestri_previsti|join(", ") }}.
-    {% if meta.trimestri_previsti %}Per previsioni sul periodo attuale vanno caricati dati più recenti.{% endif %}
+    Le previsioni riguardano i quattro trimestri successivi, {{ meta.trimestri_previsti|join(", ") }}, e la media dei prossimi 12 mesi.
+    Calcolate il {{ meta.calcolato_il }}, breakpoint {{ meta.breakpoint }}.
   </div>
 
-  <section class="panel mb-3">
-    <form class="row g-2 align-items-end" method="get">
-      <div class="col-md-5">
-        <label class="form-label small mb-1" for="microrganismo">Microrganismo</label>
-        <select class="form-select" id="microrganismo" name="microrganismo" onchange="this.form.submit()">
-          {% for code, name in pathogens %}
-            <option value="{{ code }}" {% if code == selected %}selected{% endif %}>{{ name }}</option>
-          {% endfor %}
-        </select>
-      </div>
-      <div class="col-md-4">
-        <label class="form-label small mb-1" for="orizzonte">Previsione per il</label>
-        <select class="form-select" id="orizzonte" name="orizzonte" onchange="this.form.submit()">
-          {% for h in horizons %}
-            <option value="{{ h }}" {% if h == horizon %}selected{% endif %}>{{ meta.trimestri_previsti[loop.index0] }} ({{ h }} mesi)</option>
-          {% endfor %}
-        </select>
-      </div>
-      <div class="col-md-3 text-md-end">
-        <span class="text-muted small d-block">Calcolate il {{ meta.calcolato_il }}</span>
-      </div>
-    </form>
-  </section>
-
-  <section class="panel">
-    <div class="table-responsive">
-      <table class="table align-middle">
-        <thead>
-          <tr>
-            <th>Antibiotico</th>
-            <th>Ultimi 12 mesi</th>
-            <th>Tendenza</th>
-            <th>Resistenza prevista</th>
-            <th>Affidabilità</th>
-            <th></th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for row in rows %}
-            {% set c = row.combo %}{% set f = row.forecast %}
-            <tr>
-              <td class="fw-semibold">{{ c.antibiotico_nome }}</td>
-              <td>
-                {% if c.ultimi_12_mesi %}
-                  {{ "%.0f"|format(c.ultimi_12_mesi.pct) }}%
-                  <span class="text-muted small">su {{ c.ultimi_12_mesi.n }} isolati</span>
-                {% else %}<span class="text-muted">nessun dato</span>{% endif %}
-              </td>
-              <td class="small">{{ c.tendenza }}</td>
-              <td>
-                {% if f and f.semaforo != 'grigio' %}
-                  <strong>{{ "%.0f"|format(f.pct) }}%</strong>
-                  <span class="text-muted small">(fra {{ "%.0f"|format(f.low) }}% e {{ "%.0f"|format(f.high) }}%)</span>
-                {% elif f %}
-                  <span class="text-muted small">nessuna previsione</span>
-                {% else %}
-                  <span class="text-muted small">dati insufficienti</span>
-                {% endif %}
-              </td>
-              <td>
-                {% if f %}
-                  <span class="badge text-bg-{{ traffic[f.semaforo].badge }}">{{ traffic[f.semaforo].label }}</span>
-                {% else %}
-                  <span class="badge text-bg-light border">Dati insufficienti</span>
-                {% endif %}
-              </td>
-              <td class="text-end"><a class="small" href="{{ url_for('forecasts.detail', pathogen=c.microorganismo, antibiotic=c.antibiotico) }}">Dettaglio</a></td>
-            </tr>
-          {% endfor %}
-        </tbody>
-      </table>
+<div class="viz-root">
+  <div class="selection-bar" role="toolbar" aria-label="Selezioni">
+    <div class="sel-tools">
+      <button type="button" class="sel-tool" id="backButton" title="Selezione precedente" aria-label="Selezione precedente" disabled>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg></button>
+      <button type="button" class="sel-tool" id="forwardButton" title="Selezione successiva" aria-label="Selezione successiva" disabled>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg></button>
+      <button type="button" class="sel-tool" id="clearButton" title="Togli tutte le selezioni" aria-label="Togli tutte le selezioni">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M6 6l1 14h10l1-14"/></svg></button>
     </div>
-    <p class="text-muted small mb-0">
-      <span class="badge text-bg-success">Affidabile</span> previsioni passate vicine al valore reale ·
-      <span class="badge text-bg-warning">Indicativa</span> intervallo affidabile, errore oltre il minimo atteso ·
-      <span class="badge text-bg-secondary">Non affidabile</span> solo il dato degli ultimi 12 mesi.
-      Le previsioni si basano solo sull'andamento passato dei laboratori: non possono anticipare focolai o cambi di terapia.
-    </p>
-  </section>
+    <div class="sel-chips" id="selections" aria-live="polite"></div>
+    <form method="post" action="{{ url_for('forecasts.compute') }}" data-busy="Avvio del calcolo delle previsioni…">
+      <button class="btn btn-outline-secondary btn-sm" type="submit">Ricalcola con i dati attuali</button>
+    </form>
+  </div>
 
-  <form class="mt-3" method="post" action="{{ url_for('forecasts.compute') }}">
-    <button class="btn btn-outline-secondary btn-sm" type="submit">Ricalcola con i dati attuali</button>
-  </form>
+  <div class="board-layout">
+    <aside class="filter-pane" aria-label="Filtri">
+      <details id="paneToggle" open>
+        <summary class="pane-summary">Filtri <span id="paneCount"></span></summary>
+        <div id="listBoxes"></div>
+      </details>
+    </aside>
+
+    <div id="board">
+      <div class="kpi-row" id="kpiRow"></div>
+
+      <div class="row g-3">
+        <div class="col-xxl-7">
+          <section class="panel h-100">
+            <h2 class="h6 mb-0" id="trendTitle">Andamento e previsione</h2>
+            <div class="text-muted small mb-1" id="trendNote"></div>
+            <div class="chart-legend" id="trendLegend"></div>
+            <div class="chart-frame" style="height:260px"><canvas id="trendChart" aria-label="Andamento regionale della percentuale di resistenti e previsione"></canvas></div>
+            <div class="text-muted small mt-2 mb-1">Isolati testati per trimestre, tutta la rete</div>
+            <div class="chart-frame" style="height:100px;min-height:0"><canvas id="testedChart" aria-label="Isolati testati per trimestre"></canvas></div>
+          </section>
+        </div>
+        <div class="col-xxl-5">
+          <section class="panel h-100">
+            <h2 class="h6 mb-1">Perché questa previsione</h2>
+            <div class="small text-muted mb-2" id="modelWords"></div>
+            <div id="forecastCards"></div>
+          </section>
+        </div>
+      </div>
+
+      <div class="row g-3 mt-0">
+        <div class="col-xxl-7">
+          <section class="panel h-100">
+            <h2 class="h6 mb-0" id="tableTitle">Tutti gli antibiotici</h2>
+            <div class="text-muted small mb-2">Clic su una riga per vederne il dettaglio. Il filtro «Affidabilità» sceglie quali righe mostrare.</div>
+            <div class="table-responsive"><table class="table table-sm align-middle pick-table mb-0" id="overviewTable">
+              <thead><tr><th>Antibiotico</th><th class="text-end">Ultimi 12 mesi</th><th id="trendHead">Tendenza</th><th class="text-end">Prevista</th><th>Affidabilità</th></tr></thead>
+              <tbody></tbody>
+            </table></div>
+          </section>
+        </div>
+        <div class="col-xxl-5">
+          <section class="panel h-100">
+            <h2 class="h6 mb-0" id="labsTitle">Per laboratorio, prossimi 12 mesi</h2>
+            <div class="text-muted small mb-1" id="labsNote"></div>
+            <div class="chart-legend"><span><span class="legend-bar"></span>previsto, prossimi 12 mesi</span><span><span class="legend-dot"></span>osservato, ultimi 12 mesi</span></div>
+            <div class="lab-bars" id="labBars"></div>
+            <div class="lab-axis" id="labAxis"></div>
+          </section>
+        </div>
+      </div>
+
+      <section class="panel mt-3">
+        <div class="d-flex justify-content-between align-items-start flex-wrap gap-2">
+          <div>
+            <h2 class="h6 mb-0" id="heatTitle">Antibiogramma previsto</h2>
+            <div class="text-muted small">% di resistenti previsti. «≈»: previsione indicativa; «n.a.»: non affidabile. Clic su una cella per vederne il dettaglio.</div>
+          </div>
+          <div class="heat-legend" id="heatLegend" aria-label="Legenda dei colori"></div>
+        </div>
+        <div class="table-responsive mt-2"><table class="heat-table" id="heatTable"></table></div>
+      </section>
+
+      <p class="text-muted small mt-3 mb-0">Le previsioni si basano solo sull'andamento passato dei laboratori della rete: non possono anticipare focolai,
+        nuovi cloni o cambi di terapia. Non sostituiscono l'antibiogramma del singolo paziente. Il giudizio di affidabilità si basa su poche prove
+        (2023-2024) e diventa più solido a ogni trimestre di dati caricato.</p>
+    </div>
+  </div>
+  <div class="viz-tooltip" id="vizTooltip" role="tooltip" hidden></div>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+{% if data %}
+<script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>
+<script>
+(() => {
+  const MIN_TESTED = 30;
+  let B, answer, state;
+  const el = (...a) => B.el(...a), fmt = (...a) => B.fmt(...a);
+  const observedLines = r => [`${fmt(r.pct, 1)}% resistenti (IC 95% ${fmt(r.basso, 1)}–${fmt(r.alto, 1)}%)`,
+                              `${fmt(r.testati)} isolati testati${r.riportabile ? '' : ': meno di 30, valore non riportabile'}`];
+
+  function render(response, board) {
+    B = board; answer = response; state = board.state;
+    const d = answer.dettaglio, n = d.nomi;
+    const explore = document.getElementById('exploreLink');
+    explore.href = `{{ url_for('explore.dashboard') }}?vista=previsioni&microorganismo=${encodeURIComponent(answer.selezione.microorganismo)}`
+      + `&antibiotico=${encodeURIComponent(answer.selezione.antibiotico)}`
+      + (answer.selezione.laboratorio.length ? `&laboratorio=${encodeURIComponent(answer.selezione.laboratorio[0])}` : '');
+    renderKpis(d, n); renderTrend(d, n); renderCards(d); renderTable(n); renderLabs(d, n); renderHeat();
+  }
+
+  function renderKpis(d, n) {
+    const lab = d.laboratorio, last = lab ? {pct: lab.osservato, n: lab.testati, riportabile: lab.riportabile} : d.ultimi_12_mesi;
+    const where = lab ? `${answer.selezione.laboratorio[0]}` : 'tutta la rete';
+    const f = d.selezionata;
+    const tiles = [
+      B.tile(`Ultimi 12 mesi · ${where}`, last ? `${fmt(last.pct, 0)}%` : '–',
+             last ? `resistenti a ${n.antibiotico} su ${fmt(last.n)} isolati${last.riportabile === false ? ' (non riportabile)' : ''}` : 'nessun isolato testato'),
+      lab ? B.tile('Previsione regionale, prossimi 12 mesi', d.dodici_mesi && d.dodici_mesi.semaforo !== 'grigio' ? `${fmt(d.dodici_mesi.pct, 0)}%` : '–',
+                   d.dodici_mesi ? `per confronto ·` : 'nessuna previsione', false, d.dodici_mesi ? B.trafficBadge(d.dodici_mesi.semaforo) : null)
+          : B.tile('Tendenza rispetto ai 12 mesi prima', d.tendenza || '–',
+                   d.tendenza_rete_costante ? `a laboratori costanti: ${d.tendenza_rete_costante}` : ''),
+      !f ? B.tile(`Prevista · ${answer.meta.orizzonte}`, '–', d.motivo_assenza || 'nessuna previsione per questa selezione', true)
+         : f.semaforo === 'grigio' ? B.tile(`Prevista · ${answer.meta.orizzonte}`, '–', 'nessuna previsione affidabile:', true, B.trafficBadge('grigio'))
+         : B.tile(`Prevista · ${answer.meta.orizzonte}`, `${fmt(f.pct, 0)}%`, `fra ${fmt(f.basso, 0)}% e ${fmt(f.alto, 0)}% ·`, true, B.trafficBadge(f.semaforo)),
+      B.tile('Errore tipico in passato', f && f.errore != null ? `${fmt(f.errore, 1)} punti` : '–',
+             f && f.errore != null ? 'nelle prove sul 2023-2024' : 'non valutabile'),
+    ];
+    document.getElementById('kpiRow').replaceChildren(...tiles);
+  }
+
+  function renderTrend(d, n) {
+    const rows = d.storico.map(h => ({label: h.trimestre, pct: h.pct, basso: h.low, alto: h.high, testati: h.n, riportabile: h.n >= MIN_TESTED}));
+    const ahead = d.trimestrali.map(f => ({...f, label: f.periodo}));
+    document.getElementById('trendTitle').textContent = `${n.microorganismo} e ${n.antibiotico}: andamento regionale e previsione`;
+    document.getElementById('trendNote').textContent = '% di resistenti per trimestre con intervallo al 95% (punti vuoti: meno di 30 testati); '
+      + 'tratteggio: previsione con intervallo all\'80%, i trimestri non affidabili non sono mostrati.'
+      + (d.laboratorio ? ' Per il laboratorio selezionato è prevista solo la media dei prossimi 12 mesi.' : '');
+    const legend = document.getElementById('trendLegend');
+    const a = el('span'); a.append(el('i'), document.createTextNode('osservato'));
+    const b = el('span'); b.append(el('i', 'dashed'), document.createTextNode('previsto'));
+    legend.replaceChildren(a, ...(ahead.length ? [b] : []));
+    const labels = B.drawTrend('trendChart', {rows, ahead, observedLines});
+    B.drawTested('testedChart', labels, rows);
+  }
+
+  function card(title, value, onPick, selected) {
+    const c = el(onPick ? 'button' : 'div', 'fc-card' + (selected ? ' selected' : ''));
+    if (onPick) { c.type = 'button'; c.addEventListener('click', onPick); }
+    const head = el('div', 'fc-head'); head.append(el('strong', '', title));
+    if (value) head.append(B.trafficBadge(value.semaforo));
+    c.append(head);
+    if (!value) return c;
+    c.append(el('div', 'fc-value', value.semaforo !== 'grigio'
+      ? `Resistenza prevista: ${fmt(value.pct, 0)}% (probabilmente fra ${fmt(value.basso, 0)}% e ${fmt(value.alto, 0)}%)`
+      : 'Nessuna previsione: fare riferimento al dato degli ultimi 12 mesi.'));
+    if (value.perche) c.append(el('div', 'fc-why', value.perche));
+    if (value.prova) c.append(el('div', 'fc-test', value.prova));
+    return c;
+  }
+  function renderCards(d) {
+    document.getElementById('modelWords').textContent = d.laboratorio
+      ? 'Per il laboratorio: il suo ultimo anno avvicinato al dato regionale, tanto più quanto meno isolati ha. Così un laboratorio con pochi isolati non mostra oscillazioni casuali come se fossero vere.'
+      : d.modello;
+    const host = document.getElementById('forecastCards');
+    const horizon = answer.selezione.orizzonte;
+    if (d.laboratorio) {
+      const f = d.selezionata;
+      const value = f ? {...f, perche: '', prova: d.laboratorio.prova} : null;
+      host.replaceChildren(value ? card(`${answer.selezione.laboratorio[0]} · prossimi 12 mesi`, value)
+                                 : el('div', 'panel-empty', 'Nessuna previsione per questo laboratorio e questa combinazione.'));
+      return;
+    }
+    if (!d.trimestrali.length && !d.dodici_mesi) { host.replaceChildren(el('div', 'panel-empty', d.motivo_assenza || 'Nessuna previsione.')); return; }
+    host.replaceChildren(
+      ...(d.dodici_mesi ? [card('Prossimi 12 mesi', d.dodici_mesi, () => B.set({orizzonte: 'anno'}), horizon === 'anno')] : []),
+      ...d.trimestrali.map(f => card(f.trimestre, f, () => B.set({orizzonte: f.orizzonte}), horizon === f.orizzonte)));
+  }
+
+  function renderTable(n) {
+    const lab = answer.selezione.laboratorio[0];
+    document.getElementById('tableTitle').textContent = `${n.microorganismo}: previsione per ${answer.meta.orizzonte.toLowerCase()}${lab ? ` · ${lab}` : ''}`;
+    document.getElementById('trendHead').hidden = !!lab;
+    const body = document.querySelector('#overviewTable tbody');
+    if (!answer.tabella.length) {
+      const tr = el('tr'), td = el('td', 'text-muted small', 'Nessun antibiotico con l\'affidabilità scelta.'); td.colSpan = 5; tr.append(td);
+      body.replaceChildren(tr); return;
+    }
+    body.replaceChildren(...answer.tabella.map(r => {
+      const tr = el('tr', r.antibiotico === answer.selezione.antibiotico ? 'selected' : ''); tr.tabIndex = 0;
+      const o = r.osservato, f = r.previsione;
+      tr.append(el('td', 'fw-semibold', r.nome));
+      const obs = el('td', 'text-end num');
+      obs.append(o ? `${fmt(o.pct, 0)}%` : '–', ' ', el('span', 'text-muted small', o ? `su ${fmt(o.n)}${o.riportabile === false ? ', non riport.' : ''}` : 'nessun dato'));
+      tr.append(obs);
+      if (!lab) tr.append(el('td', 'small', r.tendenza || ''));
+      const pred = el('td', 'text-end num');
+      if (f && f.semaforo !== 'grigio') pred.append(el('strong', '', `${fmt(f.pct, 0)}%`), ' ', el('span', 'text-muted small', `(${fmt(f.basso, 0)}–${fmt(f.alto, 0)}%)`));
+      else pred.append(el('span', 'text-muted small', f ? 'nessuna previsione' : 'dati insufficienti'));
+      tr.append(pred);
+      const rel = el('td');
+      rel.append(f ? B.trafficBadge(f.semaforo) : el('span', 'text-muted small', 'dati insufficienti'));
+      tr.append(rel);
+      const pick = () => B.set({antibiotico: r.antibiotico});
+      tr.addEventListener('click', pick);
+      tr.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); pick(); } });
+      return tr;
+    }));
+  }
+
+  function renderLabs(d, n) {
+    const box = document.getElementById('labBars'), axis = document.getElementById('labAxis');
+    document.getElementById('labsTitle').textContent = `${n.antibiotico}: per laboratorio, prossimi 12 mesi`;
+    document.getElementById('labsNote').textContent = 'Il suo ultimo anno avvicinato al dato regionale; intervallo all\'80%. «n.a.»: non affidabile, non mostrata. '
+      + 'La linea verticale è la previsione regionale. ' + (d.verifica_laboratori || '') + ' Clic per vedere un laboratorio.';
+    box.replaceChildren(); axis.replaceChildren();
+    const labs = d.laboratori;
+    if (!labs.length) { box.append(el('div', 'panel-empty', 'Nessun laboratorio con isolati testati negli ultimi 12 mesi.')); return; }
+    const grey = l => !l.previsione || l.previsione.semaforo === 'grigio';
+    const sorted = [...labs].sort((a, b) => grey(a) - grey(b) || (b.previsione ? b.previsione.pct : 0) - (a.previsione ? a.previsione.pct : 0));
+    const ref = d.dodici_mesi && d.dodici_mesi.semaforo !== 'grigio' ? d.dodici_mesi.pct : null;
+    const max = B.niceMax(Math.max(...sorted.map(l => Math.max(grey(l) ? 0 : l.previsione.alto, l.riportabile ? l.osservato : 0)), ref || 0));
+    const chosen = answer.selezione.laboratorio[0];
+    box.append(...sorted.map(l => {
+      const f = l.previsione;
+      return B.barRow({code: l.laboratorio, name: l.nome, pct: grey(l) ? null : f.pct, low: f ? f.basso : null, high: f ? f.alto : null,
+        thin: grey(l), label: f ? B.forecastText(f) : '–', marker: l.riportabile ? l.osservato : null, ref, max, selected: chosen === l.laboratorio,
+        lines: [...(f ? B.forecastLines(f) : ['Nessuna previsione']),
+                `Osservato negli ultimi 12 mesi: ${fmt(l.osservato, 0)}% su ${fmt(l.testati)} isolati${l.riportabile ? '' : ' (non riportabile)'}`],
+        onClick: () => B.set({laboratorio: chosen === l.laboratorio ? [] : [l.laboratorio]})});
+    }));
+    B.barAxis(axis, max);
+  }
+
+  function renderHeat() {
+    const heat = answer.antibiogramma, s = answer.selezione;
+    const cells = new Map(heat.celle.map(c => [`${c.antibiotic}|${c.microorganismo}`, c]));
+    document.getElementById('heatTitle').textContent = `Antibiogramma previsto · ${answer.meta.orizzonte.toLowerCase()}${s.laboratorio.length ? ` · ${s.laboratorio[0]}` : ''}`;
+    B.drawHeat(document.getElementById('heatTable'), {
+      columns: heat.colonne, rows: heat.righe, cell: (a, c) => cells.get(`${a}|${c}`),
+      good: c => c.semaforo !== 'grigio', text: B.forecastText, lines: B.forecastLines,
+      selected: (a, c) => c === s.microorganismo && a === s.antibiotico,
+      onPick: (a, c) => B.set({microorganismo: c, antibiotico: a}),
+    });
+    B.heatLegend(document.getElementById('heatLegend'), 'non affidabile');
+  }
+
+  createBoard({
+    single: {{ single|tojson }}, multi: {{ multi|tojson }}, oneAtATime: {{ one_at_a_time|tojson }}, labels: {{ labels|tojson }},
+    boxes: ['microorganismo', 'antibiotico', 'orizzonte', 'laboratorio', 'affidabilita'], codeNames: ['antibiotico', 'laboratorio'],
+    dataUrl: "{{ url_for('forecasts.board_data') }}", onData: render,
+  });
+})();
+</script>
 {% endif %}
 {% endblock %}

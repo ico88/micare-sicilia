@@ -103,16 +103,34 @@ def test_pages_before_and_after_computing(client, tmp_path):
     assert response.status_code == 302
     assert load_forecasts(app.config["FORECAST_FOLDER"])["meta"]["con_previsione"] == 1
 
-    html = http.get("/previsioni?microrganismo=ESCCOL&orizzonte=6").get_data(as_text=True)
-    assert "Cefotaxime" in html and "Dati fino al 30/12/2024" in html and "2° trimestre 2025" in html
+    html = http.get("/previsioni").get_data(as_text=True)
+    assert "Dati fino al 30/12/2024" in html and "2° trimestre 2025" in html and 'id="listBoxes"' in html
+    assert http.get("/previsioni?microrganismo=ESCCOL").headers["Location"].endswith("/previsioni?microorganismo=ESCCOL")
 
-    detail = http.get("/previsioni/ESCCOL/CTX").get_data(as_text=True)
-    assert "Ultimi 12 mesi" in detail and "Per laboratorio" in detail and "4° trimestre 2025" in detail
-    assert "Previsto, prossimi 12 mesi" in detail  # per-laboratory forecasts
-    assert "Prossimi 12 mesi" in detail and "Resistenza attesa nell'anno" in detail  # regional, next 12 months
+    board = http.get("/previsioni/dati?microorganismo=ESCCOL&orizzonte=6").get_json()
+    assert board["selezione"] == {"microorganismo": "ESCCOL", "antibiotico": "CTX", "orizzonte": "6",
+                                  "laboratorio": [], "affidabilita": []}
+    assert board["meta"]["orizzonte"] == "2° trimestre 2025 (6 mesi)"
+    assert [r["nome"] for r in board["tabella"]] == ["Cefotaxime"]
+    detail = board["dettaglio"]
+    assert detail["ultimi_12_mesi"]["n"] > 0 and len(detail["trimestrali"]) == 4
+    assert detail["trimestrali"][-1]["trimestre"] == "4° trimestre 2025"
+    assert detail["dodici_mesi"] is not None  # regional, next 12 months
+    assert detail["laboratori"] and any(lab["previsione"] for lab in detail["laboratori"])  # per laboratory
+    assert board["antibiogramma"]["celle"][0]["antibiotic"] == "CTX"
+
+    lab = detail["laboratori"][0]["laboratorio"]
+    one = http.get(f"/previsioni/dati?microorganismo=ESCCOL&orizzonte=6&laboratorio={lab}").get_json()
+    assert one["selezione"]["orizzonte"] == "anno"  # per laboratory only the next 12 months
+    assert one["dettaglio"]["laboratorio"]["laboratorio"] == lab
+    states = {i["valore"]: i["stato"] for i in one["liste"]["orizzonte"]}
+    assert states["anno"] == "selezionato" and states["3"] == "escluso"
+    reliable = http.get("/previsioni/dati?affidabilita=assente").get_json()
+    assert reliable["tabella"] == [] and reliable["antibiogramma"]["celle"] == []
+
     year = load_forecasts(app.config["FORECAST_FOLDER"])["combinations"]
     assert any(c.get("prossimi_12_mesi") for c in year)
-    assert http.get("/previsioni/KLEPNE/MEM").status_code == 200
+    assert http.get("/previsioni/KLEPNE/MEM").headers["Location"].endswith("microorganismo=KLEPNE&antibiotico=MEM")
     assert http.get("/previsioni/XXX/YYY").status_code == 404
     assert "sono cambiati" not in html
 

@@ -7,95 +7,62 @@ from pathlib import Path
 
 import pandas as pd
 
-from flask import Blueprint, abort, current_app, flash, redirect, render_template, request, send_file, url_for
+from flask import Blueprint, abort, current_app, flash, jsonify, redirect, render_template, request, send_file, url_for
 
 from app import APP_VERSION
 from app.routes.guide import current_workflow
-from app.services import jobs, model_search
+from app.services import forecast_board, jobs, model_search
 from app.services.diagnostics import CAUSE_LABELS, MODEL_NAMES, build_validation_workbook
 from app.services.out_of_sample import (
     COMPARED, compute_validation, cutoff_label, load_validation, save_validation, validation_possible,
 )
 from app.services.reference import laboratory_names
+from app.services.forecast_board import TRAFFIC_WHY
 from app.services.forecast_run import compute_forecasts, load_forecasts, save_forecasts, stale_reason
 
 bp = Blueprint("forecasts", __name__)
 
 TRAFFIC = {
-    "verde": {"label": "Affidabile", "badge": "success",
-              "why": "Le previsioni fatte nel 2023-2024 sono state vicine al valore reale e l'intervallo è stato affidabile."},
-    "giallo": {"label": "Indicativa", "badge": "warning",
-               "why": "L'intervallo è affidabile, ma l'errore è stato più ampio di quanto si spiega con il solo "
-                      "numero di isolati: usare come indicazione di massima."},
-    "grigio": {"label": "Non affidabile", "badge": "secondary",
-               "why": "Nelle prove sul passato l'intervallo non conteneva il valore reale abbastanza spesso, "
-                      "oppure le prove sono troppo poche. Si mostra solo il dato degli ultimi 12 mesi."},
-}
-MODEL_WORDS = {
-    "persistenza_tarata": "Previsione basata sul livello degli ultimi 12 mesi: nei dati non c'è una tendenza "
-                          "che un modello riesca ad anticipare meglio.",
-    "trend": "Previsione basata sulla tendenza recente, smorzata per non estrapolare troppo lontano.",
-    "trend_laboratori": "Previsione basata sulla tendenza recente, al netto dei cambiamenti nel numero di isolati "
-                        "inviati dai singoli laboratori.",
-    "prophet": "Previsione del modello Prophet (tendenza e andamento stagionale), che nelle prove sul passato "
-               "ha sbagliato meno degli altri.",
+    "verde": {"label": "Affidabile", "badge": "success", "why": TRAFFIC_WHY["verde"]},
+    "giallo": {"label": "Indicativa", "badge": "warning", "why": TRAFFIC_WHY["giallo"]},
+    "grigio": {"label": "Non affidabile", "badge": "secondary", "why": TRAFFIC_WHY["grigio"]},
 }
 COMPARED_NAMES = {"persistenza_12m": "come gli ultimi 12 mesi", "prophet": "Prophet"}
-HORIZONS = (3, 6, 9, 12)
 
 
 def _folder():
     return current_app.config["FORECAST_FOLDER"]
 
 
-def _forecast_for(combo: dict, horizon: int) -> dict | None:
-    return next((f for f in combo["previsioni"] if f["orizzonte_mesi"] == horizon), None)
-
-
-def past_test_sentence(f: dict) -> str:
-    inside = round((f["copertura"] or 0) * f["prove"] / 100)
-    return (f"Su {f['prove']} previsioni simili fatte nel 2023-2024 l'errore tipico è stato di "
-            f"{f['errore_tipico']:.1f}".replace(".", ",") + " punti percentuali; il valore reale era dentro l'intervallo "
-            f"in {inside} casi su {f['prove']}.")
-
-
 @bp.get("/previsioni")
 def overview():
+    if "microrganismo" in request.args:  # address of the earlier page
+        return redirect(url_for("forecasts.overview", microorganismo=request.args["microrganismo"]))
     data = load_forecasts(_folder())
     if not data or not data["meta"].get("available"):
         return render_template("forecasts.html", data=None, wf=current_workflow())
-    combos = data["combinations"]
-    pathogens = sorted({(c["microorganismo"], c["microorganismo_nome"]) for c in combos}, key=lambda p: p[1])
-    selected = request.args.get("microrganismo") or (pathogens[0][0] if pathogens else "")
-    horizon = int(request.args.get("orizzonte", 12))
-    if horizon not in HORIZONS:
-        horizon = 12
-    rows = []
-    for c in combos:
-        if c["microorganismo"] != selected:
-            continue
-        rows.append({"combo": c, "forecast": _forecast_for(c, horizon)})
-    order = {"verde": 0, "giallo": 1, "grigio": 2}
-    rows.sort(key=lambda r: (r["forecast"] is None, order.get((r["forecast"] or {}).get("semaforo"), 3),
-                             r["combo"]["antibiotico_nome"]))
     stale = stale_reason(data["meta"], current_app.config["DATASET_FOLDER"])
-    return render_template("forecasts.html", data=data, rows=rows, pathogens=pathogens, selected=selected,
-                           horizon=horizon, horizons=HORIZONS, traffic=TRAFFIC, stale=stale, wf=current_workflow())
+    return render_template("forecasts.html", data=data, stale=stale, wf=current_workflow(),
+                           labels=forecast_board.LABELS, single=forecast_board.SINGLE, multi=forecast_board.MULTI,
+                           one_at_a_time=forecast_board.ONE_AT_A_TIME)
+
+
+@bp.get("/previsioni/dati")
+def board_data():
+    data = load_forecasts(_folder())
+    stale = stale_reason(data["meta"], current_app.config["DATASET_FOLDER"]) if data else None
+    filters = {key: request.args.get(key, "").strip() for key in forecast_board.SINGLE}
+    filters.update({key: request.args.getlist(key) for key in forecast_board.MULTI})
+    return jsonify(forecast_board.board(data, filters, stale))
 
 
 @bp.get("/previsioni/<pathogen>/<antibiotic>")
 def detail(pathogen: str, antibiotic: str):
+    """Address of the earlier detail page: the dashboard with that combination selected."""
     data = load_forecasts(_folder())
-    if not data:
+    if not data or not any(c["microorganismo"] == pathogen and c["antibiotico"] == antibiotic for c in data["combinations"]):
         abort(404)
-    combo = next((c for c in data["combinations"]
-                  if c["microorganismo"] == pathogen and c["antibiotico"] == antibiotic), None)
-    if combo is None:
-        abort(404)
-    forecasts = [dict(f, frase_prova=past_test_sentence(f)) for f in combo["previsioni"]]
-    model = forecasts[0]["modello"] if forecasts else None
-    return render_template("forecast_detail.html", data=data, combo=combo, forecasts=forecasts,
-                           traffic=TRAFFIC, model_words=MODEL_WORDS.get(model))
+    return redirect(url_for("forecasts.overview", microorganismo=pathogen, antibiotico=antibiotic))
 
 
 @bp.post("/previsioni/calcola")
